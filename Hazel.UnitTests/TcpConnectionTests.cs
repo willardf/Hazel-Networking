@@ -11,7 +11,7 @@ namespace Hazel.UnitTests
         ///     Tests the fields on TcpConnection.
         /// </summary>
         [TestMethod]
-        public void TcpConnectionFieldTest()
+        public void TcpFieldTest()
         {
             using (TcpConnectionListener listener = new TcpConnectionListener(IPAddress.Any, 4296))
             using (TcpConnection connection = new TcpConnection())
@@ -35,12 +35,12 @@ namespace Hazel.UnitTests
         ///     Tests sending and receiving on the TcpConnection.
         /// </summary>
         [TestMethod]
-        public void TcpConnectionSendReceiveTest()
+        public void TcpServerToClientTest()
         {
             using (TcpConnectionListener listener = new TcpConnectionListener(IPAddress.Any, 4296))
             using (TcpConnection connection = new TcpConnection())
             {
-                TestHelper.RunSendReceiveTest(listener, connection, 4, 0, 0);
+                TestHelper.RunServerToClientTest(listener, connection, 4, 0, 0, SendOption.OrderedFragmentedReliable);
             }
         }
     }

@@ -55,7 +55,8 @@
     <Compile Include="NetworkEndPoint.cs" />
     <Compile Include="NewConnectionEventArgs.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="SendFlags.cs" />
+    <Compile Include="SendOption.cs" />
+    <Compile Include="SendOptionInternal.cs" />
     <Compile Include="StateObject.cs" />
     <Compile Include="ConnectionStatistics.cs" />
     <Compile Include="TcpConnection.cs" />
@@ -64,6 +65,7 @@
     <Compile Include="UdpConnection.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="UdpConnection.Reliable.cs" />
     <Compile Include="UdpConnectionListener.cs" />
     <Compile Include="UdpServerConnection.cs" />
     <Compile Include="Utility.cs" />

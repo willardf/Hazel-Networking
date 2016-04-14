@@ -11,7 +11,7 @@ namespace Hazel.UnitTests
         ///     Tests the fields on UdpConnection.
         /// </summary>
         [TestMethod]
-        public void UdpConnectionFieldTest()
+        public void UdpFieldTest()
         {
             using (UdpConnectionListener listener = new UdpConnectionListener(IPAddress.Any, 4296))
             using (UdpConnection connection = new UdpClientConnection())
@@ -32,15 +32,28 @@ namespace Hazel.UnitTests
         }
 
         /// <summary>
-        ///     Tests sending and receiving on the UdpConnection.
+        ///     Tests server to client unreliable communication on the UdpConnection.
         /// </summary>
         [TestMethod]
-        public void UdpConnectionSendReceiveTest()
+        public void UdpUnreliableServerToClientTest()
         {
             using (UdpConnectionListener listener = new UdpConnectionListener(IPAddress.Any, 4296))
             using (UdpConnection connection = new UdpClientConnection())
             {
-                TestHelper.RunSendReceiveTest(listener, connection, 1, 1, 2);
+                TestHelper.RunServerToClientTest(listener, connection, 1, 1, 2, SendOption.None);
+            }
+        }
+
+        /// <summary>
+        ///     Tests server to client reliable communication on the UdpConnection.
+        /// </summary>
+        [TestMethod]
+        public void UdpReliableServerToClientTest()
+        {
+            using (UdpConnectionListener listener = new UdpConnectionListener(IPAddress.Any, 4296))
+            using (UdpConnection connection = new UdpClientConnection())
+            {
+                TestHelper.RunServerToClientTest(listener, connection, 3, 1, 2, SendOption.Reliable);
             }
         }
     }

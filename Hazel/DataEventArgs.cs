@@ -17,15 +17,21 @@ namespace Hazel
         /// <summary>
         ///     The bytes received.
         /// </summary>
-        public byte[] Bytes;
+        public byte[] Bytes { get; private set; }
+
+        /// <summary>
+        ///     The SendOption the data was sent with.
+        /// </summary>
+        public object SendOption { get; private set; }
 
         /// <summary>
         ///     Creates DataEventArgs from bytes received.
         /// </summary>
         /// <param name="bytes"></param>
-        public DataEventArgs(byte[] bytes)
+        public DataEventArgs(byte[] bytes, SendOption sendOption)
         {
             this.Bytes = bytes;
+            this.SendOption = sendOption;
         }
     }
 }

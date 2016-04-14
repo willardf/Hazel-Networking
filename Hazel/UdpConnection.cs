@@ -18,34 +18,18 @@ namespace Hazel
     /// <summary>
     ///     Represents a connection that uses the UDP protocol.
     /// </summary>
-    public abstract class UdpConnection : Connection
+    public abstract partial class UdpConnection : Connection
     {
-        /// <summary>
-        ///     The packets of data that have been transmitted reliably and not acknowledged.
-        /// </summary>
-        Dictionary<uint, Packet> reliableDataPacketsSent = new Dictionary<uint, Packet>();
-
-        /// <summary>
-        ///     Holds the last ID allocated.
-        /// </summary>
-        volatile uint lastIDAllocated;
-
         /// <summary>
         ///     The remote end point of this connection.
         /// </summary>
         public EndPoint RemoteEndPoint { get; protected set; }
 
-        class Packet
-        {
-            public byte[] Data;
-            public DateTime SentTime;
-
-            public Packet(byte[] data, DateTime sentTime)
-            {
-                Data = data;
-                SentTime = sentTime;
-            }
-        }
+        /// <summary>
+        ///     Writes the given bytes to the connection.
+        /// </summary>
+        /// <param name="bytes">The bytes to write.</param>
+        protected abstract void WriteBytesToConnection(byte[] bytes);
 
         /// <summary>
         ///     Handles the reliable/fragmented/ordered sending from this connection.
@@ -53,38 +37,65 @@ namespace Hazel
         /// <param name="data">The data being sent.</param>
         /// <param name="sendOption">The send option.</param>
         /// <returns>The bytes that should actually be sent.</returns>
-        protected byte[] HandleSend(byte[] data, SendOption sendOption)
+        protected void HandleSend(byte[] data, SendOption sendOption)
         {
-            byte[] bytes = new byte[data.Length + 1];
-            int offset = 1;
-
-            if (sendOption == SendOption.Reliable)
+            byte[] bytes;
+            switch (sendOption)
             {
-                bytes = new byte[data.Length + 5];
-                offset = 5;
+                case SendOption.Reliable:
+                    bytes = new byte[data.Length + 3];
+                    WriteReliableSendHeader(bytes);
+                    break;
 
-                lock (reliableDataPacketsSent)
-                {
-                    //Find an ID not used yet.
-                    uint id;
-
-                    do
-                        id = ++lastIDAllocated;
-                    while (reliableDataPacketsSent.ContainsKey(id));
-
-                    bytes[1] = (byte)(id & 0xFF);
-                    bytes[2] = (byte)((id >> 16) & 0xFF);
-                    bytes[3] = (byte)((id >> 8) & 0xFF);
-                    bytes[4] = (byte)id;
-
-                    //Remember packet
-                    reliableDataPacketsSent.Add(id, new Packet(data, DateTime.Now));
-                }
+                default:
+                    bytes = new byte[data.Length + 1];
+                    break;
             }
 
-            Buffer.BlockCopy(data, 0, bytes, offset, bytes.Length);
+            //Add message type
+            bytes[0] = (byte)sendOption;
 
-            return bytes;
+            //Copy data into new array
+            Buffer.BlockCopy(data, 0, bytes, bytes.Length - data.Length, data.Length);
+
+            //Write to connection
+            WriteBytesToConnection(bytes);
+
+            Statistics.LogSend(data.Length, bytes.Length);
+        }
+
+        /// <summary>
+        ///     Handles the receiving of data.
+        /// </summary>
+        /// <param name="buffer">The array of the data received.</param>
+        /// <param name="bytesReceived">The number of bytes that were received.</param>
+        /// <returns>The bytes of data received.</returns>
+        protected byte[] HandleReceive(byte[] buffer, int bytesReceived)
+        {
+            int headerSize = 1;
+            switch (buffer[0])
+            {
+                case (byte)SendOption.Reliable:
+                    headerSize = 3;
+
+                    if (HandleReliableReceive(buffer) == false)
+                        return null;
+                    break;
+
+                case (byte)SendOptionInternal.Acknowledgement:
+                    HandleAcknowledgement(buffer);
+                    
+                    Statistics.LogReceive(0, bytesReceived);
+                    
+                    return null;
+            }
+
+            byte[] dataBytes = new byte[bytesReceived - headerSize];
+            Buffer.BlockCopy(buffer, headerSize, dataBytes, 0, dataBytes.Length);
+
+            Statistics.LogReceive(dataBytes.Length, bytesReceived);
+
+            return dataBytes;
         }
     }
 }

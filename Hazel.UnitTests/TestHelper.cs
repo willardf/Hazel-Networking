@@ -16,7 +16,8 @@ namespace Hazel.UnitTests
         /// </summary>
         /// <param name="listener">The listener to test.</param>
         /// <param name="connection">The connection to test.</param>
-        internal static void RunSendReceiveTest(ConnectionListener listener, Connection connection, int headerSize, int handshakeSize, int totalHandshakeSize)
+        //TODO both directions?
+        internal static void RunServerToClientTest(ConnectionListener listener, Connection connection, int headerSize, int handshakeSize, int totalHandshakeSize, SendOption sendOption)
         {
             //Setup meta stuff 
             byte[] data = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
@@ -25,7 +26,7 @@ namespace Hazel.UnitTests
             //Setup listener
             listener.NewConnection += delegate(object sender, NewConnectionEventArgs args)
             {
-                args.Connection.WriteBytes(data);
+                args.Connection.WriteBytes(data, sendOption);
                 Assert.AreEqual(data.Length, args.Connection.Statistics.DataBytesSent);
                 Assert.AreEqual(0, args.Connection.Statistics.DataBytesReceived);
                 Assert.AreEqual(data.Length + headerSize, args.Connection.Statistics.TotalBytesSent);
@@ -43,6 +44,8 @@ namespace Hazel.UnitTests
                 {
                     Assert.AreEqual(data[i], args.Bytes[i]);
                 }
+
+                Assert.AreEqual(sendOption, args.SendOption);
 
                 mutex.Set();
             };

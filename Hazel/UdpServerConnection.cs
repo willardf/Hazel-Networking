@@ -46,20 +46,22 @@ namespace Hazel
         /// <param name="sendOption">The option this data is requested to send with.</param>
         public override void WriteBytes(byte[] bytes, SendOption sendOption = SendOption.None)
         {
-            //Add sendflag byte to start
-            byte[] fullBytes = new byte[bytes.Length + 1];
-            fullBytes[0] = (byte)sendOption;
-            Buffer.BlockCopy(bytes, 0, fullBytes, 1, bytes.Length);
+            HandleSend(bytes, sendOption);
+        }
 
+        /// <summary>
+        ///     Writes bytes to the listener to send.
+        /// </summary>
+        /// <param name="bytes">bytes to send.</param>
+        protected override void WriteBytesToConnection(byte[] bytes)
+        {
             lock (stateLock)
             {
                 if (State != ConnectionState.Connected)
                     throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
 
-                Listener.SendData(fullBytes, RemoteEndPoint);
+                Listener.SendData(bytes, RemoteEndPoint);
             }
-
-            Statistics.LogSend(bytes.Length, fullBytes.Length);
         }
 
         /// <summary>
@@ -79,12 +81,10 @@ namespace Hazel
         /// <param name="buffer"></param>
         internal void InvokeDataReceived(byte[] buffer)
         {
-            byte[] data = new byte[buffer.Length - 1];
-            Buffer.BlockCopy(buffer, 1, data, 0, data.Length);
+           byte[] data = HandleReceive(buffer, buffer.Length);
 
-            Statistics.LogReceive(data.Length, buffer.Length); 
-            
-            InvokeDataReceived(new DataEventArgs(data));
+           if (data != null)
+                InvokeDataReceived(new DataEventArgs(data, (SendOption)data[0]));
         }
 
         /// <summary>

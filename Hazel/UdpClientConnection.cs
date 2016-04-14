@@ -36,14 +36,19 @@ namespace Hazel
         /// <param name="sendOption">The option this data is requested to send with.</param>
         public override void WriteBytes(byte[] bytes, SendOption sendOption = SendOption.None)
         {
-            //Add sendflag byte to start
-            byte[] fullBytes = new byte[bytes.Length + 1];
-            fullBytes[0] = (byte)sendOption;
-            Buffer.BlockCopy(bytes, 0, fullBytes, 1, bytes.Length);
+            //Add header information and send
+            HandleSend(bytes, sendOption);
+        }
 
+        /// <summary>
+        ///     Writes bytes to the socket.
+        /// </summary>
+        /// <param name="bytes">The bytes to send.</param>
+        protected override void WriteBytesToConnection(byte[] bytes)
+        {
             //Pack
             SocketAsyncEventArgs args = new SocketAsyncEventArgs();
-            args.SetBuffer(fullBytes, 0, fullBytes.Length);
+            args.SetBuffer(bytes, 0, bytes.Length);
             args.RemoteEndPoint = RemoteEndPoint;
 
             lock (socket)
@@ -67,8 +72,6 @@ namespace Hazel
                     throw he;
                 }
             }
-
-            Statistics.LogSend(bytes.Length, fullBytes.Length);
         }
 
         /// <summary>
@@ -120,7 +123,7 @@ namespace Hazel
             }
 
             //Write bytes to the server to tell it hi (and to punch a hole in our NAT, if present).
-            WriteBytes(new byte[] { 0 }, SendOption.Reliable);
+            WriteBytes(new byte[] { 0 }, SendOption.None);  //TODO special hello message
         }
 
         /// <summary>
@@ -163,9 +166,11 @@ namespace Hazel
                 return;
             }
 
-            //Copy to new buffer
-            byte[] buffer = new byte[bytesReceived];
-            Buffer.BlockCopy((byte[])result.AsyncState, 1, buffer, 0, bytesReceived - 1);
+            //Decode the data received
+            byte[] buffer = HandleReceive(dataBuffer, bytesReceived);
+            SendOption sendOption = (SendOption)dataBuffer[0];
+
+            //TODO may possibly get better performance with above/below swapped and block copy added
 
             //Begin receiving again
             try
@@ -177,10 +182,9 @@ namespace Hazel
             {
                 HandleDisconnect(new HazelException("A Socket exception occured while initiating a receive operation.", e));
             }
-
-            Statistics.LogReceive(buffer.Length - 1, buffer.Length);
-
-            InvokeDataReceived(new DataEventArgs(buffer));
+            
+            if (buffer != null)
+                InvokeDataReceived(new DataEventArgs(buffer, sendOption));
         }
 
         /// <summary>

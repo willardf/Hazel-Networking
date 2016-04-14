@@ -177,7 +177,7 @@ namespace Hazel
             Statistics.LogReceive(bytes.Length, bytes.Length + 4);
 
             //Fire DataReceived event
-            InvokeDataReceived(new DataEventArgs(bytes));
+            InvokeDataReceived(new DataEventArgs(bytes, SendOption.OrderedFragmentedReliable));
         }
 
         /// <summary>
