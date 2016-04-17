@@ -56,5 +56,31 @@ namespace Hazel.UnitTests
                 TestHelper.RunServerToClientTest(listener, connection, 3, 1, 2, SendOption.Reliable);
             }
         }
+
+        /// <summary>
+        ///     Tests server to client unreliable communication on the UdpConnection.
+        /// </summary>
+        [TestMethod]
+        public void UdpUnreliableClientToServerTest()
+        {
+            using (UdpConnectionListener listener = new UdpConnectionListener(IPAddress.Any, 4296))
+            using (UdpConnection connection = new UdpClientConnection())
+            {
+                TestHelper.RunClientToServerTest(listener, connection, 1, 1, 2, SendOption.None);
+            }
+        }
+
+        /// <summary>
+        ///     Tests server to client reliable communication on the UdpConnection.
+        /// </summary>
+        [TestMethod]
+        public void UdpReliableClientToServerTest()
+        {
+            using (UdpConnectionListener listener = new UdpConnectionListener(IPAddress.Any, 4296))
+            using (UdpConnection connection = new UdpClientConnection())
+            {
+                TestHelper.RunClientToServerTest(listener, connection, 3, 1, 2, SendOption.Reliable);
+            }
+        }
     }
 }

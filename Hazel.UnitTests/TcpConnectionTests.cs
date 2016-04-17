@@ -43,5 +43,18 @@ namespace Hazel.UnitTests
                 TestHelper.RunServerToClientTest(listener, connection, 4, 0, 0, SendOption.OrderedFragmentedReliable);
             }
         }
+
+        /// <summary>
+        ///     Tests sending and receiving on the TcpConnection.
+        /// </summary>
+        [TestMethod]
+        public void TcpClientToServerTest()
+        {
+            using (TcpConnectionListener listener = new TcpConnectionListener(IPAddress.Any, 4296))
+            using (TcpConnection connection = new TcpConnection())
+            {
+                TestHelper.RunClientToServerTest(listener, connection, 4, 0, 0, SendOption.OrderedFragmentedReliable);
+            }
+        }
     }
 }

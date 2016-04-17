@@ -84,7 +84,7 @@ namespace Hazel
            byte[] data = HandleReceive(buffer, buffer.Length);
 
            if (data != null)
-                InvokeDataReceived(new DataEventArgs(data, (SendOption)data[0]));
+                InvokeDataReceived(new DataEventArgs(data, (SendOption)buffer[0]));
         }
 
         /// <summary>

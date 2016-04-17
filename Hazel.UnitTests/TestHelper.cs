@@ -16,12 +16,11 @@ namespace Hazel.UnitTests
         /// </summary>
         /// <param name="listener">The listener to test.</param>
         /// <param name="connection">The connection to test.</param>
-        //TODO both directions?
         internal static void RunServerToClientTest(ConnectionListener listener, Connection connection, int headerSize, int handshakeSize, int totalHandshakeSize, SendOption sendOption)
         {
             //Setup meta stuff 
             byte[] data = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
-            AutoResetEvent mutex = new AutoResetEvent(false);
+            ManualResetEvent mutex = new ManualResetEvent(false);
 
             //Setup listener
             listener.NewConnection += delegate(object sender, NewConnectionEventArgs args)
@@ -59,6 +58,55 @@ namespace Hazel.UnitTests
             Assert.AreEqual(data.Length, connection.Statistics.DataBytesReceived);
             Assert.AreEqual(totalHandshakeSize, connection.Statistics.TotalBytesSent);
             Assert.AreEqual(data.Length + headerSize, connection.Statistics.TotalBytesReceived);
+        }
+
+        /// <summary>
+        ///     Runs a general test on the given listener and connection.
+        /// </summary>
+        /// <param name="listener">The listener to test.</param>
+        /// <param name="connection">The connection to test.</param>
+        internal static void RunClientToServerTest(ConnectionListener listener, Connection connection, int headerSize, int handshakeSize, int totalHandshakeSize, SendOption sendOption)
+        {
+            //Setup meta stuff 
+            byte[] data = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+            ManualResetEvent mutex = new ManualResetEvent(false);
+
+            //Setup listener
+            listener.NewConnection += delegate(object sender, NewConnectionEventArgs args)
+            {
+                args.Connection.DataReceived += delegate(object innerSender, DataEventArgs innerArgs)
+                {
+                    Trace.WriteLine("Data was received correctly.");
+
+                    for (int i = 0; i < data.Length; i++)
+                    {
+                        Assert.AreEqual(data[i], innerArgs.Bytes[i]);
+                    }
+
+                    Assert.AreEqual(sendOption, innerArgs.SendOption);
+
+                    Assert.AreEqual(0, args.Connection.Statistics.DataBytesSent);
+                    Assert.AreEqual(data.Length, args.Connection.Statistics.DataBytesReceived);
+                    Assert.AreEqual(0, args.Connection.Statistics.TotalBytesSent);
+                    Assert.AreEqual(data.Length + headerSize, args.Connection.Statistics.TotalBytesReceived);
+
+                    mutex.Set();
+                };
+            };
+
+            listener.Start();
+
+            //Connect
+            connection.Connect(new NetworkEndPoint(IPAddress.Loopback, 4296));
+            connection.WriteBytes(data, sendOption);
+
+            //Wait until data is received
+            mutex.WaitOne();
+
+            Assert.AreEqual(data.Length + handshakeSize, connection.Statistics.DataBytesSent);
+            Assert.AreEqual(0, connection.Statistics.DataBytesReceived);
+            Assert.AreEqual(totalHandshakeSize + data.Length + headerSize, connection.Statistics.TotalBytesSent);
+            Assert.AreEqual(sendOption == SendOption.Reliable ? 3 : 0, connection.Statistics.TotalBytesReceived);
         }
     }
 }

@@ -127,26 +127,29 @@ namespace Hazel
             //Begin receiving again
             StartListeningForData();
 
-            //If we're aware of this connection pass the data to the neccesary UdpConnection
-            bool exists;
+            bool aware;
+            UdpServerConnection connection;
             lock (connections)
-                exists = connections.ContainsKey(remoteEndPoint);
-            
-            if (exists)
             {
-                lock (connections)
-                    connections[remoteEndPoint].InvokeDataReceived(buffer);
-            }
-            //If this is a new client then connect with them!
-            else
-            {
-                UdpServerConnection newConnection = new UdpServerConnection(this, remoteEndPoint);
-                lock (connections)
-                    connections.Add(remoteEndPoint, newConnection);
+                aware = connections.ContainsKey(remoteEndPoint);
 
-                //And tell everyone about it!
-                FireNewConnectionEvent(new NewConnectionEventArgs(newConnection));
+                //If we're aware of this connection use the one already
+                if (aware)
+                    connection = connections[remoteEndPoint];
+                
+                //If this is a new client then connect with them!
+                else
+                {
+                    connection = new UdpServerConnection(this, remoteEndPoint);
+                    connections.Add(remoteEndPoint, connection);
+                }
             }
+
+            //And fire the corresponding event
+            if (aware)
+                connection.InvokeDataReceived(buffer);
+            else
+                FireNewConnectionEvent(new NewConnectionEventArgs(connection));
         }
 
         /// <summary>
