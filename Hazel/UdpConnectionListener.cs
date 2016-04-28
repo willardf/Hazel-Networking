@@ -142,6 +142,9 @@ namespace Hazel
                 {
                     connection = new UdpServerConnection(this, remoteEndPoint);
                     connections.Add(remoteEndPoint, connection);
+                    
+                    //Then ping back an ack to make sure they're happy
+                    connection.SendAck(buffer[1], buffer[2]);
                 }
             }
 

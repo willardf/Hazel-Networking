@@ -11,6 +11,14 @@ namespace Hazel
     /// </summary>
     enum SendOptionInternal : byte
     {
+        /// <summary>
+        ///     Hello message for initiating communication.
+        /// </summary>
+        Hello = 254,
+
+        /// <summary>
+        ///     Message acknowledging the receipt of a message.
+        /// </summary>
         Acknowledgement = 255
     }
 }

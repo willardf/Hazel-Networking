@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -56,8 +57,9 @@ namespace Hazel
             public byte[] Data;
             public Timer Timer;
             public int LastTimeout;
+            public Action AckCallback;
 
-            public Packet(byte[] data, Action<Packet> resendAction, int timeout)
+            public Packet(byte[] data, Action<Packet> resendAction, int timeout, Action ackCallback)
             {
                 Data = data;
                 
@@ -65,10 +67,11 @@ namespace Hazel
                     (object obj) => resendAction(this),
                     null, 
                     timeout,
-                    timeout
+                    Timeout.Infinite
                 );
 
                 LastTimeout = timeout;
+                AckCallback = ackCallback;
             }
         }
 
@@ -76,7 +79,7 @@ namespace Hazel
         ///     Writes the bytes neccessary for a reliable send and stores the send.
         /// </summary>
         /// <param name="bytes">The byte array to write to.</param>
-        void WriteReliableSendHeader(byte[] bytes)
+        void WriteReliableSendHeader(byte[] bytes, Action ackCallback)
         {
             lock (reliableDataPacketsSent)
             {
@@ -99,9 +102,13 @@ namespace Hazel
                         WriteBytesToConnection(p.Data);
 
                         //Double packet timeout
-                        p.Timer.Change(0, p.LastTimeout *= 2);
+                        lock (p.Timer)
+                            p.Timer.Change(p.LastTimeout *= 2, Timeout.Infinite);
+
+                        Trace.WriteLine("Resend.");
                     },
-                    resendTimeout
+                    resendTimeout,
+                    ackCallback
                 );
 
                 //Remember packet
@@ -119,15 +126,8 @@ namespace Hazel
             //Get the ID form the packet
             ushort id = (ushort)((bytes[1] << 8) + bytes[2]);
 
-            //Always reply with acknowledgement in order to stop the sender repeatedly sending it
-            WriteBytesToConnection(     //TODO group acks together
-                new byte[]
-                {
-                    (byte)SendOptionInternal.Acknowledgement,
-                    bytes[1],
-                    bytes[2]
-                }
-            );
+            //Send an acknowledgement
+            SendAck(bytes[1], bytes[2]);
 
             //Handle reliableness!
             lock (reliableDataPacketsMissing)
@@ -174,10 +174,30 @@ namespace Hazel
                 //Dispose of timer and remove from dictionary
                 if (reliableDataPacketsSent.ContainsKey(id))
                 {
-                    reliableDataPacketsSent[id].Timer.Dispose();
+                    Packet packet = reliableDataPacketsSent[id];
+                    
+                    lock (packet.Timer)
+                        packet.Timer.Dispose();
+                    
+                    if (packet.AckCallback != null)
+                        packet.AckCallback.Invoke();
+
                     reliableDataPacketsSent.Remove(id);
                 }
             }
+        }
+
+        internal void SendAck(byte byte1, byte byte2)
+        {
+            //Always reply with acknowledgement in order to stop the sender repeatedly sending it
+            WriteBytesToConnection(     //TODO group acks together
+                new byte[]
+                {
+                    (byte)SendOptionInternal.Acknowledgement,
+                    byte1,
+                    byte2
+                }
+            );
         }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Net;
+using System.Threading;
 
 namespace Hazel.UnitTests
 {
@@ -26,7 +27,7 @@ namespace Hazel.UnitTests
 
                 //UdpConnection fields
                 Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 4296), connection.RemoteEndPoint);
-                Assert.AreEqual(1, connection.Statistics.DataBytesSent);
+                Assert.AreEqual(0, connection.Statistics.DataBytesSent);
                 Assert.AreEqual(0, connection.Statistics.DataBytesReceived);
             }
         }
@@ -40,7 +41,7 @@ namespace Hazel.UnitTests
             using (UdpConnectionListener listener = new UdpConnectionListener(IPAddress.Any, 4296))
             using (UdpConnection connection = new UdpClientConnection())
             {
-                TestHelper.RunServerToClientTest(listener, connection, 1, 1, 2, SendOption.None);
+                TestHelper.RunServerToClientTest(listener, connection, 1, 3, SendOption.None);
             }
         }
 
@@ -53,7 +54,7 @@ namespace Hazel.UnitTests
             using (UdpConnectionListener listener = new UdpConnectionListener(IPAddress.Any, 4296))
             using (UdpConnection connection = new UdpClientConnection())
             {
-                TestHelper.RunServerToClientTest(listener, connection, 3, 1, 2, SendOption.Reliable);
+                TestHelper.RunServerToClientTest(listener, connection, 3, 3, SendOption.Reliable);
             }
         }
 
@@ -66,7 +67,7 @@ namespace Hazel.UnitTests
             using (UdpConnectionListener listener = new UdpConnectionListener(IPAddress.Any, 4296))
             using (UdpConnection connection = new UdpClientConnection())
             {
-                TestHelper.RunClientToServerTest(listener, connection, 1, 1, 2, SendOption.None);
+                TestHelper.RunClientToServerTest(listener, connection, 1, 3, SendOption.None);
             }
         }
 
@@ -79,7 +80,56 @@ namespace Hazel.UnitTests
             using (UdpConnectionListener listener = new UdpConnectionListener(IPAddress.Any, 4296))
             using (UdpConnection connection = new UdpClientConnection())
             {
-                TestHelper.RunClientToServerTest(listener, connection, 3, 1, 2, SendOption.Reliable);
+                TestHelper.RunClientToServerTest(listener, connection, 3, 3, SendOption.Reliable);
+            }
+        }
+
+        /// <summary>
+        ///     Tests the keepalive functionality from the client,
+        /// </summary>
+        [TestMethod]
+        public void KeepAliveClientTest()
+        {
+            using (UdpConnectionListener listener = new UdpConnectionListener(IPAddress.Any, 4296))
+            using (UdpConnection connection = new UdpClientConnection())
+            {
+                listener.Start();
+
+                connection.Connect(new NetworkEndPoint(IPAddress.Loopback, 4296));
+                connection.KeepAliveInterval = 100;
+
+                System.Threading.Thread.Sleep(1100);    //Enough time for 10 keep alive packets
+
+                Assert.AreEqual(33, connection.Statistics.TotalBytesSent);
+            }
+        }
+
+        /// <summary>
+        ///     Tests the keepalive functionality from the client,
+        /// </summary>
+        [TestMethod]
+        public void KeepAliveServerTest()
+        {
+            ManualResetEvent mutex = new ManualResetEvent(false);
+
+            using (UdpConnectionListener listener = new UdpConnectionListener(IPAddress.Any, 4296))
+            using (UdpConnection connection = new UdpClientConnection())
+            {
+                listener.NewConnection += delegate(object sender, NewConnectionEventArgs args)
+                {
+                    ((UdpConnection)args.Connection).KeepAliveInterval = 100;
+
+                    Thread.Sleep(1100);    //Enough time for 10 keep alive packets
+
+                    Assert.AreEqual(30, args.Connection.Statistics.TotalBytesSent);
+                    mutex.Set();
+                };
+
+                listener.Start();
+
+                connection.Connect(new NetworkEndPoint(IPAddress.Loopback, 4296));
+
+                mutex.WaitOne();
             }
         }
     }

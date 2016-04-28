@@ -65,6 +65,7 @@
     <Compile Include="UdpConnection.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="UdpConnection.KeepAlive.cs" />
     <Compile Include="UdpConnection.Reliable.cs" />
     <Compile Include="UdpConnectionListener.cs" />
     <Compile Include="UdpServerConnection.cs" />

@@ -31,20 +31,32 @@ namespace Hazel
         /// <param name="bytes">The bytes to write.</param>
         protected abstract void WriteBytesToConnection(byte[] bytes);
 
+        protected UdpConnection()
+        {
+            InitializeKeepAliveTimer();
+        }
+
         /// <summary>
         ///     Handles the reliable/fragmented/ordered sending from this connection.
         /// </summary>
         /// <param name="data">The data being sent.</param>
-        /// <param name="sendOption">The send option.</param>
+        /// <param name="sendOption">The send option as a byte.</param>
         /// <returns>The bytes that should actually be sent.</returns>
-        protected void HandleSend(byte[] data, SendOption sendOption)
+        protected void HandleSend(byte[] data, byte sendOption, Action ackCallback = null)
         {
             byte[] bytes;
             switch (sendOption)
             {
-                case SendOption.Reliable:
+                //Handle reliable header
+                case (byte)SendOption.Reliable:
                     bytes = new byte[data.Length + 3];
-                    WriteReliableSendHeader(bytes);
+                    WriteReliableSendHeader(bytes, ackCallback);
+                    break;
+
+                //Handle hellos (ignore data)
+                case (byte)SendOptionInternal.Hello:
+                    bytes = new byte[3];
+                    WriteReliableSendHeader(bytes, ackCallback);
                     break;
 
                 default:
@@ -53,14 +65,17 @@ namespace Hazel
             }
 
             //Add message type
-            bytes[0] = (byte)sendOption;
+            bytes[0] = sendOption;
 
             //Copy data into new array
             Buffer.BlockCopy(data, 0, bytes, bytes.Length - data.Length, data.Length);
 
+            //Inform keepalive not to send for a while
+            ResetKeepAliveTimer();      //TODO keepalive tests
+
             //Write to connection
             WriteBytesToConnection(bytes);
-
+            
             Statistics.LogSend(data.Length, bytes.Length);
         }
 
@@ -72,9 +87,13 @@ namespace Hazel
         /// <returns>The bytes of data received.</returns>
         protected byte[] HandleReceive(byte[] buffer, int bytesReceived)
         {
+            //Inform keepalive not to send for a while
+            ResetKeepAliveTimer();
+
             int headerSize = 1;
             switch (buffer[0])
             {
+                    //Handle reliable receives
                 case (byte)SendOption.Reliable:
                     headerSize = 3;
 
@@ -82,11 +101,17 @@ namespace Hazel
                         return null;
                     break;
 
+                    //Handle acknowledgments
                 case (byte)SendOptionInternal.Acknowledgement:
                     HandleAcknowledgement(buffer);
-                    
-                    Statistics.LogReceive(0, bytesReceived);
-                    
+
+                    return null;
+
+                //We need to acknowledge hello messages so just use the same reliable receive
+                //method
+                case (byte)SendOptionInternal.Hello:
+                    HandleReliableReceive(buffer);
+
                     return null;
             }
 
@@ -96,6 +121,29 @@ namespace Hazel
             Statistics.LogReceive(dataBytes.Length, bytesReceived);
 
             return dataBytes;
+        }
+
+        /// <summary>
+        ///     Sends a hello packet to the remote endpoint.
+        /// </summary>
+        /// <param name="acknowledgeCallback">The callback to invoke when the hello packet is acknowledged.</param>
+        protected void SendHello(Action acknowledgeCallback)
+        {
+            HandleSend(new byte[0], (byte)SendOptionInternal.Hello, acknowledgeCallback);
+        }
+
+        /// <summary>
+        ///     Called when things are being disposed of
+        /// </summary>
+        /// <param name="disposing"></param>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                DisposeKeepAliveTimer();
+            }
+
+            base.Dispose(disposing);
         }
     }
 }

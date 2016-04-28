@@ -25,6 +25,7 @@ namespace Hazel
         ///     Creates a new UdpClientConnection.
         /// </summary>
         public UdpClientConnection()
+            : base()
         {
             socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         }
@@ -36,8 +37,11 @@ namespace Hazel
         /// <param name="sendOption">The option this data is requested to send with.</param>
         public override void WriteBytes(byte[] bytes, SendOption sendOption = SendOption.None)
         {
+            if (State != ConnectionState.Connected)
+                throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
+
             //Add header information and send
-            HandleSend(bytes, sendOption);
+            HandleSend(bytes, (byte)sendOption);
         }
 
         /// <summary>
@@ -53,8 +57,8 @@ namespace Hazel
 
             lock (socket)
             {
-                if (State != ConnectionState.Connected)
-                    throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
+                if (State != ConnectionState.Connected && State != ConnectionState.Connecting)
+                    throw new InvalidOperationException("Could not send data as this Connection is not connected and is not connecting. Did you disconnect?");
 
                 try
                 {
@@ -82,7 +86,7 @@ namespace Hazel
             NetworkEndPoint nep = remoteEndPoint as NetworkEndPoint;
             if (nep == null)
             {
-                throw new ArgumentException("The remote end point of a TCP connection must be a NetworkEndPoint.");
+                throw new ArgumentException("The remote end point of a UDP connection must be a NetworkEndPoint.");
             }
 
             this.EndPoint = nep;
@@ -118,12 +122,14 @@ namespace Hazel
                 {
                     throw new HazelException("A Socket exception occured while initiating a receive operation.", e);
                 }
-
-                State = ConnectionState.Connected;
             }
 
-            //Write bytes to the server to tell it hi (and to punch a hole in our NAT, if present).
-            WriteBytes(new byte[] { 0 }, SendOption.None);  //TODO special hello message
+            //Write bytes to the server to tell it hi (and to punch a hole in our NAT, if present)
+            //When acknowledged set the state to connected
+            SendHello(() => State = ConnectionState.Connected);
+
+            //Wait till hello packet is acknowledged and the state is set to Connected
+            WaitOnConnect();
         }
 
         /// <summary>

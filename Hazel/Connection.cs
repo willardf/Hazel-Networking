@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Net.Sockets;
 using System.Net;
+using System.Threading;
 
 
 /* 
@@ -43,8 +44,29 @@ namespace Hazel
         /// <summary>
         ///     The state of this connection.
         /// </summary>
-        public ConnectionState State { get { return state; } protected set { state = value; } }
+        public ConnectionState State
+        {
+            get
+            {
+                return state;
+            }
+            
+            protected set
+            {
+                state = value;
+
+                if (state == ConnectionState.Connected)
+                    connectWaitLock.Set();
+                else
+                    connectWaitLock.Reset();
+            }
+        }
         volatile ConnectionState state;
+
+        /// <summary>
+        ///     Reset event that is triggered when the connection is marked Connected.
+        /// </summary>
+        ManualResetEvent connectWaitLock = new ManualResetEvent(false);
 
         /// <summary>
         ///     Constructor that initializes the ConnecitonStatistics object.
@@ -95,6 +117,14 @@ namespace Hazel
             EventHandler<DisconnectedEventArgs> handler = Disconnected;
             if (handler != null)
                 handler(this, args);
+        }
+
+        /// <summary>
+        ///     Blocks until the Connection is connected.
+        /// </summary>
+        protected void WaitOnConnect()
+        {
+            connectWaitLock.WaitOne();
         }
 
         /// <summary>

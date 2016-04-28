@@ -31,6 +31,7 @@ namespace Hazel
         /// </summary>
         /// <param name="socket"></param>
         internal UdpServerConnection(UdpConnectionListener listener, EndPoint endPoint)
+            : base()
         {
             this.Listener = listener;
             this.RemoteEndPoint = endPoint;
@@ -46,7 +47,7 @@ namespace Hazel
         /// <param name="sendOption">The option this data is requested to send with.</param>
         public override void WriteBytes(byte[] bytes, SendOption sendOption = SendOption.None)
         {
-            HandleSend(bytes, sendOption);
+            HandleSend(bytes, (byte)sendOption);
         }
 
         /// <summary>

@@ -64,6 +64,22 @@ namespace Hazel
         }
 
         /// <summary>
+        ///     Internal call to start listening once this socket has been constructed and is ready.
+        /// </summary>
+        internal void StartListening()
+        {
+            //Start receiving data
+            try
+            {
+                StartWaitingForHeader();
+            }
+            catch (SocketException e)
+            {
+                throw new HazelException("A Socket exception occured while initiating a receive operation.", e);
+            }
+        }
+
+        /// <summary>
         ///     Connects this TCP connection to the endpoint.
         /// </summary>
         /// <param name="remotEndPoint">The location of the server to connect to.</param>

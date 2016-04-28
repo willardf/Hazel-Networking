@@ -98,6 +98,8 @@ namespace Hazel
                 NewConnectionEventArgs args = new NewConnectionEventArgs(tcpConnection);
 
                 FireNewConnectionEvent(args);
+
+                tcpConnection.StartListening();
             }
         }
 
