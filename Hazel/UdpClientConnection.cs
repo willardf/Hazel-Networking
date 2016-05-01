@@ -188,6 +188,10 @@ namespace Hazel
             {
                 HandleDisconnect(new HazelException("A Socket exception occured while initiating a receive operation.", e));
             }
+            catch (ObjectDisposedException)
+            {
+                throw new HazelException("Could not begin read as the socket has been disposed of.");
+            }
             
             if (buffer != null)
                 InvokeDataReceived(new DataEventArgs(buffer, sendOption));
