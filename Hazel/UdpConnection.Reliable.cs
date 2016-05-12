@@ -56,8 +56,9 @@ namespace Hazel
         {
             public byte[] Data;
             public Timer Timer;
-            public int LastTimeout;
+            public volatile int LastTimeout;
             public Action AckCallback;
+            public volatile bool Acknowledged = false;
 
             public Packet(byte[] data, Action<Packet> resendAction, int timeout, Action ackCallback)
             {
@@ -103,7 +104,10 @@ namespace Hazel
 
                         //Double packet timeout
                         lock (p.Timer)
-                            p.Timer.Change(p.LastTimeout *= 2, Timeout.Infinite);
+                        {
+                            if (!p.Acknowledged)
+                                p.Timer.Change(p.LastTimeout *= 2, Timeout.Infinite);
+                        }
 
                         Trace.WriteLine("Resend.");
                     },
@@ -176,6 +180,8 @@ namespace Hazel
                 {
                     Packet packet = reliableDataPacketsSent[id];
                     
+                    packet.Acknowledged = true;
+
                     lock (packet.Timer)
                         packet.Timer.Dispose();
                     
