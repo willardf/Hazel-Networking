@@ -128,7 +128,7 @@ namespace Hazel
         }
 
         /// <summary>
-        ///     Closes this connections safely.
+        ///     Closes this connection safely.
         /// </summary>
         public void Close()
         {
