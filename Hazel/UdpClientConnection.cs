@@ -99,11 +99,19 @@ namespace Hazel
 
                 State = ConnectionState.Connecting;
 
+                //Calculate local end point
+                EndPoint localEndPoint;
+                if (nep.EndPoint is IPEndPoint)
+                    localEndPoint = new IPEndPoint(((IPEndPoint)nep.EndPoint).Address, 0);
+                else if (nep.EndPoint is IPEndPoint)
+                    localEndPoint = new DnsEndPoint(((DnsEndPoint)nep.EndPoint).Host, 0);
+                else
+                    throw new ArgumentException("Can only connect using an IPEndPoint or DnsEndpoint");
+
                 //Begin listening
                 try
                 {
-                    //TODO should that really be IPAddress.Any?
-                    socket.Bind(new IPEndPoint(IPAddress.Any, 0));
+                    socket.Bind(localEndPoint);
                 }
                 catch (SocketException e)
                 {
@@ -179,7 +187,7 @@ namespace Hazel
             byte[] buffer = HandleReceive(dataBuffer, bytesReceived);
             SendOption sendOption = (SendOption)dataBuffer[0];
 
-            //TODO may possibly get better performance with above/below swapped and block copy added
+            //TODO may get better performance with Handle receive after and block copy call added
 
             //Begin receiving again
             try

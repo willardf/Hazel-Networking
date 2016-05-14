@@ -5,7 +5,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
-//TODO complete trawl through for thread safety, everywhere
+
 /* 
 * Copyright (C) Jamie Read - All Rights Reserved
 * Unauthorized copying of this file, via any medium is strictly prohibited

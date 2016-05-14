@@ -71,7 +71,7 @@ namespace Hazel
             Buffer.BlockCopy(data, 0, bytes, bytes.Length - data.Length, data.Length);
 
             //Inform keepalive not to send for a while
-            ResetKeepAliveTimer();      //TODO keepalive tests
+            ResetKeepAliveTimer();
 
             //Write to connection
             WriteBytesToConnection(bytes);

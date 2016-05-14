@@ -9,7 +9,9 @@ using System.Threading.Tasks;
 namespace Hazel
 {
     partial class UdpConnection
-    {//TODO recycle dataevents and things?
+    {
+        //TODO recycle dataevents and things?
+        
         /// <summary>
         ///     The starting timeout, in miliseconds, at which data will be resent.
         /// </summary>
@@ -23,11 +25,6 @@ namespace Hazel
         ///     Holds the last ID allocated.
         /// </summary>
         volatile ushort lastIDAllocated;
-
-        /// <summary>
-        ///     The number of items to remember we have received before overwriting.
-        /// </summary>
-        private readonly int receiveCapacity = 4096;
 
         /// <summary>
         ///     The packets of data that have been transmitted reliably and not acknowledged.
@@ -136,9 +133,12 @@ namespace Hazel
             //Handle reliableness!
             lock (reliableDataPacketsMissing)
             {
+                //TODO Looping of IDs
+                //      Currently when ID loops all packets will be discarded as ID will be less than reliableReceiveLast
+                //      And wont be in reliableDataPacketsMissing.
+
                 //If the ID <= reliableReceiveLast it might be something we're missing
                 //HasReceivedSomething handles the edge case of reliableReceiveLast = 0 & ID = 0
-                //TODO Looping of IDs
                 if (id <= reliableReceiveLast && hasReceivedSomething)
                 {
                     //See if we're missing it, else this packet is a duplicate
