@@ -47,6 +47,11 @@ namespace Hazel
         Object keepAliveTimerLock = new Object();
 
         /// <summary>
+        ///     Has the keep alive timer been disposed already?
+        /// </summary>
+        bool keepAliveTimerDisposed;
+
+        /// <summary>
         ///     Starts the keepalive timer.
         /// </summary>
         void InitializeKeepAliveTimer()
@@ -81,7 +86,11 @@ namespace Hazel
         void DisposeKeepAliveTimer()
         {
             lock(keepAliveTimerLock)
-                keepAliveTimer.Dispose();
+            {
+                if (!keepAliveTimerDisposed)
+                    keepAliveTimer.Dispose();
+                keepAliveTimerDisposed = true;
+            }
         }
     }
 }

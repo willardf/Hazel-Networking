@@ -47,9 +47,9 @@ namespace Hazel
             lock (this.Socket)
             {
                 this.Socket.NoDelay = true;
-            }
 
-            State = ConnectionState.Connected;
+                State = ConnectionState.Connected;
+            }
         }
 
         /// <summary>
@@ -223,7 +223,13 @@ namespace Hazel
         protected virtual void StartWaitingForChunk(StateObject state)
         {
             lock (Socket)
-                Socket.BeginReceive(state.buffer, state.totalBytesReceived, state.buffer.Length, SocketFlags.None, ChunkReadCallback, state);
+            {
+                //Double check we've not disconnected then begin receiving
+                if (State == ConnectionState.Connected || State == ConnectionState.Connecting)
+                    Socket.BeginReceive(state.buffer, state.totalBytesReceived, state.buffer.Length, SocketFlags.None, ChunkReadCallback, state);
+                else
+                    HandleDisconnect();
+            }
         }
 
         /// <summary>

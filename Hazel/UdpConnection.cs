@@ -113,6 +113,11 @@ namespace Hazel
                     HandleReliableReceive(buffer);
 
                     return null;
+
+                case (byte)SendOptionInternal.Disconnect:
+                    HandleDisconnect();
+
+                    return null;
             }
 
             byte[] dataBytes = new byte[bytesReceived - headerSize];
@@ -131,6 +136,22 @@ namespace Hazel
         {
             HandleSend(new byte[0], (byte)SendOptionInternal.Hello, acknowledgeCallback);
         }
+
+        /// <summary>
+        ///     Closes this connection safely.
+        /// </summary>
+        public override void Close()
+        {
+            HandleSend(new byte[0], (byte)SendOptionInternal.Disconnect);       //TODO Should disconnect wait for an ack?
+
+            base.Close();
+        }
+
+        /// <summary>
+        ///     Called when the socket has been disconnected at the remote host.
+        /// </summary>
+        /// <param name="e">The exception if one was the cause.</param>
+        protected abstract void HandleDisconnect(HazelException e = null);
 
         /// <summary>
         ///     Called when things are being disposed of

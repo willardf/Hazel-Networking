@@ -130,7 +130,7 @@ namespace Hazel
         /// <summary>
         ///     Closes this connection safely.
         /// </summary>
-        public void Close()
+        public virtual void Close()
         {
             Dispose();
         }

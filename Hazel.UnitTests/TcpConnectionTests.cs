@@ -1,6 +1,7 @@
 ﻿using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Net;
+using System.Threading;
 
 namespace Hazel.UnitTests
 {
@@ -54,6 +55,32 @@ namespace Hazel.UnitTests
             using (TcpConnection connection = new TcpConnection())
             {
                 TestHelper.RunClientToServerTest(listener, connection, 4, 0, SendOption.OrderedFragmentedReliable);
+            }
+        }
+
+        /// <summary>
+        ///     Tests disconnection from the client.
+        /// </summary>
+        [TestMethod]
+        public void ClientDisconnectTest()
+        {
+            using (TcpConnectionListener listener = new TcpConnectionListener(IPAddress.Any, 4296))
+            using (TcpConnection connection = new TcpConnection())
+            {
+                TestHelper.RunClientDisconnectTest(listener, connection);
+            }
+        }
+
+        /// <summary>
+        ///     Tests disconnection from the server.
+        /// </summary>
+        [TestMethod]
+        public void ServerDisconnectTest()
+        {
+            using (TcpConnectionListener listener = new TcpConnectionListener(IPAddress.Any, 4296))
+            using (TcpConnection connection = new TcpConnection())
+            {
+                TestHelper.RunServerDisconnectTest(listener, connection);
             }
         }
     }

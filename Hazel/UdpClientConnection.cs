@@ -116,7 +116,10 @@ namespace Hazel
                 }
                 catch (ObjectDisposedException)
                 {
-                    throw new HazelException("Could not begin read as the socket has been disposed of, did you disconnect?");
+                    //If the socket's been disposed then we can just end there but make sure we're in NotConnected state.
+                    //If we end up here I'm really lost...
+                    State = ConnectionState.NotConnected;
+                    return;
                 }
                 catch (SocketException e)
                 {
@@ -190,7 +193,8 @@ namespace Hazel
             }
             catch (ObjectDisposedException)
             {
-                throw new HazelException("Could not begin read as the socket has been disposed of.");
+                //If the socket's been disposed then we can just end there.
+                return;
             }
             
             if (buffer != null)
@@ -201,7 +205,7 @@ namespace Hazel
         ///     Called when the socket has been disconnected at the remote host.
         /// </summary>
         /// <param name="e">The exception if one was the cause.</param>
-        void HandleDisconnect(HazelException e = null)
+        protected override void HandleDisconnect(HazelException e = null)
         {
             bool invoke = false;
 

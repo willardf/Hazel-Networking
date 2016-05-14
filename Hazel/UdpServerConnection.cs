@@ -89,6 +89,33 @@ namespace Hazel
         }
 
         /// <summary>
+        ///     Called when the socket has been disconnected at the remote host.
+        /// </summary>
+        /// <param name="e">The exception if one was the cause.</param>
+        protected override void HandleDisconnect(HazelException e = null)
+        {
+            bool invoke = false;
+
+            lock (stateLock)
+            {
+                //Only invoke the disconnected event if we're not already disconnecting
+                if (State == ConnectionState.Connected)
+                {
+                    State = ConnectionState.Disconnecting;
+                    invoke = true;
+                }
+            }
+
+            //Invoke event outide lock if need be
+            if (invoke)
+            {
+                InvokeDisconnected(new DisconnectedEventArgs(e));
+
+                Dispose();
+            }
+        }
+
+        /// <summary>
         ///     Safely closes this connection.
         /// </summary>
         protected override void Dispose(bool disposing)

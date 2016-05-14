@@ -110,7 +110,7 @@ namespace Hazel
                 //If the socket's been disposed then we can just end there.
                 return;
             }
-            catch (SocketException e)
+            catch (SocketException)
             {
                 //TODO Errr...;
                 return;
@@ -140,6 +140,10 @@ namespace Hazel
                 //If this is a new client then connect with them!
                 else
                 {
+                    //Check for malformed connection attempts
+                    if (buffer[0] != (byte)SendOptionInternal.Hello || buffer.Length != 3)
+                        return;
+
                     connection = new UdpServerConnection(this, remoteEndPoint);
                     connections.Add(remoteEndPoint, connection);
                     

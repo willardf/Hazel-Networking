@@ -132,5 +132,31 @@ namespace Hazel.UnitTests
                 mutex.WaitOne();
             }
         }
+
+        /// <summary>
+        ///     Tests disconnection from the client.
+        /// </summary>
+        [TestMethod]
+        public void ClientDisconnectTest()
+        {
+            using (UdpConnectionListener listener = new UdpConnectionListener(IPAddress.Any, 4296))
+            using (UdpConnection connection = new UdpClientConnection())
+            {
+                TestHelper.RunClientDisconnectTest(listener, connection);
+            }
+        }
+
+        /// <summary>
+        ///     Tests disconnection from the server.
+        /// </summary>
+        [TestMethod]
+        public void ServerDisconnectTest()
+        {
+            using (UdpConnectionListener listener = new UdpConnectionListener(IPAddress.Any, 4296))
+            using (UdpConnection connection = new UdpClientConnection())
+            {
+                TestHelper.RunServerDisconnectTest(listener, connection);
+            }
+        }
     }
 }

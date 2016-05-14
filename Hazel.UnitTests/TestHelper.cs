@@ -110,5 +110,57 @@ namespace Hazel.UnitTests
             Assert.AreEqual(totalHandshakeSize + data.Length + headerSize, connection.Statistics.TotalBytesSent);
             Assert.AreEqual(0, connection.Statistics.TotalBytesReceived);
         }
+
+        /// <summary>
+        ///     Runs a server disconnect test on the given listener and connection.
+        /// </summary>
+        /// <param name="listener">The listener to test.</param>
+        /// <param name="connection">The connection to test.</param>
+        internal static void RunServerDisconnectTest(ConnectionListener listener, Connection connection)
+        {
+            ManualResetEvent mutex = new ManualResetEvent(false);
+
+            connection.Disconnected += delegate(object sender, DisconnectedEventArgs args)
+            {
+                mutex.Set();
+            };
+
+            listener.NewConnection += delegate(object sender, NewConnectionEventArgs args)
+            {
+                args.Connection.Close();
+            };
+
+            listener.Start();
+
+            connection.Connect(new NetworkEndPoint(IPAddress.Loopback, 4296));
+
+            mutex.WaitOne();
+        }
+
+        /// <summary>
+        ///     Runs a client disconnect test on the given listener and connection.
+        /// </summary>
+        /// <param name="listener">The listener to test.</param>
+        /// <param name="connection">The connection to test.</param>
+        internal static void RunClientDisconnectTest(ConnectionListener listener, Connection connection)
+        {
+            ManualResetEvent mutex = new ManualResetEvent(false);
+
+            listener.NewConnection += delegate(object sender, NewConnectionEventArgs args)
+            {
+                args.Connection.Disconnected += delegate(object sender2, DisconnectedEventArgs args2)
+                {
+                    mutex.Set();
+                };
+            };
+
+            listener.Start();
+
+            connection.Connect(new NetworkEndPoint(IPAddress.Loopback, 4296));
+
+            connection.Close();
+
+            mutex.WaitOne();
+        }
     }
 }
