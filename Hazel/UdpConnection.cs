@@ -18,13 +18,8 @@ namespace Hazel
     /// <summary>
     ///     Represents a connection that uses the UDP protocol.
     /// </summary>
-    public abstract partial class UdpConnection : Connection
+    public abstract partial class UdpConnection : NetworkConnection
     {
-        /// <summary>
-        ///     The remote end point of this connection.
-        /// </summary>
-        public EndPoint RemoteEndPoint { get; protected set; }
-
         /// <summary>
         ///     Writes the given bytes to the connection.
         /// </summary>

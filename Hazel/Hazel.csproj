@@ -52,6 +52,8 @@
     <Compile Include="DataEventArgs.cs" />
     <Compile Include="DisconnectedEventArgs.cs" />
     <Compile Include="HazelException.cs" />
+    <Compile Include="NetworkConnection.cs" />
+    <Compile Include="NetworkConnectionListener.cs" />
     <Compile Include="NetworkEndPoint.cs" />
     <Compile Include="NewConnectionEventArgs.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

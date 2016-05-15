@@ -18,22 +18,12 @@ namespace Hazel
     /// <summary>
     ///     Listens for new TCP connections and creates TCPConnections for them.
     /// </summary>
-    public class TcpConnectionListener : ConnectionListener
+    public class TcpConnectionListener : NetworkConnectionListener
     {
-        /// <summary>
-        ///     The IP address we're listening on.
-        /// </summary>
-        public IPAddress IPAddress { get; private set; }
-
-        /// <summary>
-        ///     The port we're listening on.
-        /// </summary>
-        public int Port { get; private set; }
-
         /// <summary>
         ///     The socket listening for connections.
         /// </summary>
-        public Socket Listener { get; private set; }
+        Socket listener;
 
         /// <summary>
         ///     Creates a new ConnectionListener for the given IP and port.
@@ -45,7 +35,7 @@ namespace Hazel
             this.IPAddress = IPAddress;
             this.Port = port;
 
-            this.Listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            this.listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         }
 
         /// <summary>
@@ -55,12 +45,12 @@ namespace Hazel
         {
             try
             {
-                lock (Listener)
+                lock (listener)
                 {
-                    Listener.Bind(new IPEndPoint(IPAddress, Port));
-                    Listener.Listen(1000);
+                    listener.Bind(new IPEndPoint(IPAddress, Port));
+                    listener.Listen(1000);
 
-                    Listener.BeginAccept(AcceptConnection, null);
+                    listener.BeginAccept(AcceptConnection, null);
                 }
             }
             catch (SocketException e)
@@ -75,13 +65,13 @@ namespace Hazel
         /// <param name="result">The asyncronous operation's result.</param>
         void AcceptConnection(IAsyncResult result)
         {
-            lock (Listener)
+            lock (listener)
             {
                 //Accept Tcp socket
                 Socket tcpSocket;
                 try
                 {
-                    tcpSocket = Listener.EndAccept(result);
+                    tcpSocket = listener.EndAccept(result);
                 }
                 catch (ObjectDisposedException)
                 {
@@ -90,7 +80,7 @@ namespace Hazel
                 }
 
                 //Start listening for the next connection
-                Listener.BeginAccept(new AsyncCallback(AcceptConnection), null);
+                listener.BeginAccept(new AsyncCallback(AcceptConnection), null);
 
                 //Sort the event out
                 TcpConnection tcpConnection = new TcpConnection(tcpSocket);
@@ -111,8 +101,8 @@ namespace Hazel
         {
             if (disposing)
             {
-                lock (Listener)
-                    Listener.Dispose();
+                lock (listener)
+                    listener.Dispose();
             }
 
             base.Dispose(disposing);

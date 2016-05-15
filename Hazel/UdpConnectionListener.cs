@@ -16,20 +16,10 @@ using System.Threading.Tasks;
 namespace Hazel
 {
     /// <summary>
-    ///     Listens for new UDP connections and creates UdpConnection for them.
+    ///     Listens for new UDP connections and creates UdpConnections for them.
     /// </summary>
-    public class UdpConnectionListener : ConnectionListener
+    public class UdpConnectionListener : NetworkConnectionListener
     {
-        /// <summary>
-        ///     The IP address we're listening on.
-        /// </summary>
-        public IPAddress IPAddress { get; private set; }
-
-        /// <summary>
-        ///     The port we're listening on.
-        /// </summary>
-        public int Port { get; private set; }
-
         /// <summary>
         ///     The socket listening for connections.
         /// </summary>

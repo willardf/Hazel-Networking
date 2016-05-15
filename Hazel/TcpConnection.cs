@@ -17,17 +17,12 @@ namespace Hazel
     /// <summary>
     ///     Represents a connection that uses the TCP protocol.
     /// </summary>
-    public class TcpConnection : Connection
+    public class TcpConnection : NetworkConnection
     {
         /// <summary>
         ///     The socket we're managing.
         /// </summary>
         public Socket Socket { get; private set; }
-
-        /// <summary>
-        ///     The remote end point of this connection.
-        /// </summary>
-        public EndPoint RemoteEndPoint { get; protected set; }
 
         /// <summary>
         ///     Creates a TcpConnection from a given TCP Socket.

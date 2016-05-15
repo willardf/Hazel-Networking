@@ -98,9 +98,13 @@ namespace Hazel.UnitTests
                 connection.Connect(new NetworkEndPoint(IPAddress.Loopback, 4296));
                 connection.KeepAliveInterval = 100;
 
-                System.Threading.Thread.Sleep(1100);    //Enough time for 10 keep alive packets
+                System.Threading.Thread.Sleep(1100);    //Enough time for ~10 keep alive packets
 
-                Assert.AreEqual(33, connection.Statistics.TotalBytesSent);
+                Assert.IsTrue(
+                    connection.Statistics.TotalBytesSent >= 27
+                        && connection.Statistics.TotalBytesSent <= 33,
+                    "Received: " + connection.Statistics.TotalBytesSent
+                );
             }
         }
 
@@ -119,9 +123,14 @@ namespace Hazel.UnitTests
                 {
                     ((UdpConnection)args.Connection).KeepAliveInterval = 100;
 
-                    Thread.Sleep(1100);    //Enough time for 10 keep alive packets
+                    Thread.Sleep(1100);    //Enough time for ~10 keep alive packets
 
-                    Assert.AreEqual(30, args.Connection.Statistics.TotalBytesSent);
+                    Assert.IsTrue(
+                        args.Connection.Statistics.TotalBytesSent >= 27
+                            && args.Connection.Statistics.TotalBytesSent <= 33,
+                        "Received: " + args.Connection.Statistics.TotalBytesSent
+                    );
+
                     mutex.Set();
                 };
 
