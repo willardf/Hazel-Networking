@@ -206,7 +206,7 @@ namespace Hazel
             }
             
             if (buffer != null)
-                InvokeDataReceived(new DataEventArgs(buffer, sendOption));
+                InvokeDataReceived(buffer, sendOption);
         }
 
         /// <summary>
@@ -230,7 +230,7 @@ namespace Hazel
             //Invoke event outide lock if need be
             if (invoke)
             {
-                InvokeDisconnected(new DisconnectedEventArgs(e));
+                InvokeDisconnected(e);
 
                 Dispose();
             }

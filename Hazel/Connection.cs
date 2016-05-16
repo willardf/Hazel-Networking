@@ -98,9 +98,13 @@ namespace Hazel
         /// <summary>
         ///     Invokes the DataReceived event to alert subscribers we received data.
         /// </summary>
-        /// <param name="args">The arguments to supply.</param>
-        protected void InvokeDataReceived(DataEventArgs args)
+        /// <param name="bytes">The bytes to supply.</param>
+        /// <param name="sendOption">The sendOption to supply.</param>
+        protected void InvokeDataReceived(byte[] bytes, SendOption sendOption)
         {
+            DataEventArgs args = DataEventArgs.GetObject();
+            args.Set(bytes, sendOption);
+
             //Make a copy to avoid race condition between null check and invocation
             EventHandler<DataEventArgs> handler = DataReceived;
             if (handler != null)
@@ -110,9 +114,12 @@ namespace Hazel
         /// <summary>
         ///     Invokes the Disconnected event to alert hooked up methods there was an error or the remote end point disconnected.
         /// </summary>
-        /// <param name="args">The arguments to supply.</param>
-        protected void InvokeDisconnected(DisconnectedEventArgs args)
+        /// <param name="e">The exception, if any, that occured to cause this.</param>
+        protected void InvokeDisconnected(Exception e)
         {
+            DisconnectedEventArgs args = DisconnectedEventArgs.GetObject();
+            args.Set(e);
+
             //Make a copy to avoid race condition between null check and invocation
             EventHandler<DisconnectedEventArgs> handler = Disconnected;
             if (handler != null)

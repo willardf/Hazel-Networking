@@ -85,9 +85,8 @@ namespace Hazel
                 //Sort the event out
                 TcpConnection tcpConnection = new TcpConnection(tcpSocket);
 
-                NewConnectionEventArgs args = new NewConnectionEventArgs(tcpConnection);
-
-                FireNewConnectionEvent(args);
+                //Invoke
+                InvokeNewConnection(tcpConnection);
 
                 tcpConnection.StartListening();
             }

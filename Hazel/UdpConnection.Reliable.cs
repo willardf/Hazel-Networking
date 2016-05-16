@@ -49,15 +49,34 @@ namespace Hazel
         /// <summary>
         ///     Class to hold packet data
         /// </summary>
-        class Packet
+        class Packet : IRecyclable
         {
+            /// <summary>
+            ///     Object pool for this event.
+            /// </summary>
+            static readonly ObjectPool<Packet> objectPool = new ObjectPool<Packet>(() => new Packet());
+
+            /// <summary>
+            ///     Returns an instance of this object from the pool.
+            /// </summary>
+            /// <returns></returns>
+            internal static Packet GetObject()
+            {
+                return objectPool.GetObject();
+            }
+
             public byte[] Data;
             public Timer Timer;
             public volatile int LastTimeout;
             public Action AckCallback;
-            public volatile bool Acknowledged = false;
+            public volatile bool Acknowledged;
 
-            public Packet(byte[] data, Action<Packet> resendAction, int timeout, Action ackCallback)
+            Packet()
+            {
+
+            }
+            
+            internal void Set(byte[] data, Action<Packet> resendAction, int timeout, Action ackCallback)
             {
                 Data = data;
                 
@@ -70,6 +89,15 @@ namespace Hazel
 
                 LastTimeout = timeout;
                 AckCallback = ackCallback;
+                Acknowledged = false;
+            }
+
+            /// <summary>
+            ///     Returns this object back to the object pool from whence it came.
+            /// </summary>
+            public void Recycle()
+            {
+                objectPool.PutObject(this);
             }
         }
 
@@ -93,7 +121,8 @@ namespace Hazel
                 bytes[2] = (byte)id;
 
                 //Create packet object
-                Packet packet = new Packet(
+                Packet packet = Packet.GetObject();
+                packet.Set(
                     bytes,
                     (Packet p) =>
                     {
@@ -103,7 +132,7 @@ namespace Hazel
                         lock (p.Timer)
                         {
                             if (!p.Acknowledged)
-                                p.Timer.Change(p.LastTimeout *= 2, Timeout.Infinite);
+                                p.Timer.Change(p.LastTimeout *= 2, Timeout.Infinite);       //TODO disconnect after x tries
                         }
 
                         Trace.WriteLine("Resend.");
@@ -187,6 +216,8 @@ namespace Hazel
                     
                     if (packet.AckCallback != null)
                         packet.AckCallback.Invoke();
+
+                    packet.Recycle();
 
                     reliableDataPacketsSent.Remove(id);
                 }

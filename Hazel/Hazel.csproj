@@ -52,10 +52,12 @@
     <Compile Include="DataEventArgs.cs" />
     <Compile Include="DisconnectedEventArgs.cs" />
     <Compile Include="HazelException.cs" />
+    <Compile Include="IRecyclable.cs" />
     <Compile Include="NetworkConnection.cs" />
     <Compile Include="NetworkConnectionListener.cs" />
     <Compile Include="NetworkEndPoint.cs" />
     <Compile Include="NewConnectionEventArgs.cs" />
+    <Compile Include="ObjectPool.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SendOption.cs" />
     <Compile Include="SendOptionInternal.cs" />

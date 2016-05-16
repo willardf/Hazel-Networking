@@ -26,8 +26,12 @@ namespace Hazel
         ///     Invokes the NewConnection event with the supplied args.
         /// </summary>
         /// <param name="args">The arguments for the event.</param>
-        protected void FireNewConnectionEvent(NewConnectionEventArgs args)
+        protected void InvokeNewConnection(Connection connection)
         {
+            //Get new args
+            NewConnectionEventArgs args = NewConnectionEventArgs.GetObject();
+            args.Set(connection);
+
             //Make a copy to avoid race condition between null check and invocation
             EventHandler<NewConnectionEventArgs> handler = NewConnection;
             if (handler != null)

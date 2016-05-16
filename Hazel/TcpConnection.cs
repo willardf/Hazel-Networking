@@ -188,7 +188,7 @@ namespace Hazel
             Statistics.LogReceive(bytes.Length, bytes.Length + 4);
 
             //Fire DataReceived event
-            InvokeDataReceived(new DataEventArgs(bytes, SendOption.OrderedFragmentedReliable));
+            InvokeDataReceived(bytes, SendOption.OrderedFragmentedReliable);
         }
 
         /// <summary>
@@ -296,7 +296,7 @@ namespace Hazel
             //Invoke event outide lock if need be
             if (invoke)
             {
-                InvokeDisconnected(new DisconnectedEventArgs(e));
+                InvokeDisconnected(e);
 
                 Dispose();
             }

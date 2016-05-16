@@ -85,7 +85,7 @@ namespace Hazel
            byte[] data = HandleReceive(buffer, buffer.Length);
 
            if (data != null)
-                InvokeDataReceived(new DataEventArgs(data, (SendOption)buffer[0]));
+                InvokeDataReceived(data, (SendOption)buffer[0]);
         }
 
         /// <summary>
@@ -109,7 +109,7 @@ namespace Hazel
             //Invoke event outide lock if need be
             if (invoke)
             {
-                InvokeDisconnected(new DisconnectedEventArgs(e));
+                InvokeDisconnected(e);
 
                 Dispose();
             }

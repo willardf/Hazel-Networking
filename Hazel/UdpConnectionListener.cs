@@ -146,7 +146,7 @@ namespace Hazel
             if (aware)
                 connection.InvokeDataReceived(buffer);
             else
-                FireNewConnectionEvent(new NewConnectionEventArgs(connection));
+                InvokeNewConnection(connection);
         }
 
         /// <summary>
@@ -168,6 +168,11 @@ namespace Hazel
             catch (SocketException e)
             {
                 throw new HazelException("Could not send data as a SocketException occured.", e);
+            }
+            catch (ObjectDisposedException)
+            {
+                //Keep alive timer probably ran, ignore
+                return;
             }
         }
 
