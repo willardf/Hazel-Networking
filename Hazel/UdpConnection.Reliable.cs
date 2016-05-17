@@ -19,7 +19,7 @@ namespace Hazel
         ///     On each resend this is doubled for that packet.
         /// </remarks>
         public int ResendTimeout { get { return resendTimeout; } set { resendTimeout = value; } }
-        private int resendTimeout = 200;        //TODO this based of average ping?
+        private volatile int resendTimeout = 200;        //TODO this based of average ping?
 
         /// <summary>
         ///     Holds the last ID allocated.
@@ -47,9 +47,15 @@ namespace Hazel
         volatile bool hasReceivedSomething = false;
 
         /// <summary>
+        ///     The maximum times a message should be retransmitted before marking the endpoint as disconnected.
+        /// </summary>
+        public int RetransmissionsBeforeDisconnect { get { return retransmissionsBeforeDisconnect; } set { retransmissionsBeforeDisconnect = value; } }
+        private volatile int retransmissionsBeforeDisconnect = 3;
+
+        /// <summary>
         ///     Class to hold packet data
         /// </summary>
-        class Packet : IRecyclable
+        class Packet : IRecyclable, IDisposable
         {
             /// <summary>
             ///     Object pool for this event.
@@ -70,6 +76,7 @@ namespace Hazel
             public volatile int LastTimeout;
             public Action AckCallback;
             public volatile bool Acknowledged;
+            public volatile int Retransmissions;
 
             Packet()
             {
@@ -90,6 +97,7 @@ namespace Hazel
                 LastTimeout = timeout;
                 AckCallback = ackCallback;
                 Acknowledged = false;
+                Retransmissions = 0;
             }
 
             /// <summary>
@@ -97,7 +105,28 @@ namespace Hazel
             /// </summary>
             public void Recycle()
             {
+                lock (Timer)
+                    Timer.Dispose();
+
                 objectPool.PutObject(this);
+            }
+
+            /// <summary>
+            ///     Disposes of this object.
+            /// </summary>
+            public void Dispose()
+            {
+                Dispose(true);
+                GC.SuppressFinalize(this);
+            }
+
+            protected void Dispose(bool disposing)
+            {
+                if (disposing)
+                {
+                    lock (Timer)
+                        Timer.Dispose();
+                }
             }
         }
 
@@ -132,7 +161,14 @@ namespace Hazel
                         lock (p.Timer)
                         {
                             if (!p.Acknowledged)
+                            {
                                 p.Timer.Change(p.LastTimeout *= 2, Timeout.Infinite);       //TODO disconnect after x tries
+                                if (++p.Retransmissions >= RetransmissionsBeforeDisconnect)
+                                {
+                                    HandleDisconnect();
+                                    p.Recycle();
+                                }
+                            }
                         }
 
                         Trace.WriteLine("Resend.");
@@ -211,9 +247,6 @@ namespace Hazel
                     
                     packet.Acknowledged = true;
 
-                    lock (packet.Timer)
-                        packet.Timer.Dispose();
-                    
                     if (packet.AckCallback != null)
                         packet.AckCallback.Invoke();
 
