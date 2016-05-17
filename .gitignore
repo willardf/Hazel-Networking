@@ -16,6 +16,9 @@ bld/
 [Bb]in/
 [Oo]bj/
 
+#Sandcastle generated documentation
+[Hh]elp/
+
 # Roslyn cache directories
 *.ide/
 
