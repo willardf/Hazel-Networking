@@ -6,7 +6,7 @@ using System.Text;
 namespace Hazel
 {
     /// <summary>
-    ///     Marks the state a Connection is currently in.
+    ///     Represents the state a <see cref="Connection"/> is currently in.
     /// </summary>
     public enum ConnectionState
     {

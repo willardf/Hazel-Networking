@@ -7,23 +7,23 @@ using System.Threading.Tasks;
 namespace Hazel
 {
     /// <summary>
-    ///     Extra internal states for SendOption enumeration.
+    ///     Extra internal states for SendOption enumeration when using UDP.
     /// </summary>
     enum SendOptionInternal : byte
     {
         /// <summary>
         ///     Hello message for initiating communication.
         /// </summary>
-        Hello = 253,
+        Hello = 128,
 
         /// <summary>
         ///     Message for discontinuing communication.
         /// </summary>
-        Disconnect = 254,
+        Disconnect = 129,
 
         /// <summary>
         ///     Message acknowledging the receipt of a message.
         /// </summary>
-        Acknowledgement = 255
+        Acknowledgement = 130
     }
 }

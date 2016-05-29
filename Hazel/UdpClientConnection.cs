@@ -9,12 +9,21 @@ using System.Threading.Tasks;
 
 namespace Hazel
 {
-    public class UdpClientConnection : UdpConnection
+    /// <summary>
+    ///     Represents a client's connection to a server that uses the UDP protocol.
+    /// </summary>
+    /// <inheritdoc/>
+    public sealed class UdpClientConnection : UdpConnection
     {
         /// <summary>
         ///     The socket we're connected via.
         /// </summary>
         Socket socket;
+
+        /// <summary>
+        ///     The lock for the socket.
+        /// </summary>
+        Object socketLock = new Object();
 
         /// <summary>
         ///     The buffer to store incomming data in.
@@ -27,27 +36,10 @@ namespace Hazel
         public UdpClientConnection()
             : base()
         {
-            socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            
         }
 
-        /// <summary>
-        ///     Writes an array of bytes to the connection.
-        /// </summary>
-        /// <param name="bytes">The bytes of the message to send.</param>
-        /// <param name="sendOption">The option this data is requested to send with.</param>
-        public override void WriteBytes(byte[] bytes, SendOption sendOption = SendOption.None)
-        {
-            if (State != ConnectionState.Connected)
-                throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
-
-            //Add header information and send
-            HandleSend(bytes, (byte)sendOption);
-        }
-
-        /// <summary>
-        ///     Writes bytes to the socket.
-        /// </summary>
-        /// <param name="bytes">The bytes to send.</param>
+        /// <inheritdoc />
         protected override void WriteBytesToConnection(byte[] bytes)
         {
             //Pack
@@ -55,7 +47,7 @@ namespace Hazel
             args.SetBuffer(bytes, 0, bytes.Length);
             args.RemoteEndPoint = RemoteEndPoint;
 
-            lock (socket)
+            lock (socketLock)
             {
                 if (State != ConnectionState.Connected && State != ConnectionState.Connecting)
                     throw new InvalidOperationException("Could not send data as this Connection is not connected and is not connecting. Did you disconnect?");
@@ -78,9 +70,8 @@ namespace Hazel
             }
         }
 
-        /// <summary>
-        ///     Connects this Connection to a given remote server and begins listening for data.
-        /// </summary>
+        /// <inheritdoc />
+        /// <param name="remoteEndPoint">A <see cref="NetworkEndPoint"/> to connect to.</param>
         public override void Connect(ConnectionEndPoint remoteEndPoint)
         {
             NetworkEndPoint nep = remoteEndPoint as NetworkEndPoint;
@@ -89,11 +80,19 @@ namespace Hazel
                 throw new ArgumentException("The remote end point of a UDP connection must be a NetworkEndPoint.");
             }
 
-            this.EndPoint = nep;
-            this.RemoteEndPoint = nep.EndPoint;
-
-            lock (socket)
+            lock (socketLock)
             {
+                this.EndPoint = nep;
+                this.RemoteEndPoint = nep.EndPoint;
+
+                if (nep.IPMode == IPMode.IPv4)
+                    socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+                else
+                {
+                    socket = new Socket(AddressFamily.InterNetworkV6, SocketType.Dgram, ProtocolType.Udp);
+                    socket.DualMode = true;
+                }
+
                 if (State != ConnectionState.NotConnected)
                     throw new InvalidOperationException("Cannot connect as the Connection is already connected.");
 
@@ -137,7 +136,7 @@ namespace Hazel
 
             //Write bytes to the server to tell it hi (and to punch a hole in our NAT, if present)
             //When acknowledged set the state to connected
-            SendHello(() => State = ConnectionState.Connected);
+            SendHello(() => { lock (socketLock) State = ConnectionState.Connected; });
 
             //Wait till hello packet is acknowledged and the state is set to Connected
             WaitOnConnect();
@@ -148,7 +147,8 @@ namespace Hazel
         /// </summary>
         void StartListeningForData()
         {
-            socket.BeginReceive(dataBuffer, 0, dataBuffer.Length, SocketFlags.None, ReadCallback, dataBuffer);
+            lock (socketLock)
+                socket.BeginReceive(dataBuffer, 0, dataBuffer.Length, SocketFlags.None, ReadCallback, dataBuffer);
         }
 
         /// <summary>
@@ -162,7 +162,7 @@ namespace Hazel
             //End the receive operation
             try
             {
-                lock (socket)
+                lock (socketLock)
                     bytesReceived = socket.EndReceive(result);
             }
             catch (ObjectDisposedException)
@@ -192,8 +192,7 @@ namespace Hazel
             //Begin receiving again
             try
             {
-                lock (socket)
-                    StartListeningForData();
+                StartListeningForData();
             }
             catch (SocketException e)
             {
@@ -209,15 +208,12 @@ namespace Hazel
                 InvokeDataReceived(buffer, sendOption);
         }
 
-        /// <summary>
-        ///     Called when the socket has been disconnected at the remote host.
-        /// </summary>
-        /// <param name="e">The exception if one was the cause.</param>
+        /// <inheritdoc />
         protected override void HandleDisconnect(HazelException e = null)
         {
             bool invoke = false;
 
-            lock (socket)
+            lock (socketLock)
             {
                 //Only invoke the disconnected event if we're not already disconnecting
                 if (State == ConnectionState.Connected)
@@ -236,15 +232,13 @@ namespace Hazel
             }
         }
 
-        /// <summary>
-        ///     Safely closes this connection.
-        /// </summary>
+        /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
             //Dispose of the socket
             if (disposing)
             {
-                lock (socket)
+                lock (socketLock)
                 {
                     State = ConnectionState.NotConnected;
 

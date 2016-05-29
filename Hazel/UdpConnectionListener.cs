@@ -6,18 +6,12 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
-/* 
-* Copyright (C) Jamie Read - All Rights Reserved
-* Unauthorized copying of this file, via any medium is strictly prohibited
-* Proprietary and confidential
-* Written by Jamie Read <jamie.read@outlook.com>, January 2016
-*/
-
 namespace Hazel
 {
     /// <summary>
     ///     Listens for new UDP connections and creates UdpConnections for them.
     /// </summary>
+    /// <inheritdoc />
     public class UdpConnectionListener : NetworkConnectionListener
     {
         /// <summary>
@@ -31,21 +25,26 @@ namespace Hazel
         Dictionary<EndPoint, UdpServerConnection> connections = new Dictionary<EndPoint, UdpServerConnection>();
 
         /// <summary>
-        ///     Creates a new ConnectionListener for the given IP and port.
+        ///     Creates a new ConnectionListener for the given <see cref="IPAddress"/>, port and <see cref="IPMode"/>.
         /// </summary>
-        /// <param name="ipAdress">The IPAddress to listen on.</param>
+        /// <param name="IPAddress">The IPAddress to listen on.</param>
         /// <param name="port">The port to listen on.</param>
-        public UdpConnectionListener(IPAddress IPAddress, int port)
+        /// <param name="mode">The <see cref="IPMode"/> to listen with.</param>
+        public UdpConnectionListener(IPAddress IPAddress, int port, IPMode mode = IPMode.IPv4AndIPv6)
         {
             this.IPAddress = IPAddress;
             this.Port = port;
 
-            this.listener = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            if (mode == IPMode.IPv4)
+                this.listener = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            else
+            {
+                this.listener = new Socket(AddressFamily.InterNetworkV6, SocketType.Dgram, ProtocolType.Udp);
+                this.listener.DualMode = true;
+            }
         }
 
-        /// <summary>
-        ///     Instruct the listener to begin listening for connections.
-        /// </summary>
+        /// <inheritdoc />
         public override void Start()
         {
             try
@@ -186,10 +185,7 @@ namespace Hazel
                 connections.Remove(endPoint);
         }
 
-        /// <summary>
-        ///     Called when the listener is being disposed of
-        /// </summary>
-        /// <param name="disposing"></param>
+        /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
             if (disposing)

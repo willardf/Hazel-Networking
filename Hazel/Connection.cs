@@ -6,44 +6,105 @@ using System.Net.Sockets;
 using System.Net;
 using System.Threading;
 
-
-/* 
-* Copyright (C) Jamie Read - All Rights Reserved
-* Unauthorized copying of this file, via any medium is strictly prohibited
-* Proprietary and confidential
-* Written by Jamie Read <jamie.read@outlook.com>, January 2016
-*/
-
 namespace Hazel
 {
     /// <summary>
-    ///     Handles the sending and receiving of messages through the channel to give connection orientated, packet based transmission.
+    ///     Base class for all connections.
     /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Connection is the base class for all connections that Hazel can make. It provides common functionality and a 
+    ///         standard interface to allow connections to be swapped easily.
+    ///     </para>
+    ///     <para>
+    ///         Any class inheriting from Connection should provide the 3 standard guarantees that Hazel provides:
+    ///         <list type="bullet">
+    ///             <item>
+    ///                 <description>Thread Safe</description>
+    ///             </item>
+    ///             <item>
+    ///                 <description>Connection Orientated</description>
+    ///             </item>
+    ///             <item>
+    ///                 <description>Packet/Message Based</description>
+    ///             </item>
+    ///         </list>
+    ///     </para>
+    /// </remarks>
+    /// <threadsafety static="true" instance="true"/>
     public abstract class Connection : IDisposable
     {
         /// <summary>
         ///     Called when a message has been received.
         /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         DataReceived is invoked everytime a message is received from the end point of this connection, the message 
+        ///         that was received can be found in the <see cref="DataEventArgs"/> alongside other information from the 
+        ///         event.
+        ///     </para>
+        ///     <include file="DocInclude/common.xml" path="docs/item[@name='Event_Thread_Safety_Warning']/*" />
+        /// </remarks>
+        /// <example>
+        ///     <code language="C#" source="DocInclude/TcpClientExample.cs"/>
+        /// </example>
         public event EventHandler<DataEventArgs> DataReceived;
 
         /// <summary>
-        ///     Called when the end point disconnects from us or an error occurs.
+        ///     Called when the end point disconnects or an error occurs.
         /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         Disconnected is invoked when the connection is closed due to an exception occuring or because the remote 
+        ///         end point disconnected. If it was invoked due to an exception occuring then the exception is available 
+        ///         in the <see cref="DisconnectedEventArgs"/> passed with the event.
+        ///     </para>
+        ///     <include file="DocInclude/common.xml" path="docs/item[@name='Event_Thread_Safety_Warning']/*" />
+        /// </remarks>
+        /// <example>
+        ///     <code language="C#" source="DocInclude/TcpClientExample.cs"/>
+        /// </example>
         public event EventHandler<DisconnectedEventArgs> Disconnected;
 
         /// <summary>
-        ///     The end point of this Connection.
+        ///     The remote end point of this Connection.
         /// </summary>
+        /// <remarks>
+        ///     This is the end point that this connection is connected to (i.e. the other device). This returns an abstract 
+        ///     <see cref="ConnectionEndPoint"/> which can then be cast to an appropriate end point depending on the 
+        ///     connection type.
+        /// </remarks>
         public ConnectionEndPoint EndPoint { get; protected set; }
 
         /// <summary>
         ///     The traffic statistics about this Connection.
         /// </summary>
+        /// <remarks>
+        ///     Contains statistics about the number of messages and bytes sent and received by this connection.
+        /// </remarks>
         public ConnectionStatistics Statistics { get; protected set; }
 
         /// <summary>
         ///     The state of this connection.
         /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         Connections go round 4 states in their lifetime: they start as <see cref="ConnectionState.NotConnected"/> to 
+        ///         indicate they have no endpoint, calling <see cref="Connect"/> takes them into 
+        ///         <see cref="ConnectionState.Connecting"/>, once they have received confirmation they are connected they enter
+        ///         <see cref="ConnectionState.Connected"/> and finally calling <see cref="Close"/> sets them to 
+        ///         <see cref="ConnectionState.Disconnecting"/> and then the sequence repeats back to
+        ///         <see cref="ConnectionState.NotConnected"/> once disconnection is complete.
+        ///     </para>
+        ///     <para>
+        ///         Data can only be sent while in <see cref="ConnectionState.Connected"/> and all attempts to send data when
+        ///         in any other state will throw an InvalidOperationException.
+        ///     </para>
+        ///     <para>
+        ///         All implementers should be aware that when this is set to <see cref="ConnectionState.Connected"/> it will
+        ///         release all threads that are blocked on <see cref="WaitOnConnect"/>.
+        ///     </para>
+        /// </remarks>
         public ConnectionState State
         {
             get
@@ -71,6 +132,10 @@ namespace Hazel
         /// <summary>
         ///     Constructor that initializes the ConnecitonStatistics object.
         /// </summary>
+        /// <remarks>
+        ///     This constructor initialises <see cref="Statistics"/> with empty statistics and sets <see cref="State"/> to 
+        ///     <see cref="ConnectionState.NotConnected"/>.
+        /// </remarks>
         protected Connection()
         {
             Statistics = new ConnectionStatistics();
@@ -79,27 +144,40 @@ namespace Hazel
         }
 
         /// <summary>
-        ///     Writes an array of bytes to the connection and prefixes the length.
+        ///     Sends a number of bytes to the end point of the connection using the specified <see cref="SendOption"/>.
         /// </summary>
         /// <param name="bytes">The bytes of the message to send.</param>
-        /// <param name="sendOption">The options this data is requested to send with.</param>
+        /// <param name="sendOption">The option specifying how the message should be sent.</param>
         /// <remarks>
-        ///     The sendOptions parameter is only a request to use those options and the actual method used to send the
-        ///     data is up to the implementation. There are circumstances where this parameter may be ignored but in 
-        ///     general any implementer should aim to always follow the user's request here.
+        ///     <include file="DocInclude/common.xml" path="docs/item[@name='Connection_SendBytes_General']/*" />
+        ///     <para>
+        ///         The sendOptions parameter is only a request to use those options and the actual method used to send the
+        ///         data is up to the implementation. There are circumstances where this parameter may be ignored but in 
+        ///         general any implementer should aim to always follow the user's request.
+        ///     </para>
         /// </remarks>
-        public abstract void WriteBytes(byte[] bytes, SendOption sendOption = SendOption.None);
+        public abstract void SendBytes(byte[] bytes, SendOption sendOption = SendOption.None);
 
         /// <summary>
-        ///     Connects the connection to a remote server and begins listening.
+        ///     Connects the connection to a server and begins listening.
         /// </summary>
+        /// <remarks>
+        ///     Calling Connect makes the connection attempt to connect to the end point that's specified in the 
+        ///     <see cref="ConnectionEndPoint"/> passed. This method will block until the connection attempt completes and
+        ///     will throw a <see cref="HazelException"/> if there is a problem connecting.
+        /// </remarks>
         public abstract void Connect(ConnectionEndPoint remoteEndPoint);
 
         /// <summary>
-        ///     Invokes the DataReceived event to alert subscribers we received data.
+        ///     Invokes the DataReceived event.
         /// </summary>
-        /// <param name="bytes">The bytes to supply.</param>
-        /// <param name="sendOption">The sendOption to supply.</param>
+        /// <param name="bytes">The bytes received.</param>
+        /// <param name="sendOption">The <see cref="SendOption"/> the message was received with.</param>
+        /// <remarks>
+        ///     Invokes the <see cref="DataReceived"/> event on this connection to alert subscribers a new message has been
+        ///     received. The bytes and the send option that the message was sent with should be passed in to give to the
+        ///     subscribers.
+        /// </remarks>
         protected void InvokeDataReceived(byte[] bytes, SendOption sendOption)
         {
             DataEventArgs args = DataEventArgs.GetObject();
@@ -112,10 +190,15 @@ namespace Hazel
         }
 
         /// <summary>
-        ///     Invokes the Disconnected event to alert hooked up methods there was an error or the remote end point disconnected.
+        ///     Invokes the Disconnected event.
         /// </summary>
         /// <param name="e">The exception, if any, that occured to cause this.</param>
-        protected void InvokeDisconnected(Exception e)
+        /// <remarks>
+        ///     Invokes the <see cref="Disconnected"/> event to alert subscribres this connection has been disconnected either 
+        ///     by the end point or because an error occured. If an error occured the error should be passed in in order to 
+        ///     pass to the subscribers, otherwise null can be passed in.
+        /// </remarks>
+        protected void InvokeDisconnected(Exception e = null)
         {
             DisconnectedEventArgs args = DisconnectedEventArgs.GetObject();
             args.Set(e);
@@ -129,6 +212,11 @@ namespace Hazel
         /// <summary>
         ///     Blocks until the Connection is connected.
         /// </summary>
+        /// <remarks>
+        ///     This is a helper method for waiting until the connection is connected. It will block until the 
+        ///     <see cref="State"/> property is set to <see cref="ConnectionState.Connected"/> allowing the main thread to 
+        ///     wait until specific data is received etc. before returning to the user's code.
+        /// </remarks>
         protected void WaitOnConnect()
         {
             connectWaitLock.WaitOne();
@@ -137,6 +225,17 @@ namespace Hazel
         /// <summary>
         ///     Closes this connection safely.
         /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         Informs the end point of the connection that we are disconnecting from them and disposes of this 
+        ///         connection.
+        ///     </para>
+        ///     <para>
+        ///         This calls <see cref="Dispose"/> and therefore sets <see cref="State"/> straight to 
+        ///         <see cref="ConnectionState.NotConnected"/>. Once you call Close you will not be able to send any more
+        ///         data using this connection and no more data will be received.
+        ///     </para> 
+        /// </remarks>
         public virtual void Close()
         {
             Dispose();

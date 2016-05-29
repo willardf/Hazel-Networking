@@ -9,7 +9,7 @@ namespace Hazel
     /// <summary>
     ///     Represents the state of the current receive operation for TCP connections.
     /// </summary>
-    public struct StateObject
+    struct StateObject
     {
         /// <summary>
         ///     The buffer we're receiving.

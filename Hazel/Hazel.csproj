@@ -36,7 +36,8 @@
     <SignAssembly>true</SignAssembly>
   </PropertyGroup>
   <PropertyGroup>
-    <AssemblyOriginatorKeyFile>Hazel.snk</AssemblyOriginatorKeyFile>
+    <AssemblyOriginatorKeyFile>
+    </AssemblyOriginatorKeyFile>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -54,7 +55,12 @@
     <Compile Include="ConnectionState.cs" />
     <Compile Include="DataEventArgs.cs" />
     <Compile Include="DisconnectedEventArgs.cs" />
+    <None Include="DocInclude\TcpClientExample.cs" />
+    <None Include="DocInclude\UdpClientExample.cs" />
+    <None Include="DocInclude\TcpListenerExample.cs" />
+    <None Include="DocInclude\UdpListenerExample.cs" />
     <Compile Include="HazelException.cs" />
+    <Compile Include="IPMode.cs" />
     <Compile Include="IRecyclable.cs" />
     <Compile Include="NetworkConnection.cs" />
     <Compile Include="NetworkConnectionListener.cs" />
@@ -76,10 +82,11 @@
     <Compile Include="UdpConnection.Reliable.cs" />
     <Compile Include="UdpConnectionListener.cs" />
     <Compile Include="UdpServerConnection.cs" />
-    <Compile Include="Utility.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Hazel.snk" />
+    <Content Include="DocInclude\common.xml">
+      <SubType>Designer</SubType>
+    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

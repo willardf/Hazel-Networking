@@ -6,36 +6,53 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 
-/* 
-* Copyright (C) Jamie Read - All Rights Reserved
-* Unauthorized copying of this file, via any medium is strictly prohibited
-* Proprietary and confidential
-* Written by Jamie Read <jamie.read@outlook.com>, January 2016
-*/
-
 namespace Hazel
 {
     /// <summary>
     ///     Represents a connection that uses the UDP protocol.
     /// </summary>
+    /// <inheritdoc />
     public abstract partial class UdpConnection : NetworkConnection
     {
         /// <summary>
-        ///     Writes the given bytes to the connection.
+        ///     Creates a new UdpConnection and initializes the keep alive timer.
         /// </summary>
-        /// <param name="bytes">The bytes to write.</param>
-        protected abstract void WriteBytesToConnection(byte[] bytes);
-
         protected UdpConnection()
         {
             InitializeKeepAliveTimer();
         }
 
         /// <summary>
-        ///     Handles the reliable/fragmented/ordered sending from this connection.
+        ///     Writes the given bytes to the connection.
+        /// </summary>
+        /// <param name="bytes">The bytes to write.</param>
+        protected abstract void WriteBytesToConnection(byte[] bytes);
+
+        /// <inheritdoc/>
+        /// <remarks>
+        ///     <include file="DocInclude/common.xml" path="docs/item[@name='Connection_SendBytes_General']/*" />
+        ///     <para>
+        ///         Udp connections can currently send messages using <see cref="SendOption.None"/> and
+        ///         <see cref="SendOption.Reliable"/>. Fragmented messages are not currently supported and will default to
+        ///         <see cref="SendOption.None"/> until implemented.
+        ///     </para>
+        /// </remarks>
+        public override void SendBytes(byte[] bytes, SendOption sendOption = SendOption.None)
+        {
+            //Early check
+            if (State != ConnectionState.Connected)
+                throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
+
+            //Add header information and send
+            HandleSend(bytes, (byte)sendOption);
+        }
+
+        /// <summary>
+        ///     Handles the reliable/fragmented sending from this connection.
         /// </summary>
         /// <param name="data">The data being sent.</param>
-        /// <param name="sendOption">The send option as a byte.</param>
+        /// <param name="sendOption">The <see cref="SendOption"/> specified as its byte value.</param>
+        /// <param name="ackCallback">The callback to invoke when this packet is acknowledged.</param>
         /// <returns>The bytes that should actually be sent.</returns>
         protected void HandleSend(byte[] data, byte sendOption, Action ackCallback = null)
         {
@@ -77,7 +94,7 @@ namespace Hazel
         /// <summary>
         ///     Handles the receiving of data.
         /// </summary>
-        /// <param name="buffer">The array of the data received.</param>
+        /// <param name="buffer">The buffer containing the bytes received.</param>
         /// <param name="bytesReceived">The number of bytes that were received.</param>
         /// <returns>The bytes of data received.</returns>
         protected byte[] HandleReceive(byte[] buffer, int bytesReceived)
@@ -132,9 +149,7 @@ namespace Hazel
             HandleSend(new byte[0], (byte)SendOptionInternal.Hello, acknowledgeCallback);
         }
 
-        /// <summary>
-        ///     Closes this connection safely.
-        /// </summary>
+        /// <inheritdoc/>
         public override void Close()
         {
             HandleSend(new byte[0], (byte)SendOptionInternal.Disconnect);       //TODO Should disconnect wait for an ack?
@@ -148,10 +163,7 @@ namespace Hazel
         /// <param name="e">The exception if one was the cause.</param>
         protected abstract void HandleDisconnect(HazelException e = null);
 
-        /// <summary>
-        ///     Called when things are being disposed of
-        /// </summary>
-        /// <param name="disposing"></param>
+        /// <inheritdoc/>
         protected override void Dispose(bool disposing)
         {
             if (disposing)

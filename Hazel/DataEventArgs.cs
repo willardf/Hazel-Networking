@@ -3,15 +3,18 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-/* 
-* Copyright (C) Jamie Read - All Rights Reserved
-* Unauthorized copying of this file, via any medium is strictly prohibited
-* Proprietary and confidential
-* Written by Jamie Read <jamie.read@outlook.com>, January 2016
-*/
-
 namespace Hazel
 {
+    /// <summary>
+    ///     Event arguments for the <see cref="Connection.DataEvent"/> event.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         This contains information about messages received by a connection and is passed to subscribers of the 
+    ///         <see cref="Connection.DataEvent">DataEvent</see>. 
+    ///     </para>
+    ///     <include file="DocInclude/common.xml" path="docs/item[@name='Recyclable']/*" />
+    /// </remarks>
     public class DataEventArgs : EventArgs, IRecyclable
     {
         /// <summary>
@@ -22,19 +25,19 @@ namespace Hazel
         /// <summary>
         ///     Returns an instance of this object from the pool.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>A new or recycled DataEventArgs object.</returns>
         internal static DataEventArgs GetObject()
         {
             return objectPool.GetObject();
         }
 
         /// <summary>
-        ///     The bytes received.
+        ///     The bytes received from the client.
         /// </summary>
         public byte[] Bytes { get; private set; }
 
         /// <summary>
-        ///     The SendOption the data was sent with.
+        ///     The <see cref="SendOption"/> the data was sent with.
         /// </summary>
         public object SendOption { get; private set; }
 
@@ -57,9 +60,7 @@ namespace Hazel
             this.SendOption = sendOption;
         }
 
-        /// <summary>
-        ///     Returns this object back to the object pool.
-        /// </summary>
+        /// <inheritdoc />
         public void Recycle()
         {
             objectPool.PutObject(this);

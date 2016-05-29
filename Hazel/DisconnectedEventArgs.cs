@@ -6,8 +6,15 @@ using System.Text;
 namespace Hazel
 {
     /// <summary>
-    ///     Events args for disconnected events.
+    ///     Event arguments for the <see cref="Connection.Disconnected"/> event.
     /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         This contains information about the cause of a disconnection and is passed to subscribers of the
+    ///         <see cref="Connection.Disconnected"/> event.
+    ///     </para>
+    ///     <include file="DocInclude/common.xml" path="docs/item[@name='Recyclable']/*" />
+    /// </remarks>
     public class DisconnectedEventArgs : IRecyclable
     {
         /// <summary>
@@ -18,15 +25,20 @@ namespace Hazel
         /// <summary>
         ///     Returns an instance of this object from the pool.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>A new or recycled DisconnectedEventArgs object.</returns>
         internal static DisconnectedEventArgs GetObject()
         {
             return objectPool.GetObject();
         }
 
         /// <summary>
-        ///     The exception, if any, that caused the disconnect, otherwise null.
+        ///     The exception, if any, that caused the disconnect.
         /// </summary>
+        /// <remarks>
+        ///     If the disconnection was caused because of an exception occuring (for exemple a <see cref="SocketException"/> 
+        ///     on network based connections) this will contain the error that caused it or a <see cref="HazelException"/> 
+        ///     with the details of the exception, if the disconnection wasn't caused by an error then this will contain null.
+        /// </remarks>
         public Exception Exception { get; private set; }
 
         /// <summary>
@@ -46,9 +58,7 @@ namespace Hazel
             this.Exception = e;
         }
 
-        /// <summary>
-        ///     Returns this object back to the object pool.
-        /// </summary>
+        /// <inheritdoc />
         public void Recycle()
         {
             objectPool.PutObject(this);

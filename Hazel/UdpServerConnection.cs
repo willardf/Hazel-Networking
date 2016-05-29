@@ -5,20 +5,21 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
-/* 
-* Copyright (C) Jamie Read - All Rights Reserved
-* Unauthorized copying of this file, via any medium is strictly prohibited
-* Proprietary and confidential
-* Written by Jamie Read <jamie.read@outlook.com>, January 2016
-*/
-
 namespace Hazel
 {
-    class UdpServerConnection : UdpConnection
+    /// <summary>
+    ///     Represents a servers's connection to a client that uses the UDP protocol.
+    /// </summary>
+    /// <inheritdoc/>
+    sealed class UdpServerConnection : UdpConnection
     {
         /// <summary>
         ///     The connection listener that we use the socket of.
         /// </summary>
+        /// <remarks>
+        ///     Udp server connections utilize the same socket in the listener for sends/receives, this is the listener that 
+        ///     created this connection and is hence the listener this conenction sends and receives via.
+        /// </remarks>
         public UdpConnectionListener Listener { get; private set; }
 
         /// <summary>
@@ -29,7 +30,8 @@ namespace Hazel
         /// <summary>
         ///     Creates a UdpConnection for the virtual connection to the endpoint.
         /// </summary>
-        /// <param name="socket"></param>
+        /// <param name="listener">The listener that created this connection.</param>
+        /// <param name="endPoint">The endpoint that we are connected to.</param>
         internal UdpServerConnection(UdpConnectionListener listener, EndPoint endPoint)
             : base()
         {
@@ -40,20 +42,7 @@ namespace Hazel
             State = ConnectionState.Connected;
         }
 
-        /// <summary>
-        ///     Writes an array of bytes to the connection.
-        /// </summary>
-        /// <param name="bytes">The bytes of the message to send.</param>
-        /// <param name="sendOption">The option this data is requested to send with.</param>
-        public override void WriteBytes(byte[] bytes, SendOption sendOption = SendOption.None)
-        {
-            HandleSend(bytes, (byte)sendOption);
-        }
-
-        /// <summary>
-        ///     Writes bytes to the listener to send.
-        /// </summary>
-        /// <param name="bytes">bytes to send.</param>
+        /// <inheritdoc />
         protected override void WriteBytesToConnection(byte[] bytes)
         {
             lock (stateLock)
@@ -65,9 +54,7 @@ namespace Hazel
             }
         }
 
-        /// <summary>
-        ///     Connects this Connection to a given remote server.
-        /// </summary>
+        /// <inheritdoc />
         /// <remarks>
         ///     This will always throw an InvalidOperationException.
         /// </remarks>
@@ -88,10 +75,7 @@ namespace Hazel
                 InvokeDataReceived(data, (SendOption)buffer[0]);
         }
 
-        /// <summary>
-        ///     Called when the socket has been disconnected at the remote host.
-        /// </summary>
-        /// <param name="e">The exception if one was the cause.</param>
+        /// <inheritdoc />
         protected override void HandleDisconnect(HazelException e = null)
         {
             bool invoke = false;
@@ -115,9 +99,7 @@ namespace Hazel
             }
         }
 
-        /// <summary>
-        ///     Safely closes this connection.
-        /// </summary>
+        /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
             //Here we just need to inform the listener we no longer need data.

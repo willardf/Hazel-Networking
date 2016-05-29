@@ -8,16 +8,20 @@ using System.Threading.Tasks;
 
 namespace Hazel
 {
-    /// <summary>
-    ///     UdpConnection part which handles keepalive packets.
-    /// </summary>
     partial class UdpConnection
     {
         /// <summary>
-        ///     The interval from data being received or transmitted to a keepalive packet being sent.
+        ///     The interval from data being received or transmitted to a keepalive packet being sent in milliseconds.
         /// </summary>
         /// <remarks>
-        ///     Set to System.Threading.Timeout.Infinite to disable keepalive packets.
+        ///     <para>
+        ///         Keepalive packets serve to close connections when an endpoint abruptly disconnects and to ensure than any
+        ///         NAT devices do not close their translation for our argument. By ensuring there is regular contact the
+        ///         connection can detect and prevent these issues.
+        ///     </para>
+        ///     <para>
+        ///         The default value is 10 seconds, set to System.Threading.Timeout.Infinite to disable keepalive packets.
+        ///     </para>
         /// </remarks>
         public int KeepAliveInterval
         {

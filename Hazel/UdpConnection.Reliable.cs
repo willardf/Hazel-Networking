@@ -10,13 +10,14 @@ namespace Hazel
 {
     partial class UdpConnection
     {
-        //TODO recycle dataevents and things?
-        
         /// <summary>
         ///     The starting timeout, in miliseconds, at which data will be resent.
         /// </summary>
         /// <remarks>
-        ///     On each resend this is doubled for that packet.
+        ///     For reliable delivery data is resent at specified intervals unless an acknowledgement is received from the 
+        ///     receiving device. The ResendTimeout specifies the interval between the packets being resent, each time a packet
+        ///     is resent the interval is doubled for that packet until the number of resends exceeds the 
+        ///     <see cref="ResendsBeforeDisconnect"/> value.
         /// </remarks>
         public int ResendTimeout { get { return resendTimeout; } set { resendTimeout = value; } }
         private volatile int resendTimeout = 200;        //TODO this based of average ping?
@@ -47,10 +48,16 @@ namespace Hazel
         volatile bool hasReceivedSomething = false;
 
         /// <summary>
-        ///     The maximum times a message should be retransmitted before marking the endpoint as disconnected.
+        ///     The maximum times a message should be resent before marking the endpoint as disconnected.
         /// </summary>
-        public int RetransmissionsBeforeDisconnect { get { return retransmissionsBeforeDisconnect; } set { retransmissionsBeforeDisconnect = value; } }
-        private volatile int retransmissionsBeforeDisconnect = 3;
+        /// <remarks>
+        ///     Reliable packets will be resent at an interval defined in <see cref="ResendInterval"/> for the number of times
+        ///     specified here. Once a packet has been retransmitted this number of times and has not been acknowledged the
+        ///     connection will be marked as disconnected and the <see cref="Connection.Disconnected">Disconnected</see> event
+        ///     will be invoked.
+        /// </remarks>
+        public int ResendsBeforeDisconnect { get { return resendsBeforeDisconnect; } set { resendsBeforeDisconnect = value; } }
+        private volatile int resendsBeforeDisconnect = 3;
 
         /// <summary>
         ///     Class to hold packet data
@@ -155,21 +162,22 @@ namespace Hazel
                     bytes,
                     (Packet p) =>
                     {
-                        WriteBytesToConnection(p.Data);
-
                         //Double packet timeout
                         lock (p.Timer)
                         {
                             if (!p.Acknowledged)
                             {
-                                p.Timer.Change(p.LastTimeout *= 2, Timeout.Infinite);       //TODO disconnect after x tries
-                                if (++p.Retransmissions >= RetransmissionsBeforeDisconnect)
+                                p.Timer.Change(p.LastTimeout *= 2, Timeout.Infinite);
+                                if (++p.Retransmissions > ResendsBeforeDisconnect)
                                 {
                                     HandleDisconnect();
                                     p.Recycle();
+                                    return;
                                 }
                             }
                         }
+
+                        WriteBytesToConnection(p.Data);
 
                         Trace.WriteLine("Resend.");
                     },
@@ -257,6 +265,11 @@ namespace Hazel
             }
         }
 
+        /// <summary>
+        ///     Sends an acknowledgement for a packet given its identification bytes.
+        /// </summary>
+        /// <param name="byte1">The first identification byte.</param>
+        /// <param name="byte2">The second identification byte.</param>
         internal void SendAck(byte byte1, byte byte2)
         {
             //Always reply with acknowledgement in order to stop the sender repeatedly sending it

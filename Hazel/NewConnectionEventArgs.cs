@@ -6,8 +6,15 @@ using System.Text;
 namespace Hazel
 {
     /// <summary>
-    ///     Event args for new connection events.
+    ///     Event arguments for the <see cref="ConnectionListener.NewConnection"/> event.
     /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         This contains the new connection for the client that connection and is passed to subscribers of the
+    ///         <see cref="ConnectionListener.NewConnection"/> event.
+    ///     </para>
+    ///     <include file="DocInclude/common.xml" path="docs/item[@name='Recyclable']/*" />
+    /// </remarks>
     public class NewConnectionEventArgs : EventArgs, IRecyclable
     {
         /// <summary>
@@ -18,19 +25,19 @@ namespace Hazel
         /// <summary>
         ///     Returns an instance of this object from the pool.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>A new or recycled NewConnectionEventArgs object.</returns>
         internal static NewConnectionEventArgs GetObject()
         {
             return objectPool.GetObject();
         }
 
         /// <summary>
-        ///     The new connection.
+        ///     The <see cref="Connection"/> to the new client.
         /// </summary>
         public Connection Connection { get; private set; }
 
         /// <summary>
-        ///     Private constructor for thread pool.
+        ///     Private constructor for object pool.
         /// </summary>
         NewConnectionEventArgs()
         {
@@ -40,15 +47,13 @@ namespace Hazel
         /// <summary>
         ///     Sets the members of the arguments.
         /// </summary>
-        /// <param name="Connection"></param>
+        /// <param name="Connection">The new connection</param>
         internal void Set(Connection Connection)
         {
             this.Connection = Connection;
         }
 
-        /// <summary>
-        ///     Returns this object back to the object pool.
-        /// </summary>
+        /// <inheritdoc />
         public void Recycle()
         {
             objectPool.PutObject(this);
