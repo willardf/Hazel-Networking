@@ -39,7 +39,7 @@ namespace Hazel
         /// <summary>
         ///     The <see cref="SendOption"/> the data was sent with.
         /// </summary>
-        public object SendOption { get; private set; }
+        public SendOption SendOption { get; private set; }
 
         /// <summary>
         ///     Private constructor for object pool.

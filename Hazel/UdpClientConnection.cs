@@ -98,19 +98,10 @@ namespace Hazel
 
                 State = ConnectionState.Connecting;
 
-                //Calculate local end point
-                EndPoint localEndPoint;
-                if (nep.EndPoint is IPEndPoint)
-                    localEndPoint = new IPEndPoint(((IPEndPoint)nep.EndPoint).Address, 0);
-                else if (nep.EndPoint is IPEndPoint)
-                    localEndPoint = new DnsEndPoint(((DnsEndPoint)nep.EndPoint).Host, 0);
-                else
-                    throw new ArgumentException("Can only connect using an IPEndPoint or DnsEndpoint");
-
                 //Begin listening
                 try
                 {
-                    socket.Bind(localEndPoint);
+                    socket.Bind(new IPEndPoint(IPAddress.Any, 0));
                 }
                 catch (SocketException e)
                 {

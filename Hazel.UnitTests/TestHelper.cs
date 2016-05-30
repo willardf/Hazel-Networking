@@ -28,7 +28,7 @@ namespace Hazel.UnitTests
                 Assert.AreEqual(0, args.Connection.Statistics.DataBytesReceived);
                 Assert.AreEqual(0, args.Connection.Statistics.TotalBytesReceived);
                 
-                args.Connection.WriteBytes(data, sendOption);
+                args.Connection.SendBytes(data, sendOption);
                 
                 Assert.AreEqual(data.Length, args.Connection.Statistics.DataBytesSent);
                 Assert.AreEqual(data.Length + headerSize, args.Connection.Statistics.TotalBytesSent);
@@ -100,7 +100,7 @@ namespace Hazel.UnitTests
 
             //Connect
             connection.Connect(new NetworkEndPoint(IPAddress.Loopback, 4296));
-            connection.WriteBytes(data, sendOption);
+            connection.SendBytes(data, sendOption);
 
             //Wait until data is received
             mutex.WaitOne();

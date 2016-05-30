@@ -33,6 +33,43 @@ namespace Hazel.UnitTests
         }
 
         /// <summary>
+        ///     Tests IPv4 connectivity.
+        /// </summary>
+        [TestMethod]
+        public void UdpIPv4ConnectionTest()
+        {
+            using (UdpConnectionListener listener = new UdpConnectionListener(IPAddress.Any, 4296, IPMode.IPv4))
+            using (UdpConnection connection = new UdpClientConnection())
+            {
+                listener.Start();
+
+                connection.Connect(new NetworkEndPoint(IPAddress.Loopback, 4296, IPMode.IPv4));
+            }
+        }
+
+        /// <summary>
+        ///     Tests dual mode connectivity.
+        /// </summary>
+        [TestMethod]
+        public void TcpDualModeConnectionTest()
+        {
+            using (UdpConnectionListener listener = new UdpConnectionListener(IPAddress.Any, 4296, IPMode.IPv4AndIPv6))
+            {
+                listener.Start();
+
+                using (UdpConnection connection = new UdpClientConnection())
+                {
+                    connection.Connect(new NetworkEndPoint(IPAddress.Loopback, 4296, IPMode.IPv4));
+                }
+
+                using (UdpConnection connection = new UdpClientConnection())
+                {
+                    connection.Connect(new NetworkEndPoint(IPAddress.Loopback, 4296, IPMode.IPv4AndIPv6));
+                }
+            }
+        }
+
+        /// <summary>
         ///     Tests server to client unreliable communication on the UdpConnection.
         /// </summary>
         [TestMethod]
