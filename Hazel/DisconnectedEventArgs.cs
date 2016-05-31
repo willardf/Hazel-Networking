@@ -15,6 +15,7 @@ namespace Hazel
     ///     </para>
     ///     <include file="DocInclude/common.xml" path="docs/item[@name='Recyclable']/*" />
     /// </remarks>
+    /// <threadsafety static="true" instance="true"/>
     public class DisconnectedEventArgs : IRecyclable
     {
         /// <summary>

@@ -226,9 +226,13 @@ namespace Hazel
         /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
-            //Dispose of the socket
             if (disposing)
             {
+                //Send disconnect message if we're not already disconnecting
+                if (State == ConnectionState.Connected)
+                    SendDisconnect();
+
+                //Dispose of the socket
                 lock (socketLock)
                 {
                     State = ConnectionState.NotConnected;

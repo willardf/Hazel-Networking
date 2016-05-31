@@ -14,6 +14,7 @@ namespace Hazel
     /// <remarks>
     ///     This wraps a <see cref="System.Net.EndPoint"/> for connecting across a network using protocols like TCP or UDP.
     /// </remarks>
+    /// <threadsafety static="true" instance="true"/>
     public sealed class NetworkEndPoint : ConnectionEndPoint
     {
         /// <summary>

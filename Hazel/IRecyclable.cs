@@ -8,6 +8,7 @@ namespace Hazel
     /// <summary>
     ///     Interface for all items that can be returned to an object pool.
     /// </summary>
+    /// <threadsafety static="true" instance="true"/>
     interface IRecyclable
     {
         /// <summary>

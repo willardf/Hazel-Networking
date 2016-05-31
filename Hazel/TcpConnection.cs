@@ -248,6 +248,11 @@ namespace Hazel
                 //If the socket's been disposed then we can just end there.
                 return;
             }
+            catch (SocketException e)
+            {
+                HandleDisconnect(new HazelException("A Socket exception occured while initiating a receive operation.", e));
+                return;
+            }
 
             StateObject state = (StateObject)result.AsyncState;
 

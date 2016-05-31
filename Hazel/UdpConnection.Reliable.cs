@@ -194,7 +194,7 @@ namespace Hazel
         ///     Handles receives from reliable packets.
         /// </summary>
         /// <param name="bytes">The buffer containing the data.</param>
-        /// <returns>Whether the bytes were valid or not.</returns>
+        /// <returns>Whether the packet was a new packet or not.</returns>
         bool HandleReliableReceive(byte[] bytes)
         {
             //Get the ID form the packet
@@ -203,26 +203,45 @@ namespace Hazel
             //Send an acknowledgement
             SendAck(bytes[1], bytes[2]);
 
-            //Handle reliableness!
+            /*
+             * It gets a little complicated here (note the fact I'm actually using a multiline comment for once...)
+             * 
+             * In a simple world if our data is greater than the last reliable packet received (reliableReceiveLast)
+             * then it is guaranteed to be a new packet, if it's not we can see if we are missing that packet (lookup 
+             * in reliableDataPacketsMissing).
+             * 
+             * --------rrl#############             (1)
+             * 
+             * (where --- are packets received already and #### are packets that will be counted as new)
+             * 
+             * Unfortunately if id becomes greater than 65535 it will loop back to zero so we will add a pointer that
+             * specifies any packets with an id behind it are also new (overwritePointer).
+             * 
+             * ####op----------rrl#####             (2)
+             * 
+             * ------rll#########op----             (3)
+             * 
+             * Anything behind than the reliableReceiveLast pointer (but greater than the overwritePointer is either a 
+             * missing packet or something we've already received so when we change the pointers we need to make sure 
+             * we keep note of what hasn't been received yet (reliableDataPacketsMissing).
+             * 
+             * So...
+             */
+            
             lock (reliableDataPacketsMissing)
             {
-                //TODO Looping of IDs
-                //      Currently when ID loops all packets will be discarded as ID will be less than reliableReceiveLast
-                //      And wont be in reliableDataPacketsMissing.
+                //Calculate overwritePointer
+                ushort overwritePointer = (ushort)(reliableReceiveLast - 32768);
 
-                //If the ID <= reliableReceiveLast it might be something we're missing
-                //HasReceivedSomething handles the edge case of reliableReceiveLast = 0 & ID = 0
-                if (id <= reliableReceiveLast && hasReceivedSomething)
-                {
-                    //See if we're missing it, else this packet is a duplicate
-                    if (reliableDataPacketsMissing.Contains(id))
-                        reliableDataPacketsMissing.Remove(id);
-                    else
-                        return false;
-                }
-                
-                //If ID > reliableReceiveLast then it's something new
+                //Calculate if it is a new packet by examining if it is within the range
+                bool isNew;
+                if (overwritePointer < reliableReceiveLast)
+                    isNew = id > reliableReceiveLast || id <= overwritePointer;     //Figure (2)
                 else
+                    isNew = id > reliableReceiveLast && id <= overwritePointer;     //Figure (3)
+                
+                //If it's new or we've not received anything yet
+                if (isNew || !hasReceivedSomething)
                 {
                     //Mark items between the most recent receive and the id received as missing
                     for (ushort i = (ushort)(reliableReceiveLast + 1); i < id; i++)
@@ -231,6 +250,16 @@ namespace Hazel
                     //Update the most recently received
                     reliableReceiveLast = id;
                     hasReceivedSomething = true;
+                }
+                
+                //Else it could be a missing packet
+                else
+                {
+                    //See if we're missing it, else this packet is a duplicate as so we return false
+                    if (reliableDataPacketsMissing.Contains(id))
+                        reliableDataPacketsMissing.Remove(id);
+                    else
+                        return false;
                 }
             }
 

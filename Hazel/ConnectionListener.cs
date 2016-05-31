@@ -47,7 +47,7 @@ namespace Hazel
         ///     <code language="C#" source="DocInclude/TcpListenerExample.cs"/>
         /// </example>
         public event EventHandler<NewConnectionEventArgs> NewConnection;
-        //TODO add threadsafe markers on all xmldocs
+
         /// <summary>
         ///     Makes this connection listener begin listening for connections.
         /// </summary>

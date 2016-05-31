@@ -105,6 +105,10 @@ namespace Hazel
             //Here we just need to inform the listener we no longer need data.
             if (disposing)
             {
+                //Send disconnect message if we're not already disconnecting
+                if (State == ConnectionState.Connected)
+                    SendDisconnect();
+
                 lock (stateLock)
                 {
                     Listener.RemoveConnectionTo(RemoteEndPoint);

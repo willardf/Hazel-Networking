@@ -10,6 +10,7 @@ namespace Hazel
     /// <summary>
     ///     Abstract base class for a <see cref="Connection"/> to a remote end point via a network protocol like TCP or UDP.
     /// </summary>
+    /// <threadsafety static="true" instance="true"/>
     public abstract class NetworkConnection : Connection
     {
         /// <summary>

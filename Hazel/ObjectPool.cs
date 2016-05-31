@@ -11,6 +11,7 @@ namespace Hazel
     ///     A fairly simple object pool for items that will be created a lot.
     /// </summary>
     /// <typeparam name="T">The type that is pooled.</typeparam>
+    /// <threadsafety static="true" instance="true"/>
     sealed class ObjectPool<T> where T : IRecyclable
     {
         /// <summary>

@@ -10,6 +10,7 @@ namespace Hazel
     /// <summary>
     ///     Abstract base class for a <see cref="ConnectionListener"/> for network based connections.
     /// </summary>
+    /// <threadsafety static="true" instance="true"/>
     public abstract class NetworkConnectionListener : ConnectionListener
     {
         /// <summary>

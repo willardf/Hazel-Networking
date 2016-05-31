@@ -20,6 +20,11 @@ namespace Hazel
         Socket listener;
 
         /// <summary>
+        ///     Buffer to store incoming data in.
+        /// </summary>
+        byte[] dataBuffer = new byte[ushort.MaxValue];
+
+        /// <summary>
         ///     The connections we currently hold
         /// </summary>
         Dictionary<EndPoint, UdpServerConnection> connections = new Dictionary<EndPoint, UdpServerConnection>();
@@ -66,8 +71,7 @@ namespace Hazel
         void StartListeningForData()
         {
             EndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
-            byte[] dataBuffer = new byte[ushort.MaxValue];
-
+            
             try
             {
                 lock (listener)
@@ -91,7 +95,7 @@ namespace Hazel
             //End the receive operation
             try
             {
-                lock (listener) //TODO how does this stop when the client disconnects?
+                lock (listener)
                     bytesReceived = listener.EndReceiveFrom(result, ref remoteEndPoint);
             }
             catch (ObjectDisposedException)
@@ -99,10 +103,11 @@ namespace Hazel
                 //If the socket's been disposed then we can just end there.
                 return;
             }
-            catch (SocketException)
+            catch (SocketException e)
             {
-                //TODO Errr...;
-                return;
+                //Errrr... shit...
+                //Not exactly much we can do if we've got here
+                throw e;
             }
 
             //Exit if no bytes read, we've closed.

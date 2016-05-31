@@ -149,19 +149,19 @@ namespace Hazel
             HandleSend(new byte[0], (byte)SendOptionInternal.Hello, acknowledgeCallback);
         }
 
-        /// <inheritdoc/>
-        public override void Close()
-        {
-            HandleSend(new byte[0], (byte)SendOptionInternal.Disconnect);       //TODO Should disconnect wait for an ack?
-
-            base.Close();
-        }
-
         /// <summary>
         ///     Called when the socket has been disconnected at the remote host.
         /// </summary>
         /// <param name="e">The exception if one was the cause.</param>
         protected abstract void HandleDisconnect(HazelException e = null);
+
+        /// <summary>
+        ///     Sends a disconnect message to the end point.
+        /// </summary>
+        protected void SendDisconnect()
+        {
+            HandleSend(new byte[0], (byte)SendOptionInternal.Disconnect);       //TODO Should disconnect wait for an ack?
+        }
 
         /// <inheritdoc/>
         protected override void Dispose(bool disposing)
