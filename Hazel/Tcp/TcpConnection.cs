@@ -5,7 +5,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
-namespace Hazel
+namespace Hazel.Tcp
 {
     /// <summary>
     ///     Represents a connection that uses the TCP protocol.
@@ -48,9 +48,34 @@ namespace Hazel
         /// <summary>
         ///     Creates a new TCP connection.
         /// </summary>
-        public TcpConnection()
+        /// <param name="remoteEndPoint">A <see cref="NetworkEndPoint"/> to connect to.</param>
+        public TcpConnection(NetworkEndPoint remoteEndPoint)
         {
-            
+            lock (socketLock)
+            {
+                if (State != ConnectionState.NotConnected)
+                    throw new InvalidOperationException("Cannot connect as the Connection is already connected.");
+
+                this.EndPoint = remoteEndPoint;
+                this.RemoteEndPoint = remoteEndPoint.EndPoint;
+
+                //Create a socket
+                if (remoteEndPoint.IPMode == IPMode.IPv4)
+                    socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
+                else
+                {
+                    if (!Socket.OSSupportsIPv6)
+                        throw new HazelException("IPV6 not supported!");
+
+                    socket = new Socket(AddressFamily.InterNetworkV6, SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
+                }
+
+                //Set parameters of socket
+                if (remoteEndPoint.IPMode == IPMode.IPv4AndIPv6)
+                    socket.DualMode = true;
+
+                socket.NoDelay = true;
+            }
         }
 
         /// <summary>
@@ -70,46 +95,16 @@ namespace Hazel
         }
 
         /// <inheritdoc />
-        /// <param name="remoteEndPoint">A <see cref="NetworkEndPoint"/> to connect to.</param>
-        public override void Connect(ConnectionEndPoint remoteEndPoint)
+        public override void Connect()
         {
-            NetworkEndPoint nep = remoteEndPoint as NetworkEndPoint;
-            if (nep == null)
+            lock(socketLock)
             {
-                throw new ArgumentException("The remote end point of a TCP connection must be a NetworkEndPoint.");
-            }
-
-            lock (socketLock)
-            {
-                if (State != ConnectionState.NotConnected)
-                    throw new InvalidOperationException("Cannot connect as the Connection is already connected.");
-
-                this.EndPoint = remoteEndPoint;
-                this.RemoteEndPoint = nep.EndPoint;
-
-                //Create a socket
-                if (nep.IPMode == IPMode.IPv4)
-                    socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
-                else
-                {
-                    if (!Socket.OSSupportsIPv6)
-                        throw new HazelException("IPV6 not supported!");
-
-                    socket = new Socket(AddressFamily.InterNetworkV6, SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
-                }
-
-                //Set parameters of socket
-                if (nep.IPMode == IPMode.IPv4AndIPv6)
-                    socket.DualMode = true;
-
-                socket.NoDelay = true;
-
                 //Connect
                 State = ConnectionState.Connecting;
 
                 try
                 {
-                    socket.Connect(nep.EndPoint);
+                    socket.Connect(RemoteEndPoint);
                 }
                 catch (SocketException e)
                 {

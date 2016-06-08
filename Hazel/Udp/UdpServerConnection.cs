@@ -5,7 +5,7 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Hazel
+namespace Hazel.Udp
 {
     /// <summary>
     ///     Represents a servers's connection to a client that uses the UDP protocol.
@@ -56,11 +56,11 @@ namespace Hazel
 
         /// <inheritdoc />
         /// <remarks>
-        ///     This will always throw an InvalidOperationException.
+        ///     This will always throw a HazelException.
         /// </remarks>
-        public override void Connect(ConnectionEndPoint remoteEndPoint)
+        public override void Connect()
         {
-            throw new InvalidOperationException("Cannot manually connect a UdpServerConnection, did you mean to use UdpClientConnection?");
+            throw new HazelException("Cannot manually connect a UdpServerConnection, did you mean to use UdpClientConnection?");
         }
 
         /// <summary>

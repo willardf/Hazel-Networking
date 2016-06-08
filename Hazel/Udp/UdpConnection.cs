@@ -6,7 +6,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 
-namespace Hazel
+namespace Hazel.Udp
 {
     /// <summary>
     ///     Represents a connection that uses the UDP protocol.

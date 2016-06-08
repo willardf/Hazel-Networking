@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Hazel
+namespace Hazel.Udp
 {
     partial class UdpConnection
     {

@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<topic id="a3d0767d-2da3-45d2-80d7-b0c05698992f" revisionNumber="1">
+  <developerSDKTechnologyOverviewArchitectureDocument xmlns="http://ddue.schemas.microsoft.com/authoring/2003/5" xmlns:xlink="http://www.w3.org/1999/xlink">
+    
+    <introduction>
+      <para>
+      	Hazel's TCP protocol is fairly simple as TCP already provides connection
+      	based communication and thus only needs a message system implementing.
+      </para>
+    </introduction>
+    
+    <section>
+      <title>Header Data</title>
+      <content>
+        <para>
+        	The TCP protocol is fairly simple interms of header. 4 bytes are 
+        	added to mark the number of bytes in each message.
+        </para>
+        <table>
+	      <row>
+	        <entry><para>Length (MSB)</para></entry>
+	        <entry><para>Length</para></entry>
+	        <entry><para>Length</para></entry>
+	        <entry><para>Length (LSB)</para></entry>
+	        <entry><para>Data...</para></entry>
+	      </row>
+	    </table>
+	    <para>All header data in Hazel is encoded in big endian format.</para>
+      </content>
+    </section>
+    
+  </developerSDKTechnologyOverviewArchitectureDocument>
+</topic>

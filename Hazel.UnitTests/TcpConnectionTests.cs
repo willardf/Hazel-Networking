@@ -3,6 +3,8 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Net;
 using System.Threading;
 
+using Hazel.Tcp;
+
 namespace Hazel.UnitTests
 {
     [TestClass]
@@ -14,13 +16,14 @@ namespace Hazel.UnitTests
         [TestMethod]
         public void TcpFieldTest()
         {
+            NetworkEndPoint ep = new NetworkEndPoint(IPAddress.Loopback, 4296);
+
             using (TcpConnectionListener listener = new TcpConnectionListener(IPAddress.Any, 4296))
-            using (TcpConnection connection = new TcpConnection())
+            using (TcpConnection connection = new TcpConnection(ep))
             {
                 listener.Start();
 
-                NetworkEndPoint ep = new NetworkEndPoint(IPAddress.Loopback, 4296);
-                connection.Connect(ep);
+                connection.Connect();
 
                 //Connection fields
                 Assert.AreEqual(ep, connection.EndPoint);
@@ -39,11 +42,11 @@ namespace Hazel.UnitTests
         public void TcpIPv4ConnectionTest()
         {
             using (TcpConnectionListener listener = new TcpConnectionListener(IPAddress.Any, 4296, IPMode.IPv4))
-            using (TcpConnection connection = new TcpConnection())
+            using (TcpConnection connection = new TcpConnection(new NetworkEndPoint(IPAddress.Loopback, 4296, IPMode.IPv4)))
             {
                 listener.Start();
 
-                connection.Connect(new NetworkEndPoint(IPAddress.Loopback, 4296, IPMode.IPv4));
+                connection.Connect();
             }
         }
 
@@ -57,14 +60,14 @@ namespace Hazel.UnitTests
             {
                 listener.Start();
 
-                using (TcpConnection connection = new TcpConnection())
+                using (TcpConnection connection = new TcpConnection(new NetworkEndPoint(IPAddress.Loopback, 4296, IPMode.IPv4)))
                 {
-                    connection.Connect(new NetworkEndPoint(IPAddress.Loopback, 4296, IPMode.IPv4));
+                    connection.Connect();
                 }
 
-                using (TcpConnection connection = new TcpConnection())
+                using (TcpConnection connection = new TcpConnection(new NetworkEndPoint(IPAddress.Loopback, 4296, IPMode.IPv4AndIPv6)))
                 {
-                    connection.Connect(new NetworkEndPoint(IPAddress.Loopback, 4296, IPMode.IPv4AndIPv6));
+                    connection.Connect();
                 }
             }
         }
@@ -76,7 +79,7 @@ namespace Hazel.UnitTests
         public void TcpServerToClientTest()
         {
             using (TcpConnectionListener listener = new TcpConnectionListener(IPAddress.Any, 4296))
-            using (TcpConnection connection = new TcpConnection())
+            using (TcpConnection connection = new TcpConnection(new NetworkEndPoint(IPAddress.Loopback, 4296)))
             {
                 TestHelper.RunServerToClientTest(listener, connection, 4, 0, SendOption.FragmentedReliable);
             }
@@ -89,7 +92,7 @@ namespace Hazel.UnitTests
         public void TcpClientToServerTest()
         {
             using (TcpConnectionListener listener = new TcpConnectionListener(IPAddress.Any, 4296))
-            using (TcpConnection connection = new TcpConnection())
+            using (TcpConnection connection = new TcpConnection(new NetworkEndPoint(IPAddress.Loopback, 4296)))
             {
                 TestHelper.RunClientToServerTest(listener, connection, 4, 0, SendOption.FragmentedReliable);
             }
@@ -102,7 +105,7 @@ namespace Hazel.UnitTests
         public void ClientDisconnectTest()
         {
             using (TcpConnectionListener listener = new TcpConnectionListener(IPAddress.Any, 4296))
-            using (TcpConnection connection = new TcpConnection())
+            using (TcpConnection connection = new TcpConnection(new NetworkEndPoint(IPAddress.Loopback, 4296)))
             {
                 TestHelper.RunClientDisconnectTest(listener, connection);
             }
@@ -115,7 +118,7 @@ namespace Hazel.UnitTests
         public void ServerDisconnectTest()
         {
             using (TcpConnectionListener listener = new TcpConnectionListener(IPAddress.Any, 4296))
-            using (TcpConnection connection = new TcpConnection())
+            using (TcpConnection connection = new TcpConnection(new NetworkEndPoint(IPAddress.Loopback, 4296)))
             {
                 TestHelper.RunServerDisconnectTest(listener, connection);
             }

@@ -6,9 +6,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
-//TODO replace copyright notices with MIT licenses
-
-namespace Hazel
+namespace Hazel.Tcp
 {
     /// <summary>
     ///     Listens for new TCP connections and creates TCPConnections for them.

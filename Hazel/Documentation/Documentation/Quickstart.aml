@@ -1,0 +1,337 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<topic id="4e89497f-70d3-4fb3-9c92-cfd8981ccfa9" revisionNumber="1">
+  <developerWalkthroughDocument
+    xmlns="http://ddue.schemas.microsoft.com/authoring/2003/5"
+    xmlns:xlink="http://www.w3.org/1999/xlink">
+
+    <introduction>
+	  <para>
+	    Hazel is a low level networking library that takes away a lot of the pain of writing sockets. Hazel provides the guarantee of connection orientated, message based communication across TCP, UDP and RUDP.
+	  </para>
+	  <para>
+		This guide will take you through the stages of writing a console based server and connecting to it from a console based client.
+	  </para>
+    </introduction>
+
+    <!-- <prerequisites><content>Optional prerequisites info</content></prerequisites> -->
+
+	<section>
+	  <title>Creating a Server</title>
+	  <content>
+		<procedure>
+		  <title>Creating a Listener</title>
+		  <steps class="ordered">
+			<step>
+			  <content>
+				<para>Create a new solution containing a Console project named "Server" (or at least something obvious).</para>
+			  </content>
+			</step>
+			<step>
+			  <content>
+				<para>Add a reference to Hazel.dll in the project.</para>
+			  </content>
+			</step>
+			<step>
+			  <content>
+				<para>Modify the default file to look like this, we'll go through each part individually.</para>
+				<code language="C#">
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Net;
+
+using Hazel;
+using Hazel.Tcp;
+
+namespace HazelExample
+{
+    class ServerExample
+    {
+        static ConnectionListener listener;
+
+        public static void Main(string[] args)
+        {
+            listener = new TcpConnectionListener(IPAddress.Any, 4296);
+
+            listener.NewConnection += NewConnectionHandler;
+
+            Console.WriteLine("Starting server!");
+
+            listener.Start();
+
+            Console.WriteLine("Press any key to continue...");
+
+            Console.ReadKey();
+
+            listener.Close();
+        }
+    }
+}
+				</code>
+				<para>
+				  Firstly we need to tell the compiler that we are <codeInline>using Hazel;</codeInline> and <codeInline>using Hazel.Tcp;</codeInline> so we have access to Hazel's general and TCP specific types. Secondly we create a <codeEntityReference qualifyHint="false" linkText="ConnectionListener">T:Hazel.ConnectionListener</codeEntityReference>, these wait on a specified port and accept new clients to the server invoking the <codeEntityReference qualifyHint="false" linkText="NewConnection">E:Hazel.ConnectionListener.NewConnection</codeEntityReference> event each time a new client connects.
+				</para>
+				<para>
+				  We then instruct the ConnectionListener to begin listening for new clients by calling <codeEntityReference qualifyHint="false" linkText="Start">M:ConnectionListener.Start</codeEntityReference> and then finally we close the listener using <codeEntityReference qualifyHint="false" linkText="Close">M:ConnectionListener.Close</codeEntityReference>.
+				</para>
+				<para>
+				  In this circumstance it would be much better if we enclosed the listener within a <codeInline>using</codeInline> block as it implements IDisposable, however for the majority of use cases you are more likely to use the listener in this way. If you want to see it used in a <codeInline>using</codeInline> block then look at the unit tests.
+				</para>
+				<para>
+				  If you want to use UDP instead of TCP then it is as simple as including the <codeInline>Hazel.Udp</codeInline> namespace and creating a <codeEntityReference qualifyHint="false" linkText="UdpConnectionListener">T:UdpConnectionListener</codeEntityReference> instead.
+				</para>
+			  </content>
+			</step>
+		  </steps>
+		</procedure>
+			
+		<procedure>
+		  <title>Handling Events</title>
+		  <steps class="ordered">
+			<step>
+			  <content>
+				<para>In the last example we subscribed to the <codeEntityReference qualifyHint="false" linkText="NewConnection">E:ConnectionListener.NewConnection</codeEntityReference> event but we never spsecified what to do in that event. Add the following method to your code.</para>
+				<code language="C#">
+static void NewConnectionHandler(object sender, NewConnectionEventArgs args)
+{
+    Console.WriteLine("New connection from " + args.Connection.EndPoint.ToString();
+
+    args.Connection.DataReceived += DataReceivedHandler;
+}
+				</code>
+				<para>This method is fairly simple, it follows the standard event handler delegate and take a sender (in this case it will be the ConnectionListener that called the event) and some args. The args contain a Connection which is the main object we use for communication with clients.</para>
+				<para>You can imagine this process in a similar way to TCP. You create a listener which creates sockets on the server side for each client socket that connects to it.</para>
+				<para>In this method we simply print out the IP of the client that just connected and then we subscribe to any data that this client sends us. You may also want to store the connection here for later reference as Hazel doesn't maintain a list of connection for you.</para>
+			  </content>
+			</step>
+			<step>
+			  <content>
+				<para>Once again we've got an undeclared event handler so lets fill that in now.</para>
+				<code language="C#">
+private static void DataReceivedHandler(object sender, DataEventArgs args)
+{
+    Connection connection = (Connection)sender;
+
+    Console.WriteLine("Received (" + string.Join&lt;byte&gt;(", ", args.Bytes) + ") from " + connection.EndPoint.ToString());
+
+    connection.SendBytes(args.Bytes, args.SendOption);
+
+    args.Recycle();
+}
+				</code>
+				<para>Again this method follows the standard event handler delegate and this time we make use of the sender parameter to get the connection that received the data. We then go on to print out the data received and then we send it back to the client using <codeEntityReference qualifyHint="false" linkText="SendBytes">M:ConnectionListener.SendBytes</codeEntityReference>. When we send we specify that the send option should be the same as the data that was received, we'll talk more about send options later.</para>
+				<para>You have also probably noticed that I didn't mention the <codeEntityReference qualifyHint="false" linkText="Recycle">M:DataEventArgs.Recycle</codeEntityReference> call. Recycle is an optional call that tells Hazel that it is now safe to use the object again rather than creating a new one and having to wait for the GC to collect the old object. If you are sending a lot of data then you will get less GC runs if you call Recycle but it is not necerssary to call it and if you dont the GC will collect it as normal. Also note that you should only call Recycle once you are done using the object otherwise the data inside it may change!</para>
+			  </content>
+			</step>
+	  	  </steps>
+		</procedure>
+	   	
+	    <para>In total, you should have something like this.</para>
+	    <code language="C#">
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Net;
+
+using Hazel;
+using Hazel.Tcp;
+
+namespace HazelExample
+{
+    class ServerExample
+    {
+        static ConnectionListener listener;
+
+        public static void Main(string[] args)
+        {
+            listener = new TcpConnectionListener(IPAddress.Any, 4296);
+
+            listener.NewConnection += NewConnectionHandler;
+
+            Console.WriteLine("Starting server!");
+
+            listener.Start();
+
+            Console.WriteLine("Press any key to continue...");
+
+            Console.ReadKey();
+
+            listener.Close();
+        }
+
+        static void NewConnectionHandler(object sender, NewConnectionEventArgs args)
+        {
+            Console.WriteLine("New connection from " + args.Connection.EndPoint.ToString();
+
+            args.Connection.DataReceived += DataReceivedHandler;
+
+            args.Recycle();
+        }
+
+        private static void DataReceivedHandler(object sender, DataEventArgs args)
+        {
+            Connection connection = (Connection)sender;
+
+            Console.WriteLine("Received (" + string.Join&lt;byte&gt;(", ", args.Bytes) + ") from " + connection.EndPoint.ToString());
+
+            connection.SendBytes(args.Bytes, args.SendOption);
+
+            args.Recycle();
+        }
+    }
+}
+		</code>
+	  </content>
+	</section>
+	
+	<section>
+	  <title>Creating a Client</title>
+	  <content>
+	    <procedure>
+	      <title>Connecting to a Server</title>
+	      <steps class="ordered">
+	        <step>
+	          <content>
+	            <para>Create a new project in your solution for th client and add a reference to Hazel.dll.</para>
+	          </content>
+	        </step>
+	          
+	        <step>
+	          <content>
+	            <para>Modify the default file to contain the following.</para>
+	            <code language="C#">
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+using Hazel;
+using Hazel.Tcp;
+
+namespace HazelExample
+{
+    class ClientExample
+    {
+        static Connection connection;
+
+        public static void Main(string[] args)
+        {
+            NetworkEndPoint endPoint = new NetworkEndPoint("127.0.0.1", 4296);
+
+            connection = new TcpConnection(endPoint);
+
+            connection.DataReceived += DataReceived;
+
+            Console.WriteLine("Connecting!");
+
+            connection.Connect();
+
+            Console.WriteLine("Press any key to continue...");
+
+            Console.ReadKey();
+
+            connection.Close();
+        }
+    }
+}
+	       	    </code>
+	       	    <para>As you can see you simply create a <codeEntityReference qualifyHint="false" linkText="NetworkEndPoint">T:NetworkEndPoint</codeEntityReference> for the remote server and then pass it into a new <codeEntityReference qualifyHint="false" linkText="Connection">T:Connection</codeEntityReference>. Then you can setup any events needed and finally call <codeEntityReference qualifyHint="false" linkText="Connect">M:Connection.Connect</codeEntityReference> to begin the connection.</para>
+	       	    <para>Finally we close the connection using <codeEntityReference qualifyHint="false" linkText="Close">M:Connection.Close</codeEntityReference>. Again, Connection implements IDisposable and so must be closed, if it is easier you could wrap it in a <codeInline>using</codeInline> block.</para>
+	       	    <para>
+			      If you are using UDP instead of TCP then include the <codeInline>Hazel.Udp</codeInline> namespace and create a <codeEntityReference qualifyHint="false" linkText="UdpClientConnection">T:UdpClientConnection</codeEntityReference> instead.
+		        </para>
+	          </content>
+		    </step>
+		  </steps>
+	    </procedure>
+		  
+        <procedure>
+		  <title>Handling Events</title>
+		  <steps class="ordered">
+		    <step>
+		      <content>
+		        <para>Add the following event handler to receive data, you'll notice that this is the same event we used in the server and so it will not be explained.</para>
+		        <code language="C#">
+private static void DataReceived(object sender, DataEventArgs args)
+{
+	Console.WriteLine("Received (" + string.Join&lt;byte&gt;(", ", args.Bytes) + ") from " + connection.EndPoint.ToString());
+
+	args.Recycle();
+}
+		        </code>
+  		    </content>
+  	      </step>
+        </steps>
+	  </procedure>
+	  
+	  <procedure>
+		<title>Sending Messages</title>
+		<steps class="ordered">
+		  <step>
+		    <content>
+		      <para>Sending a message is the same for both the server and client, you simply call <codeEntityReference qualifyHint="false" linkText="SendBytes">M:Connection.SendBytes</codeEntityReference> on your connection.</para>
+		      <para>Add the following line after the call to Connect</para>
+		      <code>
+connection.SendBytes(new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
+		      </code>
+	        </content>
+	      </step>
+	    </steps>
+	  </procedure>
+	  
+	  <para>You should have something like this.</para>
+	  <code language="C#">
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+using Hazel;
+using Hazel.Tcp;
+
+namespace HazelExample
+{
+    class ClientExample
+    {
+        static Connection connection;
+
+        public static void Main(string[] args)
+        {
+            NetworkEndPoint endPoint = new NetworkEndPoint("127.0.0.1", 4296);
+
+            connection = new TcpConnection(endPoint);
+
+            connection.DataReceived += DataReceived;
+
+            Console.WriteLine("Connecting!");
+
+            connection.Connect();
+
+            connection.SendBytes(new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
+
+            Console.WriteLine("Press any key to continue...");
+
+            Console.ReadKey();
+
+            connection.Close();
+        }
+
+        private static void DataReceived(object sender, DataEventArgs args)
+        {
+            Console.WriteLine("Received (" + string.Join&lt;byte&gt;(", ", args.Bytes) + ") from " + connection.EndPoint.ToString());
+
+            args.Recycle();
+        }
+    }
+}
+        </code>
+	  </content>
+	</section>
+  </developerWalkthroughDocument>
+</topic>

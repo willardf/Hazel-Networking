@@ -30,7 +30,8 @@ namespace Hazel
         /// <summary>
         ///     Creates a NetworkEndPoint from a given <see cref="System.Net.EndPoint">EndPoint</see>.
         /// </summary>
-        /// <param name="endPoint">The end point to wrap./param>
+        /// <param name="endPoint">The end point to wrap.</param>
+        /// <param name="mode">The IP mode to use.</param>
         public NetworkEndPoint(EndPoint endPoint, IPMode mode = IPMode.IPv4AndIPv6)
         {
             this.EndPoint = endPoint;
@@ -42,6 +43,7 @@ namespace Hazel
         /// </summary>
         /// <param name="address">The IP address of the server.</param>
         /// <param name="port">The port the server is listening on.</param>
+        /// <param name="mode">The IP mode to use.</param>
         /// <remarks>
         ///     When using this constructor <see cref="EndPoint"/> will contain an <see cref="IPEndPoint"/>.
         /// </remarks>
@@ -56,13 +58,20 @@ namespace Hazel
         /// </summary>
         /// <param name="IP">A valid IP address of the server.</param>
         /// <param name="port">The port the server is listening on.</param>
+        /// <param name="mode">The IP mode to use.</param>
         /// <remarks>
         ///     When using this constructor <see cref="EndPoint"/> will contain an <see cref="IPEndPoint"/>.
         /// </remarks>
         public NetworkEndPoint(string IP, int port, IPMode mode = IPMode.IPv4AndIPv6)
             : this(IPAddress.Parse(IP), port)
         {
+            
+        }
 
+        /// <inheritdoc />
+        public override string ToString()
+        {
+            return EndPoint.ToString();
         }
     }
 }

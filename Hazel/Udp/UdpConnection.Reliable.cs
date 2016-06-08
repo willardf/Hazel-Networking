@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Hazel
+namespace Hazel.Udp
 {
     partial class UdpConnection
     {
@@ -51,7 +51,7 @@ namespace Hazel
         ///     The maximum times a message should be resent before marking the endpoint as disconnected.
         /// </summary>
         /// <remarks>
-        ///     Reliable packets will be resent at an interval defined in <see cref="ResendInterval"/> for the number of times
+        ///     Reliable packets will be resent at an interval defined in <see cref="ResendTimeout"/> for the number of times
         ///     specified here. Once a packet has been retransmitted this number of times and has not been acknowledged the
         ///     connection will be marked as disconnected and the <see cref="Connection.Disconnected">Disconnected</see> event
         ///     will be invoked.
@@ -141,6 +141,7 @@ namespace Hazel
         ///     Writes the bytes neccessary for a reliable send and stores the send.
         /// </summary>
         /// <param name="bytes">The byte array to write to.</param>
+        /// <param name="ackCallback">The callback to make once the packet has been acknowledged.</param>
         void WriteReliableSendHeader(byte[] bytes, Action ackCallback)
         {
             lock (reliableDataPacketsSent)

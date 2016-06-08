@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<topic id="852623d7-5d68-47e2-b5db-76498da44f95" revisionNumber="1">
+  <developerConceptualDocument xmlns="http://ddue.schemas.microsoft.com/authoring/2003/5" xmlns:xlink="http://www.w3.org/1999/xlink">
+    
+    <introduction>
+      <para>
+      	Underneath Hazel there are a lot of technicalities, this section will 
+      	help outline those details so you understand Hazel's implementations 
+      	better.
+      </para>
+    </introduction>
+    
+  </developerConceptualDocument>
+</topic>

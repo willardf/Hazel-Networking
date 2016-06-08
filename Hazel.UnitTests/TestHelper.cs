@@ -37,7 +37,7 @@ namespace Hazel.UnitTests
             listener.Start();
 
             //Setup conneciton
-            connection.DataReceived += delegate(object sender, DataEventArgs args)
+            connection.DataReceived += delegate(object sender, DataReceivedEventArgs args)
             {
                 Trace.WriteLine("Data was received correctly.");
 
@@ -51,7 +51,7 @@ namespace Hazel.UnitTests
                 mutex.Set();
             };
 
-            connection.Connect(new NetworkEndPoint(IPAddress.Loopback, 4296));
+            connection.Connect();
 
             //Wait until data is received
             mutex.WaitOne();
@@ -76,7 +76,7 @@ namespace Hazel.UnitTests
             //Setup listener
             listener.NewConnection += delegate(object sender, NewConnectionEventArgs args)
             {
-                args.Connection.DataReceived += delegate(object innerSender, DataEventArgs innerArgs)
+                args.Connection.DataReceived += delegate(object innerSender, DataReceivedEventArgs innerArgs)
                 {
                     Trace.WriteLine("Data was received correctly.");
 
@@ -99,7 +99,7 @@ namespace Hazel.UnitTests
             listener.Start();
 
             //Connect
-            connection.Connect(new NetworkEndPoint(IPAddress.Loopback, 4296));
+            connection.Connect();
             connection.SendBytes(data, sendOption);
 
             //Wait until data is received
@@ -132,7 +132,7 @@ namespace Hazel.UnitTests
 
             listener.Start();
 
-            connection.Connect(new NetworkEndPoint(IPAddress.Loopback, 4296));
+            connection.Connect();
 
             mutex.WaitOne();
         }
@@ -156,7 +156,7 @@ namespace Hazel.UnitTests
 
             listener.Start();
 
-            connection.Connect(new NetworkEndPoint(IPAddress.Loopback, 4296));
+            connection.Connect();
 
             connection.Close();
 

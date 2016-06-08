@@ -36,9 +36,10 @@ namespace Hazel
         ///     The exception, if any, that caused the disconnect.
         /// </summary>
         /// <remarks>
-        ///     If the disconnection was caused because of an exception occuring (for exemple a <see cref="SocketException"/> 
-        ///     on network based connections) this will contain the error that caused it or a <see cref="HazelException"/> 
-        ///     with the details of the exception, if the disconnection wasn't caused by an error then this will contain null.
+        ///     If the disconnection was caused because of an exception occuring (for exemple a 
+        ///     <see cref="System.Net.Sockets.SocketException"/> on network based connections) this will contain the error 
+        ///     that caused it or a <see cref="HazelException"/> with the details of the exception, if the disconnection 
+        ///     wasn't caused by an error then this will contain null.
         /// </remarks>
         public Exception Exception { get; private set; }
 

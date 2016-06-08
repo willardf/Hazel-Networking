@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<topic id="0ffa7468-4813-4fd0-ba65-2fa5436bc5ce" revisionNumber="1">
+  <developerConceptualDocument xmlns="http://ddue.schemas.microsoft.com/authoring/2003/5" xmlns:xlink="http://www.w3.org/1999/xlink">
+    
+    <introduction>
+      <para>
+      	In order to provide the guarantees that it does, Hazel augments each
+      	transport protocol with its own meta data (or header data) that is 
+      	hidden from users.
+      </para>
+    </introduction>
+    
+  </developerConceptualDocument>
+</topic>

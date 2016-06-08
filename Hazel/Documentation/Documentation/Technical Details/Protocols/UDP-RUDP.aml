@@ -1,0 +1,146 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<topic id="490c9f89-38c8-4ccf-8af1-683ba7fb0888" revisionNumber="1">
+  <developerSDKTechnologyOverviewArchitectureDocument xmlns="http://ddue.schemas.microsoft.com/authoring/2003/5" xmlns:xlink="http://www.w3.org/1999/xlink">
+    
+    <introduction>
+      <para>
+      	UDP provides message based communication however it is not connection
+      	oriented nor does it have any built in functionality for reliable or
+      	fragmented delivery of messages hence the implementation to cover this
+      	if fairly complicated.
+      </para>
+    </introduction>
+    
+    <section>
+      <title>Header Data</title>
+      <content>
+        <para>
+          The UDP protocol has multiple layers of header data depending on the 
+          send options that are requested with the message.
+        </para>
+        <table>
+	      <row>
+	      	<entry><para><legacyBold>Unreliable</legacyBold></para></entry>
+	        <entry><para>Type</para></entry>
+	        <entry><para>Data...</para></entry>
+	        <entry><para>&#160;</para></entry>
+	        <entry><para>&#160;</para></entry>
+	      </row>
+	      <row>
+	      	<entry><para><legacyBold>Reliable</legacyBold></para></entry>
+	        <entry><para>Type</para></entry>
+	        <entry><para>ID (MSB)</para></entry>
+	        <entry><para>ID (LSB)</para></entry>
+	        <entry><para>Data...</para></entry>
+	      </row>
+	    </table>
+	    <para>All header data in Hazel is encoded in big endian format.</para>
+	    <para>
+	   	  In both of these, <quoteInline>Type</quoteInline> is an identifier 
+	      that holds the SendOption or another value indicating a control
+	      packet of data. The most significant 4 bits of 
+	      <quoteInline>Type</quoteInline> are reserved for future use and the 
+	      least significant bits specify the send option flags for the message.
+	    </para>
+	    <table>
+	      <tableHeader>
+	        <row>
+	          <entry><para>128</para></entry>
+	          <entry><para>64</para></entry>
+	          <entry><para>32</para></entry>
+	          <entry><para>16</para></entry>
+	          <entry><para>8</para></entry>
+	          <entry><para>4</para></entry>
+	          <entry><para>2</para></entry>
+	          <entry><para>1</para></entry>
+	        </row>
+	      </tableHeader>
+	      <row>
+	      	<entry><para>Reserved</para></entry>
+	        <entry><para>Reserved</para></entry>
+	        <entry><para>Reserved</para></entry>
+	        <entry><para>Reserved</para></entry>
+	        <entry><para>Control</para></entry>
+	        <entry><para>Reserved</para></entry>
+	        <entry><para>Fragmented</para></entry>
+	        <entry><para>Reliable</para></entry>
+	      </row>
+	    </table>
+	    <para>
+	      <quoteInline>Reliable</quoteInline> and 
+	      <quoteInline>Fragmented</quoteInline> are both flags for their 
+	      respective send option, <quoteInline>Control</quoteInline>, if set,
+	      specifies that the 3 least significant bits refer to a control code:
+	    </para>
+	    <table>
+	      <row>
+	      	<entry><para>0</para></entry>
+	        <entry><para>Hello</para></entry>
+	      </row>
+	      <row>
+	      	<entry><para>1</para></entry>
+	        <entry><para>Disconnect</para></entry>
+	      </row>
+	      <row>
+	      	<entry><para>2</para></entry>
+	        <entry><para>Acknowledgment</para></entry>
+	      </row>
+	    </table>
+      </content>
+    </section>
+    
+    <section>
+      <title>Reliable Delivery</title>
+      <content>
+        <para>
+    	  To implement reliable delivery 2 ID bytes are sent which identify the 
+    	  packet. When the receiver receives the data is replys with an 
+    	  acknowledgement packet as follows:
+    	</para>
+    	<table>
+	      <row>
+	      	<entry><para><legacyBold>Acknowledgement</legacyBold></para></entry>
+	        <entry><para>Type</para></entry>
+	        <entry><para>ID (MSB)</para></entry>
+	        <entry><para>ID (LSB)</para></entry>
+	      </row>
+	    </table>
+	    <para>
+	      Where type is specifying an acknowledgement packet as laid out above.
+	    </para>
+	    <para>
+	      If the sending client does not receive an acknowledgement after a 
+	      specific amount of time elapses from the pakcet being sent then it 
+	      resends that packet and thetime before the next resend of that packet 
+	      is doubled. When the sending client receives the acknowledgement is
+	      should not resend the data again.
+	    </para>
+	    <para>
+	      The receiving client must also ensure that it does not present the 
+	      same packet to the user twice but must acknowledge any packets it
+	      receives, even if it has already received that packet, in case an
+	      acknowledgement is lost.
+	    </para>
+	    <para>
+	      After a specific number of resends without acknowledgement a sending 
+	      client may mark assume that communication has been interrupted and 
+	      thus mark the connection as disconnected.
+	    </para>
+      </content>
+    </section>
+    
+    <section>
+      <title>Keepalive packets</title>
+      <content>
+        <para>
+          Keepalive packets should be sent after a specific time has elapsed 
+          since the last packet (either keepalive, acknowledgement or user sent)
+          was transmitted and should be sent using reliable delivery so that an
+          acknowledgement can be received to indicate communication has not been
+          lost. As packets that are not acknowledged should cause a 
+          disconnection no additional logic is required for keepalives.
+    	</para>
+      </content>
+    </section>
+  </developerSDKTechnologyOverviewArchitectureDocument>
+</topic>

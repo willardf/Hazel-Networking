@@ -6,28 +6,28 @@ using System.Text;
 namespace Hazel
 {
     /// <summary>
-    ///     Event arguments for the <see cref="Connection.DataEvent"/> event.
+    ///     Event arguments for the <see cref="Connection.DataReceived"/> event.
     /// </summary>
     /// <remarks>
     ///     <para>
     ///         This contains information about messages received by a connection and is passed to subscribers of the 
-    ///         <see cref="Connection.DataEvent">DataEvent</see>. 
+    ///         <see cref="Connection.DataReceived">DataEvent</see>. 
     ///     </para>
     ///     <include file="DocInclude/common.xml" path="docs/item[@name='Recyclable']/*" />
     /// </remarks>
     /// <threadsafety static="true" instance="true"/>
-    public class DataEventArgs : EventArgs, IRecyclable
+    public class DataReceivedEventArgs : EventArgs, IRecyclable
     {
         /// <summary>
         ///     Object pool for this event.
         /// </summary>
-        static readonly ObjectPool<DataEventArgs> objectPool = new ObjectPool<DataEventArgs>(() => new DataEventArgs());
+        static readonly ObjectPool<DataReceivedEventArgs> objectPool = new ObjectPool<DataReceivedEventArgs>(() => new DataReceivedEventArgs());
 
         /// <summary>
         ///     Returns an instance of this object from the pool.
         /// </summary>
         /// <returns>A new or recycled DataEventArgs object.</returns>
-        internal static DataEventArgs GetObject()
+        internal static DataReceivedEventArgs GetObject()
         {
             return objectPool.GetObject();
         }
@@ -45,7 +45,7 @@ namespace Hazel
         /// <summary>
         ///     Private constructor for object pool.
         /// </summary>
-        DataEventArgs()
+        DataReceivedEventArgs()
         {
 
         }

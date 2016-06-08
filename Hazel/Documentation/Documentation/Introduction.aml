@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<topic id="a9f1cfac-8d7d-4668-af2f-60b588018519" revisionNumber="1">
+  <developerConceptualDocument xmlns="http://ddue.schemas.microsoft.com/authoring/2003/5" xmlns:xlink="http://www.w3.org/1999/xlink">
+    
+    <introduction>
+      <para>
+      	Welcome to the Hazel documentation! Here you will find technical 
+      	details, API references and tutorials for getting started with Hazel.
+      </para>
+      <para>
+        Hazel Networking is an open source low level networking library for C# providing 
+        connection orientated, message bassed communication via TCP, UDP and 
+        RUDP. You can download it from Github
+        <externalLink>
+		  <linkText>here</linkText>
+		  <linkUri>https://github.com/DarkRiftNetworking/Hazel-Networking</linkUri>
+		  <linkTarget>_blank</linkTarget>
+ 		</externalLink>
+ 		.
+  	  </para>
+    </introduction>
+    
+  </developerConceptualDocument>
+</topic>

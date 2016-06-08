@@ -38,13 +38,13 @@ namespace Hazel
         ///     <para>
         ///         Hazel doesn't store connections so it is your responsibility to keep track of the connections to your 
         ///         server. Note that as <see cref="Connection"/> implements <see cref="IDisposable"/> if you are not storing
-        ///         a connection then as a bare minimum you should call <see cref="Connection.Dispose"/> here in order to 
+        ///         a connection then as a bare minimum you should call <see cref="Connection.Dispose()"/> here in order to 
         ///         release the connection correctly.
         ///     </para>
         ///     <include file="DocInclude/common.xml" path="docs/item[@name='Event_Thread_Safety_Warning']/*" />
         /// </remarks>
         /// <example>
-        ///     <code language="C#" source="DocInclude/TcpListenerExample.cs"/>
+        ///     <code language="C#" source="../DocInclude/TcpListenerExample.cs"/>
         /// </example>
         public event EventHandler<NewConnectionEventArgs> NewConnection;
 
@@ -57,18 +57,18 @@ namespace Hazel
         ///         connects the <see cref="NewConnection"/> event will be invoked containing the connection to the new client.
         ///     </para>
         ///     <para>
-        ///         To stop listening you should call <see cref="Dispose"/>.
+        ///         To stop listening you should call <see cref="Dispose()"/>.
         ///     </para>
         /// </remarks>
         /// <example>
-        ///     <code language="C#" source="DocInclude/TcpListenerExample.cs"/>
+        ///     <code language="C#" source="../DocInclude/TcpListenerExample.cs"/>
         /// </example>
         public abstract void Start();
 
         /// <summary>
         ///     Invokes the NewConnection event with the supplied connection.
         /// </summary>
-        /// <param name="args">The connection to pass to subscribers.</param>
+        /// <param name="connection">The connection to pass in the arguments.</param>
         /// <remarks>
         ///     Implementers should call this to invoke the <see cref="NewConnection"/> event before data is received so that
         ///     subscribers do not miss any data that may have been sent immediately after connecting.
@@ -83,6 +83,18 @@ namespace Hazel
             EventHandler<NewConnectionEventArgs> handler = NewConnection;
             if (handler != null)
                 handler(this, args);
+        }
+
+        /// <summary>
+        ///     Closes the connection listener safely.
+        /// </summary>
+        /// <remarks>
+        ///     Internally this simply calls Dispose therefore trying to reuse the ConnectionListener after calling Close will
+        ///     cause ObjectDisposedExceptions.
+        /// </remarks>
+        public virtual void Close()
+        {
+            Dispose();
         }
 
         /// <summary>

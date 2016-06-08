@@ -3,12 +3,12 @@
 <docs>
   <item name="Event_Thread_Safety_Warning">
     <para>
-      As with all Hazel events it is invoked on a thread from the .NET <see cref="ThreadPool"/> and hence any
-      subscribers should ensure their handling code is thread safe. Implementing connections are not bound to
-      invoking this event in the sequence messages are received, in fact implementers are only required to
-      ensure this method is always and only invoked for a user sent message, therefore subscribers should be
-      aware that this event may be called out of order and may be called whilst another thread is still handling
-      an invocation of the event.
+      As with all Hazel events it is invoked on a thread from the .NET 
+      <see cref="System.Threading.ThreadPool">ThreadPool</see> and hence any subscribers should ensure their 
+      handling code is thread safe. Implementing connections are not bound to invoking this event in the sequence
+      messages are received, in fact implementers are only required to ensure this method is always and only invoked
+      for a user sent message, therefore subscribers should be aware that this event may be called out of order and
+      may be called whilst another thread is still handling an invocation of the event.
     </para>
   </item>
   <item name="Recyclable">
@@ -25,7 +25,7 @@
       This method sends a number of bytes in a message to the end point of this client using the given
       <see cref="SendOption"/> to describe how the data should be sent. Sending messages requires that the
       this connection is connected to a remote end point and SendBytes will throw an exception if that is not
-      the case. See the <see cref="State"/> property for information on whether a connection is connected or not.
+      the case. See the <see cref="Connection.State"/> property for information on whether a connection is connected or not.
     </para>
   </item>
 </docs>

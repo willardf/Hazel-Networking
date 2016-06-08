@@ -14,16 +14,16 @@ namespace Hazel
         /// <summary>
         ///     Hello message for initiating communication.
         /// </summary>
-        Hello = 128,
+        Hello = 8,
 
         /// <summary>
         ///     Message for discontinuing communication.
         /// </summary>
-        Disconnect = 129,
+        Disconnect = 9,
 
         /// <summary>
         ///     Message acknowledging the receipt of a message.
         /// </summary>
-        Acknowledgement = 130
+        Acknowledgement = 10
     }
 }

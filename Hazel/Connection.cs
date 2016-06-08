@@ -40,15 +40,15 @@ namespace Hazel
         /// <remarks>
         ///     <para>
         ///         DataReceived is invoked everytime a message is received from the end point of this connection, the message 
-        ///         that was received can be found in the <see cref="DataEventArgs"/> alongside other information from the 
+        ///         that was received can be found in the <see cref="DataReceivedEventArgs"/> alongside other information from the 
         ///         event.
         ///     </para>
         ///     <include file="DocInclude/common.xml" path="docs/item[@name='Event_Thread_Safety_Warning']/*" />
         /// </remarks>
         /// <example>
-        ///     <code language="C#" source="DocInclude/TcpClientExample.cs"/>
+        ///     <code language="C#" source="../DocInclude/TcpClientExample.cs"/>
         /// </example>
-        public event EventHandler<DataEventArgs> DataReceived;
+        public event EventHandler<DataReceivedEventArgs> DataReceived;
 
         /// <summary>
         ///     Called when the end point disconnects or an error occurs.
@@ -62,7 +62,7 @@ namespace Hazel
         ///     <include file="DocInclude/common.xml" path="docs/item[@name='Event_Thread_Safety_Warning']/*" />
         /// </remarks>
         /// <example>
-        ///     <code language="C#" source="DocInclude/TcpClientExample.cs"/>
+        ///     <code language="C#" source="../DocInclude/TcpClientExample.cs"/>
         /// </example>
         public event EventHandler<DisconnectedEventArgs> Disconnected;
 
@@ -163,10 +163,10 @@ namespace Hazel
         /// </summary>
         /// <remarks>
         ///     Calling Connect makes the connection attempt to connect to the end point that's specified in the 
-        ///     <see cref="ConnectionEndPoint"/> passed. This method will block until the connection attempt completes and
-        ///     will throw a <see cref="HazelException"/> if there is a problem connecting.
+        ///     constructor. This method will block until the connection attempt completes and will throw a 
+        ///     <see cref="HazelException"/> if there is a problem connecting.
         /// </remarks>
-        public abstract void Connect(ConnectionEndPoint remoteEndPoint);
+        public abstract void Connect();
 
         /// <summary>
         ///     Invokes the DataReceived event.
@@ -180,11 +180,11 @@ namespace Hazel
         /// </remarks>
         protected void InvokeDataReceived(byte[] bytes, SendOption sendOption)
         {
-            DataEventArgs args = DataEventArgs.GetObject();
+            DataReceivedEventArgs args = DataReceivedEventArgs.GetObject();
             args.Set(bytes, sendOption);
 
             //Make a copy to avoid race condition between null check and invocation
-            EventHandler<DataEventArgs> handler = DataReceived;
+            EventHandler<DataReceivedEventArgs> handler = DataReceived;
             if (handler != null)
                 handler(this, args);
         }
@@ -231,7 +231,7 @@ namespace Hazel
         ///         connection.
         ///     </para>
         ///     <para>
-        ///         This calls <see cref="Dispose"/> and therefore sets <see cref="State"/> straight to 
+        ///         This calls <see cref="Dispose()"/> and therefore sets <see cref="State"/> straight to 
         ///         <see cref="ConnectionState.NotConnected"/>. Once you call Close you will not be able to send any more
         ///         data using this connection and no more data will be received.
         ///     </para> 

@@ -6,7 +6,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Hazel
+namespace Hazel.Udp
 {
     /// <summary>
     ///     Listens for new UDP connections and creates UdpConnections for them.

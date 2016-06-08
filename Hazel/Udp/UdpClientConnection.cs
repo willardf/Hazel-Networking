@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Hazel
+namespace Hazel.Udp
 {
     /// <summary>
     ///     Represents a client's connection to a server that uses the UDP protocol.
@@ -33,10 +33,23 @@ namespace Hazel
         /// <summary>
         ///     Creates a new UdpClientConnection.
         /// </summary>
-        public UdpClientConnection()
+        /// <param name="remoteEndPoint">A <see cref="NetworkEndPoint"/> to connect to.</param>
+        public UdpClientConnection(NetworkEndPoint remoteEndPoint)
             : base()
         {
-            
+            lock (socketLock)
+            {
+                this.EndPoint = remoteEndPoint;
+                this.RemoteEndPoint = remoteEndPoint.EndPoint;
+
+                if (remoteEndPoint.IPMode == IPMode.IPv4)
+                    socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+                else
+                {
+                    socket = new Socket(AddressFamily.InterNetworkV6, SocketType.Dgram, ProtocolType.Udp);
+                    socket.DualMode = true;
+                }
+            }
         }
 
         /// <inheritdoc />
@@ -71,28 +84,10 @@ namespace Hazel
         }
 
         /// <inheritdoc />
-        /// <param name="remoteEndPoint">A <see cref="NetworkEndPoint"/> to connect to.</param>
-        public override void Connect(ConnectionEndPoint remoteEndPoint)
+        public override void Connect()
         {
-            NetworkEndPoint nep = remoteEndPoint as NetworkEndPoint;
-            if (nep == null)
+            lock(socketLock)
             {
-                throw new ArgumentException("The remote end point of a UDP connection must be a NetworkEndPoint.");
-            }
-
-            lock (socketLock)
-            {
-                this.EndPoint = nep;
-                this.RemoteEndPoint = nep.EndPoint;
-
-                if (nep.IPMode == IPMode.IPv4)
-                    socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-                else
-                {
-                    socket = new Socket(AddressFamily.InterNetworkV6, SocketType.Dgram, ProtocolType.Udp);
-                    socket.DualMode = true;
-                }
-
                 if (State != ConnectionState.NotConnected)
                     throw new InvalidOperationException("Cannot connect as the Connection is already connected.");
 

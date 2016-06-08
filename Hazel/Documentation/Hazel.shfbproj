@@ -25,8 +25,8 @@
     <DisableCodeBlockComponent>False</DisableCodeBlockComponent>
     <CleanIntermediates>True</CleanIntermediates>
     <DocumentationSources>
-      <DocumentationSource sourceFile="bin\Release\Hazel.dll" />
-<DocumentationSource sourceFile="bin\Release\Hazel.XML" /></DocumentationSources>
+      <DocumentationSource sourceFile="..\bin\Release\Hazel.dll" />
+<DocumentationSource sourceFile="..\bin\Release\Hazel.xml" /></DocumentationSources>
     <HelpFileVersion>1.0.0.0</HelpFileVersion>
     <MaximumGroupParts>2</MaximumGroupParts>
     <NamespaceGrouping>False</NamespaceGrouping>
@@ -38,6 +38,10 @@
     <NamingMethod>Guid</NamingMethod>
     <HelpTitle>Hazel Networking</HelpTitle>
     <ContentPlacement>AboveNamespaces</ContentPlacement>
+    <NamespaceSummaries>
+      <NamespaceSummaryItem name="Hazel" isDocumented="True" xmlns="">The Hazel namespace contains various classes used across the different communication methods implemented.</NamespaceSummaryItem>
+<NamespaceSummaryItem name="Hazel.Tcp" isDocumented="True" xmlns="">Namespace for classes relating to communication via TCP.</NamespaceSummaryItem>
+<NamespaceSummaryItem name="Hazel.Udp" isDocumented="True" xmlns="">Namespace for classes relating to communication via TCP.</NamespaceSummaryItem></NamespaceSummaries>
   </PropertyGroup>
   <!-- There are no properties for these groups.  AnyCPU needs to appear in order for Visual Studio to perform
 			 the build.  The others are optional common platform types that may appear. -->
@@ -69,7 +73,24 @@
     <RunPostBuildEvent>OnBuildSuccess</RunPostBuildEvent>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="Hazel.csproj">
+    <None Include="Documentation\Introduction.aml" />
+    <None Include="Documentation\Technical Details\Protocols\TCP.aml" />
+    <None Include="Documentation\Technical Details\Protocols\UDP-RUDP.aml" />
+    <None Include="Documentation\Technical Details\Protocols\TCP.aml" />
+    <None Include="Documentation\Technical Details\Technical Details.aml" />
+    <None Include="Documentation\Technical Details\Protocols\Protocols.aml" />
+    <None Include="Documentation\Quickstart.aml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Documentation\Technical Details\Protocols\" />
+    <Folder Include="Documentation\Technical Details\" />
+    <Folder Include="Documentation\" />
+  </ItemGroup>
+  <ItemGroup>
+    <ContentLayout Include="Documentation\Content Layout.content" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Hazel.csproj">
       <Name>Hazel</Name>
       <Project>{02CFBD30-D77D-400F-94B2-700F60EFDD7F}</Project>
     </ProjectReference>

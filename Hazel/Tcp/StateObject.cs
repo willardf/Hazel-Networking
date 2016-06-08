@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Hazel
+namespace Hazel.Tcp
 {
     /// <summary>
     ///     Represents the state of the current receive operation for TCP connections.
@@ -30,6 +30,7 @@ namespace Hazel
         ///     Creates a StateObject with the specified length.
         /// </summary>
         /// <param name="length">The number of bytes expected to be received.</param>
+        /// <param name="callback">The callback to invoke once data has been received.</param>
         internal StateObject(int length, Action<byte[]> callback)
         {
             this.buffer = new byte[length];
