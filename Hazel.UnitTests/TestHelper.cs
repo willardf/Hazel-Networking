@@ -47,7 +47,7 @@ namespace Hazel.UnitTests
                 }
 
                 Assert.AreEqual(sendOption, args.SendOption);
-
+                
                 mutex.Set();
             };
 
@@ -72,6 +72,7 @@ namespace Hazel.UnitTests
             //Setup meta stuff 
             byte[] data = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
             ManualResetEvent mutex = new ManualResetEvent(false);
+            ManualResetEvent mutex2 = new ManualResetEvent(false);
 
             //Setup listener
             listener.NewConnection += delegate(object sender, NewConnectionEventArgs args)
@@ -92,18 +93,23 @@ namespace Hazel.UnitTests
                     Assert.AreEqual(0, args.Connection.Statistics.TotalBytesSent);
                     Assert.AreEqual(data.Length + headerSize, args.Connection.Statistics.TotalBytesReceived);
 
-                    mutex.Set();
+                    mutex2.Set();
                 };
+
+                mutex.Set();
             };
 
             listener.Start();
 
             //Connect
             connection.Connect();
+
+            mutex.WaitOne();
+
             connection.SendBytes(data, sendOption);
 
             //Wait until data is received
-            mutex.WaitOne();
+            mutex2.WaitOne();
 
             Assert.AreEqual(data.Length, connection.Statistics.DataBytesSent);
             Assert.AreEqual(0, connection.Statistics.DataBytesReceived);
@@ -145,22 +151,27 @@ namespace Hazel.UnitTests
         internal static void RunClientDisconnectTest(ConnectionListener listener, Connection connection)
         {
             ManualResetEvent mutex = new ManualResetEvent(false);
+            ManualResetEvent mutex2 = new ManualResetEvent(false);
 
             listener.NewConnection += delegate(object sender, NewConnectionEventArgs args)
             {
                 args.Connection.Disconnected += delegate(object sender2, DisconnectedEventArgs args2)
                 {
-                    mutex.Set();
+                    mutex2.Set();
                 };
+
+                mutex.Set();
             };
 
             listener.Start();
 
             connection.Connect();
 
+            mutex.WaitOne();
+
             connection.Close();
 
-            mutex.WaitOne();
+            mutex2.WaitOne();
         }
     }
 }

@@ -54,7 +54,7 @@ namespace Hazel.UnitTests
         ///     Tests dual mode connectivity.
         /// </summary>
         [TestMethod]
-        public void TcpDualModeConnectionTest()
+        public void UdpDualModeConnectionTest()
         {
             using (UdpConnectionListener listener = new UdpConnectionListener(IPAddress.Any, 4296, IPMode.IPv4AndIPv6))
             {
@@ -141,9 +141,9 @@ namespace Hazel.UnitTests
                 System.Threading.Thread.Sleep(1100);    //Enough time for ~10 keep alive packets
 
                 Assert.IsTrue(
-                    connection.Statistics.TotalBytesSent >= 27
-                        && connection.Statistics.TotalBytesSent <= 33,
-                    "Received: " + connection.Statistics.TotalBytesSent
+                    connection.Statistics.TotalBytesSent >= 27 &&
+                    connection.Statistics.TotalBytesSent <= 33,
+                    "Sent: " + connection.Statistics.TotalBytesSent
                 );
             }
         }
@@ -166,9 +166,9 @@ namespace Hazel.UnitTests
                     Thread.Sleep(1100);    //Enough time for ~10 keep alive packets
 
                     Assert.IsTrue(
-                        args.Connection.Statistics.TotalBytesSent >= 27
-                            && args.Connection.Statistics.TotalBytesSent <= 33,
-                        "Received: " + args.Connection.Statistics.TotalBytesSent
+                        args.Connection.Statistics.TotalBytesSent >= 27 &&
+                        args.Connection.Statistics.TotalBytesSent <= 33,
+                        "Sent: " + connection.Statistics.TotalBytesSent
                     );
 
                     mutex.Set();
