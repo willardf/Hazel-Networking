@@ -14,13 +14,19 @@ namespace Hazel.Udp
         ///     The starting timeout, in miliseconds, at which data will be resent.
         /// </summary>
         /// <remarks>
-        ///     For reliable delivery data is resent at specified intervals unless an acknowledgement is received from the 
-        ///     receiving device. The ResendTimeout specifies the interval between the packets being resent, each time a packet
-        ///     is resent the interval is doubled for that packet until the number of resends exceeds the 
-        ///     <see cref="ResendsBeforeDisconnect"/> value.
+        ///     <para>
+        ///         For reliable delivery data is resent at specified intervals unless an acknowledgement is received from the 
+        ///         receiving device. The ResendTimeout specifies the interval between the packets being resent, each time a packet
+        ///         is resent the interval is doubled for that packet until the number of resends exceeds the 
+        ///         <see cref="ResendsBeforeDisconnect"/> value.
+        ///     </para>
+        ///     <para>
+        ///         Setting this to its default of 0 will mean the timout is 4 times the value of the average ping, usually 
+        ///         resulting in a more dynamic resend that responds to endpoints on slower or faster connections.
+        ///     </para>
         /// </remarks>
         public int ResendTimeout { get { return resendTimeout; } set { resendTimeout = value; } }
-        private volatile int resendTimeout = 200;        //TODO this based of average ping?
+        private volatile int resendTimeout = 200;
 
         /// <summary>
         ///     Holds the last ID allocated.
@@ -46,6 +52,35 @@ namespace Hazel.Udp
         ///     Has the connection received anything yet
         /// </summary>
         volatile bool hasReceivedSomething = false;
+
+        /// <summary>
+        ///     The total time it has taken reliable packets to make a round trip.
+        /// </summary>
+        long totalRoundTime = 0;
+
+        /// <summary>
+        ///     The number of reliable messages that have been sent.
+        /// </summary>
+        long totalReliableMessages = 0;
+
+        /// <summary>
+        ///     Returns the average ping to this endpoint.
+        /// </summary>
+        /// <remarks>
+        ///     This returns the average ping for a one-way trip as calculated from the reliable packets that have been sent 
+        ///     and acknowledged by the endpoint.
+        /// </remarks>
+        public double AveragePing
+        {
+            get
+            {
+                long t = Interlocked.Read(ref totalReliableMessages);
+                if (t == 0)
+                    return 0;
+                else
+                    return Interlocked.Read(ref totalRoundTime) / t / 2;
+            }
+        }
 
         /// <summary>
         ///     The maximum times a message should be resent before marking the endpoint as disconnected.
@@ -84,6 +119,7 @@ namespace Hazel.Udp
             public Action AckCallback;
             public volatile bool Acknowledged;
             public volatile int Retransmissions;
+            public Stopwatch Stopwatch = new Stopwatch();
 
             Packet()
             {
@@ -105,6 +141,9 @@ namespace Hazel.Udp
                 AckCallback = ackCallback;
                 Acknowledged = false;
                 Retransmissions = 0;
+
+                Stopwatch.Reset();
+                Stopwatch.Start();
             }
 
             /// <summary>
@@ -172,17 +211,29 @@ namespace Hazel.Udp
                                 if (++p.Retransmissions > ResendsBeforeDisconnect)
                                 {
                                     HandleDisconnect();
+                                    
+                                    //Set acknowledged so we dont change the timer again
+                                    p.Acknowledged = true;
+
                                     p.Recycle();
                                     return;
                                 }
                             }
                         }
 
-                        WriteBytesToConnection(p.Data);
+                        try
+                        {
+                            WriteBytesToConnection(p.Data);
+                        }
+                        catch (InvalidOperationException e)
+                        {
+                            //No longer connected
+                            HandleDisconnect(new HazelException("Could not resend data as connection is no longer connected", e));
+                        }
 
                         Trace.WriteLine("Resend.");
                     },
-                    resendTimeout,
+                    resendTimeout > 0 ? resendTimeout : (AveragePing != 0 ? (int)AveragePing * 4 : 200),
                     ackCallback
                 );
 
@@ -287,6 +338,11 @@ namespace Hazel.Udp
 
                     if (packet.AckCallback != null)
                         packet.AckCallback.Invoke();
+
+                    //Add to average ping
+                    packet.Stopwatch.Stop();
+                    Interlocked.Add(ref totalRoundTime, packet.Stopwatch.Elapsed.Milliseconds);
+                    Interlocked.Increment(ref totalReliableMessages);
 
                     packet.Recycle();
 

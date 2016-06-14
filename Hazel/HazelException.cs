@@ -16,7 +16,7 @@ namespace Hazel
 
         }
 
-        internal HazelException(string msg, System.Net.Sockets.SocketException e) : base (msg, e)
+        internal HazelException(string msg, Exception e) : base (msg, e)
         {
 
         }

@@ -19,6 +19,8 @@ namespace Hazel.Udp
         /// </summary>
         Socket listener;
 
+        IPEndPoint bindOn;
+
         /// <summary>
         ///     Buffer to store incoming data in.
         /// </summary>
@@ -40,6 +42,8 @@ namespace Hazel.Udp
             this.IPAddress = IPAddress;
             this.Port = port;
 
+             this.bindOn = new IPEndPoint(IPAddress, Port);
+
             if (mode == IPMode.IPv4)
                 this.listener = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             else
@@ -55,7 +59,7 @@ namespace Hazel.Udp
             try
             {
                 lock (listener)
-                    listener.Bind(new IPEndPoint(IPAddress, Port));
+                    listener.Bind(bindOn);
             }
             catch (SocketException e)
             {
@@ -70,7 +74,7 @@ namespace Hazel.Udp
         /// </summary>
         void StartListeningForData()
         {
-            EndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
+            EndPoint remoteEP = (EndPoint)bindOn;
             
             try
             {
@@ -140,8 +144,8 @@ namespace Hazel.Udp
 
                     connection = new UdpServerConnection(this, remoteEndPoint);
                     connections.Add(remoteEndPoint, connection);
-                    
-                    //Then ping back an ack to make sure they're happy
+
+                    //Then ping back an ack to make sure they're happy (unless we rejected them...)
                     connection.SendAck(buffer[1], buffer[2]);
                 }
             }
