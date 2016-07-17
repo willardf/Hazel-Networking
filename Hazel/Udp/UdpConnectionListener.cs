@@ -4,7 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Threading.Tasks;
+
 
 namespace Hazel.Udp
 {
@@ -19,8 +19,6 @@ namespace Hazel.Udp
         /// </summary>
         Socket listener;
 
-        IPEndPoint bindOn;
-
         /// <summary>
         ///     Buffer to store incoming data in.
         /// </summary>
@@ -32,24 +30,36 @@ namespace Hazel.Udp
         Dictionary<EndPoint, UdpServerConnection> connections = new Dictionary<EndPoint, UdpServerConnection>();
 
         /// <summary>
-        ///     Creates a new ConnectionListener for the given <see cref="IPAddress"/>, port and <see cref="IPMode"/>.
+        ///     Creates a new UdpConnectionListener for the given <see cref="IPAddress"/>, port and <see cref="IPMode"/>.
         /// </summary>
         /// <param name="IPAddress">The IPAddress to listen on.</param>
         /// <param name="port">The port to listen on.</param>
         /// <param name="mode">The <see cref="IPMode"/> to listen with.</param>
-        public UdpConnectionListener(IPAddress IPAddress, int port, IPMode mode = IPMode.IPv4AndIPv6)
+        [Obsolete("Temporary constructor in beta only, use NetworkEndPoint constructor instead.")]
+        public UdpConnectionListener(IPAddress IPAddress, int port, IPMode mode = IPMode.IPv4)
+            : this (new NetworkEndPoint(IPAddress, port, mode))
         {
-            this.IPAddress = IPAddress;
-            this.Port = port;
 
-             this.bindOn = new IPEndPoint(IPAddress, Port);
+        }
 
-            if (mode == IPMode.IPv4)
+        /// <summary>
+        ///     Creates a new UdpConnectionListener for the given <see cref="IPAddress"/>, port and <see cref="IPMode"/>.
+        /// </summary>
+        /// <param name="endPoint">The endpoint to listen on.</param>
+        public UdpConnectionListener(NetworkEndPoint endPoint)
+        {
+            this.EndPoint = endPoint.EndPoint;
+            this.IPMode = endPoint.IPMode;
+
+            if (endPoint.IPMode == IPMode.IPv4)
                 this.listener = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             else
             {
+                if (!Socket.OSSupportsIPv6)
+                    throw new HazelException("IPV6 not supported!");
+
                 this.listener = new Socket(AddressFamily.InterNetworkV6, SocketType.Dgram, ProtocolType.Udp);
-                this.listener.DualMode = true;
+                this.listener.SetSocketOption(SocketOptionLevel.IPv6, (SocketOptionName)27, false);
             }
         }
 
@@ -59,7 +69,7 @@ namespace Hazel.Udp
             try
             {
                 lock (listener)
-                    listener.Bind(bindOn);
+                    listener.Bind(EndPoint);
             }
             catch (SocketException e)
             {
@@ -74,7 +84,7 @@ namespace Hazel.Udp
         /// </summary>
         void StartListeningForData()
         {
-            EndPoint remoteEP = (EndPoint)bindOn;
+            EndPoint remoteEP = EndPoint;
             
             try
             {
@@ -94,7 +104,7 @@ namespace Hazel.Udp
         void ReadCallback(IAsyncResult result)
         {
             int bytesReceived;
-            EndPoint remoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
+            EndPoint remoteEndPoint = new IPEndPoint(IPMode == IPMode.IPv4 ? IPAddress.Any : IPAddress.IPv6Any, 0);
 
             //End the receive operation
             try
@@ -142,7 +152,7 @@ namespace Hazel.Udp
                     if (buffer[0] != (byte)SendOptionInternal.Hello || buffer.Length != 3)
                         return;
 
-                    connection = new UdpServerConnection(this, remoteEndPoint);
+                    connection = new UdpServerConnection(this, remoteEndPoint, IPMode);
                     connections.Add(remoteEndPoint, connection);
 
                     //Then ping back an ack to make sure they're happy (unless we rejected them...)
@@ -200,7 +210,7 @@ namespace Hazel.Udp
             if (disposing)
             {
                 lock (listener)
-                    listener.Dispose();
+                    listener.Close();
             }
 
             base.Dispose(disposing);

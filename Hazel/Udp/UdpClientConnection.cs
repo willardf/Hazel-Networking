@@ -5,7 +5,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
+
 
 namespace Hazel.Udp
 {
@@ -41,13 +41,17 @@ namespace Hazel.Udp
             {
                 this.EndPoint = remoteEndPoint;
                 this.RemoteEndPoint = remoteEndPoint.EndPoint;
+                this.IPMode = remoteEndPoint.IPMode;
 
                 if (remoteEndPoint.IPMode == IPMode.IPv4)
                     socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
                 else
                 {
+                    if (!Socket.OSSupportsIPv6)
+                        throw new HazelException("IPV6 not supported!");
+
                     socket = new Socket(AddressFamily.InterNetworkV6, SocketType.Dgram, ProtocolType.Udp);
-                    socket.DualMode = true;
+                    socket.SetSocketOption(SocketOptionLevel.IPv6, (SocketOptionName)27, false);    //TODO these lines shouldn't be needed anymore
                 }
             }
         }
@@ -96,7 +100,10 @@ namespace Hazel.Udp
                 //Begin listening
                 try
                 {
-                    socket.Bind(new IPEndPoint(IPAddress.Any, 0));
+                    if (IPMode == IPMode.IPv4)
+                        socket.Bind(new IPEndPoint(IPAddress.Any, 0));
+                    else
+                        socket.Bind(new IPEndPoint(IPAddress.IPv6Any, 0));
                 }
                 catch (SocketException e)
                 {
@@ -232,7 +239,7 @@ namespace Hazel.Udp
                 {
                     State = ConnectionState.NotConnected;
 
-                    socket.Dispose();
+                    socket.Close();
                 }
             }
 

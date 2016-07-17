@@ -4,7 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Threading.Tasks;
+
 
 namespace Hazel.Tcp
 {
@@ -25,12 +25,23 @@ namespace Hazel.Tcp
         /// <param name="IPAddress">The IPAddress to listen on.</param>
         /// <param name="port">The port to listen on.</param>
         /// <param name="mode">The <see cref="IPMode"/> to listen with.</param>
-        public TcpConnectionListener(IPAddress IPAddress, int port, IPMode mode = IPMode.IPv4AndIPv6)
+        [Obsolete("Temporary constructor in beta only, use NetworkEndPoint constructor instead.")]
+        public TcpConnectionListener(IPAddress IPAddress, int port, IPMode mode = IPMode.IPv4)
+            : this (new NetworkEndPoint(IPAddress, port, mode))
         {
-            this.IPAddress = IPAddress;
-            this.Port = port;
 
-            if (mode == IPMode.IPv4)
+        }
+
+        /// <summary>
+        ///     Creates a new TcpConnectionListener for the given <see cref="IPAddress"/>, port and <see cref="IPMode"/>.
+        /// </summary>
+        /// <param name="endPoint">The end point to listen on.</param>
+        public TcpConnectionListener(NetworkEndPoint endPoint)
+        {
+            this.EndPoint = endPoint.EndPoint;
+            this.IPMode = endPoint.IPMode;
+
+            if (endPoint.IPMode == IPMode.IPv4)
                 this.listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             else
             {
@@ -38,10 +49,8 @@ namespace Hazel.Tcp
                     throw new HazelException("IPV6 not supported!");
 
                 this.listener = new Socket(AddressFamily.InterNetworkV6, SocketType.Stream, ProtocolType.Tcp);
+                this.listener.SetSocketOption(SocketOptionLevel.IPv6, (SocketOptionName)27, false);
             }
-            
-            if (mode == IPMode.IPv4AndIPv6)
-                this.listener.DualMode = true;
         }
 
         /// <inheritdoc />
@@ -51,7 +60,7 @@ namespace Hazel.Tcp
             {
                 lock (listener)
                 {
-                    listener.Bind(new IPEndPoint(IPAddress, Port));
+                    listener.Bind(EndPoint);
                     listener.Listen(1000);
 
                     listener.BeginAccept(AcceptConnection, null);
@@ -102,7 +111,7 @@ namespace Hazel.Tcp
             if (disposing)
             {
                 lock (listener)
-                    listener.Dispose();
+                    listener.Close();
             }
 
             base.Dispose(disposing);

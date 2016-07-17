@@ -58,6 +58,7 @@ namespace Hazel.Tcp
 
                 this.EndPoint = remoteEndPoint;
                 this.RemoteEndPoint = remoteEndPoint.EndPoint;
+                this.IPMode = remoteEndPoint.IPMode;
 
                 //Create a socket
                 if (remoteEndPoint.IPMode == IPMode.IPv4)
@@ -68,11 +69,8 @@ namespace Hazel.Tcp
                         throw new HazelException("IPV6 not supported!");
 
                     socket = new Socket(AddressFamily.InterNetworkV6, SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
+                    socket.SetSocketOption(SocketOptionLevel.IPv6, (SocketOptionName)27, false);
                 }
-
-                //Set parameters of socket
-                if (remoteEndPoint.IPMode == IPMode.IPv4AndIPv6)
-                    socket.DualMode = true;
 
                 socket.NoDelay = true;
             }
@@ -349,7 +347,7 @@ namespace Hazel.Tcp
 
                     if (socket.Connected)
                         socket.Shutdown(SocketShutdown.Send);
-                    socket.Dispose();
+                    socket.Close();
                 }
             }
 

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+
 
 namespace Hazel
 {
@@ -22,8 +22,9 @@ namespace Hazel
         IPv4,
 
         /// <summary>
-        ///     Instruction to use dual mode sockets, both IPv4 and IPv6 connections will be able to connect.
+        ///     Instruction to use IPv6 only, IPv4 connections will not be able to connect. IPv4 addresses can be connected 
+        ///     by converting to IPv6 addresses.
         /// </summary>
-        IPv4AndIPv6
+        IPv6
     }
 }

@@ -3,7 +3,7 @@
     static void Main(string[] args)
     {
         //Setup listener
-        using (TcpConnectionListener listener = new TcpConnectionListener(IPAddress.Any, 4296))
+        using (TcpConnectionListener listener = new TcpConnectionListener(new NetworkEndPoint(IPAddress.Any, 4296)))
         {
             //Start listening for new connection events
             listener.NewConnection += delegate(object sender, NewConnectionEventArgs a)

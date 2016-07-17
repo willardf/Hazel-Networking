@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Text;
-using System.Threading.Tasks;
+
 
 namespace Hazel.Udp
 {
@@ -32,12 +32,14 @@ namespace Hazel.Udp
         /// </summary>
         /// <param name="listener">The listener that created this connection.</param>
         /// <param name="endPoint">The endpoint that we are connected to.</param>
-        internal UdpServerConnection(UdpConnectionListener listener, EndPoint endPoint)
+        /// <param name="IPMode">The IPMode we are connected using.</param>
+        internal UdpServerConnection(UdpConnectionListener listener, EndPoint endPoint, IPMode IPMode)
             : base()
         {
             this.Listener = listener;
             this.RemoteEndPoint = endPoint;
             this.EndPoint = new NetworkEndPoint(endPoint);
+            this.IPMode = IPMode;
 
             State = ConnectionState.Connected;
         }

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Text;
-using System.Threading.Tasks;
+
 
 namespace Hazel
 {
@@ -21,5 +21,10 @@ namespace Hazel
         ///     <see cref="ConnectionEndPoint"/> as the base <see cref="Connection"/> does.
         /// </remarks>
         public EndPoint RemoteEndPoint { get; protected set; }
+
+        /// <summary>
+        ///     The <see cref="IPMode">IPMode</see> the client is connected using.
+        /// </summary>
+        public IPMode IPMode { get; protected set; }
     }
 }

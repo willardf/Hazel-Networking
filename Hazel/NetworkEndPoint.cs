@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+
 
 using System.Net;
 
@@ -32,7 +32,7 @@ namespace Hazel
         /// </summary>
         /// <param name="endPoint">The end point to wrap.</param>
         /// <param name="mode">The IP mode to use.</param>
-        public NetworkEndPoint(EndPoint endPoint, IPMode mode = IPMode.IPv4AndIPv6)
+        public NetworkEndPoint(EndPoint endPoint, IPMode mode = IPMode.IPv4)
         {
             this.EndPoint = endPoint;
             this.IPMode = mode;
@@ -47,8 +47,8 @@ namespace Hazel
         /// <remarks>
         ///     When using this constructor <see cref="EndPoint"/> will contain an <see cref="IPEndPoint"/>.
         /// </remarks>
-        public NetworkEndPoint(IPAddress address, int port, IPMode mode = IPMode.IPv4AndIPv6)
-            : this(new IPEndPoint(address, port))
+        public NetworkEndPoint(IPAddress address, int port, IPMode mode = IPMode.IPv4)
+            : this(new IPEndPoint(address, port), mode)
         {
 
         }
@@ -62,8 +62,8 @@ namespace Hazel
         /// <remarks>
         ///     When using this constructor <see cref="EndPoint"/> will contain an <see cref="IPEndPoint"/>.
         /// </remarks>
-        public NetworkEndPoint(string IP, int port, IPMode mode = IPMode.IPv4AndIPv6)
-            : this(IPAddress.Parse(IP), port)
+        public NetworkEndPoint(string IP, int port, IPMode mode = IPMode.IPv4)
+            : this(IPAddress.Parse(IP), port, mode)
         {
             
         }

@@ -16,7 +16,7 @@ namespace Hazel
     ///     <include file="DocInclude/common.xml" path="docs/item[@name='Recyclable']/*" />
     /// </remarks>
     /// <threadsafety static="true" instance="true"/>
-    public class DisconnectedEventArgs : IRecyclable
+    public class DisconnectedEventArgs : EventArgs, IRecyclable
     {
         /// <summary>
         ///     Object pool for this event.

@@ -3,7 +3,7 @@
     static void Main(string[] args)
     {
         //Setup listener
-        using (UdpConnectionListener listener = new UdpConnectionListener(IPAddress.Any, 4296))
+        using (UdpConnectionListener listener = new UdpConnectionListener(new NetworkEndPoint(IPAddress.Any, 4296)))
         {
             //Start listening for new connection events
             listener.NewConnection += delegate(object sender, NewConnectionEventArgs a)

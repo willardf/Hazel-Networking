@@ -54,18 +54,13 @@ namespace Hazel.UnitTests
         ///     Tests dual mode connectivity.
         /// </summary>
         [TestMethod]
-        public void TcpDualModeConnectionTest()
+        public void TcpIPv6ConnectionTest()
         {
-            using (TcpConnectionListener listener = new TcpConnectionListener(IPAddress.Any, 4296, IPMode.IPv4AndIPv6))
+            using (TcpConnectionListener listener = new TcpConnectionListener(IPAddress.IPv6Any, 4296, IPMode.IPv6))
             {
                 listener.Start();
 
-                using (TcpConnection connection = new TcpConnection(new NetworkEndPoint(IPAddress.Loopback, 4296, IPMode.IPv4)))
-                {
-                    connection.Connect();
-                }
-
-                using (TcpConnection connection = new TcpConnection(new NetworkEndPoint(IPAddress.Loopback, 4296, IPMode.IPv4AndIPv6)))
+                using (TcpConnection connection = new TcpConnection(new NetworkEndPoint(IPAddress.IPv6Loopback, 4296, IPMode.IPv6)))
                 {
                     connection.Connect();
                 }
