@@ -24,3 +24,9 @@ Hazel is going to be the basis of DarkRift 2 and I'm releasing it completely ope
 HTML documentation, tutorials and quickstarts are available on the DarkRift Website [here](http://www.darkriftnetworking.com/docs); support is available through [email](jamie@darkriftnetworking.com) or alternatively Hazel has a thread on the [Unity forum](http://forum.unity3d.com/threads/hazel-networking-open-source-rudp-tcp-library.409863/) where you'll also find updates and other news.
 
 If you want to make improvements, do so! If you find bugs, raise issues!
+
+-----
+
+## Building Hazel
+
+To build Hazel open [solution file](Hazel.sln) using your favourite C# IDE (I use Visual Studio 2013) and then build as you would any other project.
