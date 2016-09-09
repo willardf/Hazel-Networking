@@ -53,7 +53,7 @@
     <Compile Include="ConnectionEndPoint.cs" />
     <Compile Include="ConnectionListener.cs" />
     <Compile Include="ConnectionState.cs" />
-    <Compile Include="DataEventArgs.cs" />
+    <Compile Include="DataReceivedEventArgs.cs" />
     <Compile Include="DisconnectedEventArgs.cs" />
     <None Include="DocInclude\TcpClientExample.cs" />
     <None Include="DocInclude\UdpClientExample.cs" />
