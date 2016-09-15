@@ -7,7 +7,7 @@
             ManualResetEvent e = new ManualResetEvent(false);
 
             //Whenever we receive data print the number of bytes and how it was sent
-            connection.DataReceived += (object sender, DataEventArgs a) =>
+            connection.DataReceived += (object sender, DataReceivedEventArgs a) =>
                 Console.WriteLine("Received {0} bytes via {1}!", a.Bytes.Length, a.SendOption);
 
             //When the end point disconnects from us then release the main thread and exit
