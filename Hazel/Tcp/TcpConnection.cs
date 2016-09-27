@@ -96,7 +96,7 @@ namespace Hazel.Tcp
                 //Start receiving data
                 try
                 {
-                    StartListening();
+                    StartWaitingForHeader();
                 }
                 catch (SocketException e)
                 {
