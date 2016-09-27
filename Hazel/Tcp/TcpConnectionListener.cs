@@ -101,7 +101,15 @@ namespace Hazel.Tcp
                 //Invoke
                 InvokeNewConnection(tcpConnection);
 
-                tcpConnection.StartListening();
+                try
+                {
+                    tcpConnection.StartWaitingForHeader();
+                }
+                catch (SocketException)
+                {
+                    //Receive operation couldn't be started, there's nothing we can do to save it
+                    return;
+                }
             }
         }
 
