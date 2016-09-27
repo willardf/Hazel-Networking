@@ -239,7 +239,7 @@ namespace Hazel.Tcp
             }
             catch (SocketException e)
             {
-                HandleDisconnect(new HazelException("A Socket exception occured while initiating a receive operation.", e));
+                HandleDisconnect(new HazelException("A Socket exception occured while completing a chunk read operation.", e));
                 return;
             }
 
