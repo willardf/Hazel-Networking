@@ -29,4 +29,4 @@ If you want to make improvements, do so! If you find bugs, raise issues!
 
 ## Building Hazel
 
-To build Hazel open [solution file](Hazel.sln) using your favourite C# IDE (I use Visual Studio 2013) and then build as you would any other project.
+To build Hazel open [solution file](Hazel.sln) using your favourite C# IDE (I use Visual Studio 2015) and then build as you would any other project.
