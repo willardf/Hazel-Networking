@@ -245,7 +245,7 @@ namespace Hazel.Tcp
 
             StateObject state = (StateObject)result.AsyncState;
 
-            state.totalBytesReceived += bytesReceived;
+            state.totalBytesReceived += bytesReceived;      //TODO threading issues on state?
 
             //Exit if receive nothing
             if (bytesReceived == 0)
