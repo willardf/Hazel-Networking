@@ -103,8 +103,8 @@ namespace Hazel.Tcp
                     throw new HazelException("A Socket exception occured while initiating the first receive operation.", e);
                 }
 
-            //Set connected
-            State = ConnectionState.Connected;
+                //Set connected
+                State = ConnectionState.Connected;
             }
         }
 
