@@ -175,7 +175,7 @@ namespace Hazel.Tcp
             }
             catch (SocketException e)
             {
-                HandleDisconnect(new HazelException("A Socket exception occured while initiating a body receive operation.", e));
+                HandleDisconnect(new HazelException("A Socket exception occured while initiating a header receive operation.", e));
             }
 
             Statistics.LogReceive(bytes.Length, bytes.Length + 4);
@@ -185,9 +185,24 @@ namespace Hazel.Tcp
         }
 
         /// <summary>
+        ///     Starts this connection receiving data.
+        /// </summary>
+        internal void StartReceiving()
+        {
+            try
+            {
+                StartWaitingForHeader();
+            }
+            catch (SocketException e)
+            {
+                HandleDisconnect(new HazelException("A Socket exception occured while initiating the first receive operation.", e));
+            }
+        }
+
+        /// <summary>
         ///     Starts this connections waiting for the header.
         /// </summary>
-        internal void StartWaitingForHeader()
+        void StartWaitingForHeader()
         {
             StartWaitingForBytes(4, HeaderReadCallback);
         }
