@@ -4,6 +4,7 @@ using System.Net;
 using System.Threading;
 
 using Hazel.Udp;
+using System.Linq;
 
 namespace Hazel.UnitTests
 {
@@ -30,8 +31,25 @@ namespace Hazel.UnitTests
 
                 //UdpConnection fields
                 Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 4296), connection.RemoteEndPoint);
-                Assert.AreEqual(0, connection.Statistics.DataBytesSent);
+                Assert.AreEqual(1, connection.Statistics.DataBytesSent);
                 Assert.AreEqual(0, connection.Statistics.DataBytesReceived);
+            }
+        }
+
+        [TestMethod]
+        public void UdpHandshakeTest()
+        {
+            using (UdpConnectionListener listener = new UdpConnectionListener(IPAddress.Any, 4296, IPMode.IPv4))
+            using (UdpConnection connection = new UdpClientConnection(new NetworkEndPoint(IPAddress.Loopback, 4296, IPMode.IPv4)))
+            {
+                listener.Start();
+
+                listener.NewConnection += delegate (object sender, NewConnectionEventArgs e)
+                {
+                    Assert.IsTrue(Enumerable.SequenceEqual(e.HandshakeData, new byte[] { 1, 2, 3, 4, 5, 6 }));
+                };
+
+                connection.Connect(new byte[] { 1, 2, 3, 4, 5, 6 });
             }
         }
 
@@ -76,7 +94,7 @@ namespace Hazel.UnitTests
             using (UdpConnectionListener listener = new UdpConnectionListener(new NetworkEndPoint(IPAddress.Any, 4296)))
             using (UdpConnection connection = new UdpClientConnection(new NetworkEndPoint(IPAddress.Loopback, 4296)))
             {
-                TestHelper.RunServerToClientTest(listener, connection, 1, 3, SendOption.None);
+                TestHelper.RunServerToClientTest(listener, connection, 1, 4, SendOption.None);
             }
         }
 
@@ -89,7 +107,7 @@ namespace Hazel.UnitTests
             using (UdpConnectionListener listener = new UdpConnectionListener(new NetworkEndPoint(IPAddress.Any, 4296)))
             using (UdpConnection connection = new UdpClientConnection(new NetworkEndPoint(IPAddress.Loopback, 4296)))
             {
-                TestHelper.RunServerToClientTest(listener, connection, 3, 3, SendOption.Reliable);
+                TestHelper.RunServerToClientTest(listener, connection, 3, 4, SendOption.Reliable);
             }
         }
 
@@ -102,7 +120,7 @@ namespace Hazel.UnitTests
             using (UdpConnectionListener listener = new UdpConnectionListener(new NetworkEndPoint(IPAddress.Any, 4296)))
             using (UdpConnection connection = new UdpClientConnection(new NetworkEndPoint(IPAddress.Loopback, 4296)))
             {
-                TestHelper.RunClientToServerTest(listener, connection, 1, 3, SendOption.None);
+                TestHelper.RunClientToServerTest(listener, connection, 1, 4, SendOption.None);
             }
         }
 
@@ -115,7 +133,7 @@ namespace Hazel.UnitTests
             using (UdpConnectionListener listener = new UdpConnectionListener(new NetworkEndPoint(IPAddress.Any, 4296)))
             using (UdpConnection connection = new UdpClientConnection(new NetworkEndPoint(IPAddress.Loopback, 4296)))
             {
-                TestHelper.RunClientToServerTest(listener, connection, 3, 3, SendOption.Reliable);
+                TestHelper.RunClientToServerTest(listener, connection, 3, 4, SendOption.Reliable);
             }
         }
 
@@ -133,11 +151,11 @@ namespace Hazel.UnitTests
                 connection.Connect();
                 connection.KeepAliveInterval = 100;
 
-                System.Threading.Thread.Sleep(1100);    //Enough time for ~10 keep alive packets
+                System.Threading.Thread.Sleep(1050);    //Enough time for ~10 keep alive packets
 
                 Assert.IsTrue(
-                    connection.Statistics.TotalBytesSent >= 27 &&
-                    connection.Statistics.TotalBytesSent <= 33,
+                    connection.Statistics.TotalBytesSent >= 30 &&
+                    connection.Statistics.TotalBytesSent <= 50,
                     "Sent: " + connection.Statistics.TotalBytesSent
                 );
             }
@@ -158,12 +176,12 @@ namespace Hazel.UnitTests
                 {
                     ((UdpConnection)args.Connection).KeepAliveInterval = 100;
 
-                    Thread.Sleep(1100);    //Enough time for ~10 keep alive packets
+                    Thread.Sleep(1050);    //Enough time for ~10 keep alive packets
 
                     Assert.IsTrue(
-                        args.Connection.Statistics.TotalBytesSent >= 27 &&
-                        args.Connection.Statistics.TotalBytesSent <= 33,
-                        "Sent: " + connection.Statistics.TotalBytesSent
+                        args.Connection.Statistics.TotalBytesSent >= 30 &&
+                        args.Connection.Statistics.TotalBytesSent <= 50,
+                        "Sent: " + args.Connection.Statistics.TotalBytesSent
                     );
 
                     mutex.Set();

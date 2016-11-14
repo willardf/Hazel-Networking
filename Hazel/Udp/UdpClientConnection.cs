@@ -88,7 +88,7 @@ namespace Hazel.Udp
         }
 
         /// <inheritdoc />
-        public override void Connect()
+        public override void Connect(byte[] bytes = null)
         {
             lock(socketLock)
             {
@@ -129,7 +129,7 @@ namespace Hazel.Udp
 
             //Write bytes to the server to tell it hi (and to punch a hole in our NAT, if present)
             //When acknowledged set the state to connected
-            SendHello(() => { lock (socketLock) State = ConnectionState.Connected; });
+            SendHello(bytes, () => { lock (socketLock) State = ConnectionState.Connected; });
 
             //Wait till hello packet is acknowledged and the state is set to Connected
             WaitOnConnect();

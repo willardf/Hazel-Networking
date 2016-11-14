@@ -4,6 +4,7 @@ using System.Net;
 using System.Threading;
 
 using Hazel.Tcp;
+using System.Linq;
 
 namespace Hazel.UnitTests
 {
@@ -30,8 +31,25 @@ namespace Hazel.UnitTests
 
                 //TcpConnection fields
                 Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 4296), connection.RemoteEndPoint);
-                Assert.AreEqual(0, connection.Statistics.DataBytesSent);
+                Assert.AreEqual(1, connection.Statistics.DataBytesSent);
                 Assert.AreEqual(0, connection.Statistics.DataBytesReceived);
+            }
+        }
+
+        [TestMethod]
+        public void TcpHandshakeTest()
+        {
+            using (TcpConnectionListener listener = new TcpConnectionListener(IPAddress.Any, 4296, IPMode.IPv4))
+            using (TcpConnection connection = new TcpConnection(new NetworkEndPoint(IPAddress.Loopback, 4296, IPMode.IPv4)))
+            {
+                listener.Start();
+
+                listener.NewConnection += delegate (object sender, NewConnectionEventArgs e)
+                {
+                    Assert.IsTrue(Enumerable.SequenceEqual(e.HandshakeData, new byte[] { 1, 2, 3, 4, 5, 6 }));
+                };
+
+                connection.Connect(new byte[] { 1, 2, 3, 4, 5, 6 });
             }
         }
 
@@ -76,7 +94,7 @@ namespace Hazel.UnitTests
             using (TcpConnectionListener listener = new TcpConnectionListener(IPAddress.Any, 4296))
             using (TcpConnection connection = new TcpConnection(new NetworkEndPoint(IPAddress.Loopback, 4296)))
             {
-                TestHelper.RunServerToClientTest(listener, connection, 4, 0, SendOption.FragmentedReliable);
+                TestHelper.RunServerToClientTest(listener, connection, 4, 5, SendOption.FragmentedReliable);
             }
         }
 
@@ -89,7 +107,7 @@ namespace Hazel.UnitTests
             using (TcpConnectionListener listener = new TcpConnectionListener(IPAddress.Any, 4296))
             using (TcpConnection connection = new TcpConnection(new NetworkEndPoint(IPAddress.Loopback, 4296)))
             {
-                TestHelper.RunClientToServerTest(listener, connection, 4, 0, SendOption.FragmentedReliable);
+                TestHelper.RunClientToServerTest(listener, connection, 4, 5, SendOption.FragmentedReliable);
             }
         }
 

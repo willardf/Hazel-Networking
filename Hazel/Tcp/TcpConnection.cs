@@ -77,7 +77,7 @@ namespace Hazel.Tcp
         }
 
         /// <inheritdoc />
-        public override void Connect()
+        public override void Connect(byte[] bytes = null)
         {
             lock(socketLock)
             {
@@ -96,15 +96,29 @@ namespace Hazel.Tcp
                 //Start receiving data
                 try
                 {
-                    StartWaitingForHeader();
+                    StartWaitingForHeader(BodyReadCallback);
                 }
-                catch (SocketException e)
+                catch (SocketException e)       //TODO change these to catch exception, security risk
                 {
                     throw new HazelException("A Socket exception occured while initiating the first receive operation.", e);
                 }
 
+                //Send handshake
+                byte[] actualBytes;
+                if (bytes == null)
+                {
+                    actualBytes = new byte[1];
+                }
+                else
+                {
+                    actualBytes = new byte[bytes.Length + 1];
+                    Buffer.BlockCopy(bytes, 0, actualBytes, 1, bytes.Length);
+                }
+                
                 //Set connected
                 State = ConnectionState.Connected;
+
+                SendBytes(actualBytes);
             }
         }
 
@@ -146,7 +160,8 @@ namespace Hazel.Tcp
         ///     Called when a 4 byte header has been received.
         /// </summary>
         /// <param name="bytes">The 4 header bytes read.</param>
-        void HeaderReadCallback(byte[] bytes)
+        /// <param name="callback">The callback to invoke when the body has been received.</param>
+        void HeaderReadCallback(byte[] bytes, Action<byte[]> callback)
         {
             //Get length 
             int length = GetLengthFromBytes(bytes);
@@ -154,7 +169,7 @@ namespace Hazel.Tcp
             //Begin receiving the body
             try
             {
-                StartWaitingForBytes(length, BodyReadCallback);
+                StartWaitingForBytes(length, callback);
             }
             catch (SocketException e)
             {
@@ -171,7 +186,7 @@ namespace Hazel.Tcp
             //Begin receiving from the start
             try
             {
-                StartWaitingForHeader();
+                StartWaitingForHeader(BodyReadCallback);
             }
             catch (SocketException e)
             {
@@ -191,7 +206,32 @@ namespace Hazel.Tcp
         {
             try
             {
-                StartWaitingForHeader();
+                StartWaitingForHeader(BodyReadCallback);
+            }
+            catch (SocketException e)
+            {
+                HandleDisconnect(new HazelException("A Socket exception occured while initiating the first receive operation.", e));
+            }
+        }
+
+        /// <summary>
+        ///     Starts waiting for a first handshake packet to be received.
+        /// </summary>
+        /// <param name="callback">The callback to invoke when the handshake has been received.</param>
+        internal void StartWaitingForHandshake(Action<byte[]> callback)
+        {
+            try
+            {
+                StartWaitingForHeader(
+                    delegate (byte[] bytes)
+                    {
+                        //Remove version byte
+                        byte[] dataBytes = new byte[bytes.Length - 1];
+                        Buffer.BlockCopy(bytes, 1, dataBytes, 0, bytes.Length - 1);
+
+                        callback.Invoke(dataBytes);
+                    }
+                );
             }
             catch (SocketException e)
             {
@@ -202,9 +242,10 @@ namespace Hazel.Tcp
         /// <summary>
         ///     Starts this connections waiting for the header.
         /// </summary>
-        void StartWaitingForHeader()
+        /// <param name="callback">The callback to invoke when the body has been read.</param>
+        void StartWaitingForHeader(Action<byte[]> callback)
         {
-            StartWaitingForBytes(4, HeaderReadCallback);
+            StartWaitingForBytes(4, (bytes) => HeaderReadCallback(bytes, callback));
         }
 
         /// <summary>

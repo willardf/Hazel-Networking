@@ -56,7 +56,7 @@ namespace Hazel.UnitTests
             //Wait until data is received
             mutex.WaitOne();
 
-            Assert.AreEqual(0, connection.Statistics.DataBytesSent);
+            Assert.AreEqual(1, connection.Statistics.DataBytesSent);
             Assert.AreEqual(data.Length, connection.Statistics.DataBytesReceived);
             Assert.AreEqual(totalHandshakeSize, connection.Statistics.TotalBytesSent);
             Assert.AreEqual(data.Length + headerSize, connection.Statistics.TotalBytesReceived);
@@ -111,7 +111,7 @@ namespace Hazel.UnitTests
             //Wait until data is received
             mutex2.WaitOne();
 
-            Assert.AreEqual(data.Length, connection.Statistics.DataBytesSent);
+            Assert.AreEqual(data.Length + 1, connection.Statistics.DataBytesSent);
             Assert.AreEqual(0, connection.Statistics.DataBytesReceived);
             Assert.AreEqual(totalHandshakeSize + data.Length + headerSize, connection.Statistics.TotalBytesSent);
             Assert.AreEqual(0, connection.Statistics.TotalBytesReceived);

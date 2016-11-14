@@ -98,10 +98,16 @@ namespace Hazel.Tcp
                 //Sort the event out
                 TcpConnection tcpConnection = new TcpConnection(tcpSocket);
 
-                //Invoke
-                InvokeNewConnection(tcpConnection);
+                //Wait for handshake
+                tcpConnection.StartWaitingForHandshake(
+                    delegate (byte[] bytes)
+                    {
+                        //Invoke
+                        InvokeNewConnection(bytes, tcpConnection);
 
-                tcpConnection.StartReceiving();
+                        tcpConnection.StartReceiving();
+                    }
+                );
             }
         }
 

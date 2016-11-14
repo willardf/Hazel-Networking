@@ -149,7 +149,7 @@ namespace Hazel.Udp
                 else
                 {
                     //Check for malformed connection attempts
-                    if (buffer[0] != (byte)SendOptionInternal.Hello || buffer.Length != 3)
+                    if (buffer[0] != (byte)SendOptionInternal.Hello)
                         return;
 
                     connection = new UdpServerConnection(this, remoteEndPoint, IPMode);
@@ -162,9 +162,15 @@ namespace Hazel.Udp
 
             //And fire the corresponding event
             if (aware)
+            {
                 connection.InvokeDataReceived(buffer);
+            }
             else
-                InvokeNewConnection(connection);
+            {
+                byte[] dataBuffer = new byte[buffer.Length - 1];
+                Buffer.BlockCopy(buffer, 1, dataBuffer, 0, buffer.Length - 1);
+                InvokeNewConnection(dataBuffer, connection);
+            }
         }
 
         /// <summary>

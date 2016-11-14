@@ -59,15 +59,10 @@ namespace Hazel.Udp
             byte[] bytes;
             switch (sendOption)
             {
-                //Handle reliable header
+                //Handle reliable header and hellos
                 case (byte)SendOption.Reliable:
-                    bytes = new byte[data.Length + 3];
-                    WriteReliableSendHeader(bytes, ackCallback);
-                    break;
-
-                //Handle hellos (ignore data)
                 case (byte)SendOptionInternal.Hello:
-                    bytes = new byte[3];
+                    bytes = new byte[data.Length + 3];
                     WriteReliableSendHeader(bytes, ackCallback);
                     break;
 
@@ -144,9 +139,21 @@ namespace Hazel.Udp
         ///     Sends a hello packet to the remote endpoint.
         /// </summary>
         /// <param name="acknowledgeCallback">The callback to invoke when the hello packet is acknowledged.</param>
-        protected void SendHello(Action acknowledgeCallback)
+        protected void SendHello(byte[] bytes, Action acknowledgeCallback)
         {
-            HandleSend(new byte[0], (byte)SendOptionInternal.Hello, acknowledgeCallback);
+            //First byte of handshake is version indicator so add data after
+            byte[] actualBytes;
+            if (bytes == null)
+            {
+                actualBytes = new byte[1];
+            }
+            else
+            {
+                actualBytes = new byte[bytes.Length + 1];
+                Buffer.BlockCopy(bytes, 0, actualBytes, 1, bytes.Length);
+            }
+
+            HandleSend(actualBytes, (byte)SendOptionInternal.Hello, acknowledgeCallback);
         }
 
         /// <summary>
