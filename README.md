@@ -1,7 +1,8 @@
-### Hazel Networking is a low level networking library for C# providing connection orientated, message based communication via TCP, UDP and RUDP. 
-It's aim is to provide a standardized interface for web communication so that using and switching between protocols is incredibly simple.
+####Hazel Networking is a low-level networking library for C# providing connection orientated, message based communication via TCP, UDP and RUDP.
 
-Hazel is going to be the basis of DarkRift 2 and I'm releasing it completely open source so that members of the community can make use of it, improve it and help find any bugs before DarkRift 2 is released.
+Its aim is to provide a standardized interface for web communication so that using and switching between protocols is incredibly simple.
+
+Hazel is going to be the basis of DarkRift 2 and it is being released completely open source so that members of the community can make use of it, improve it and help find any bugs before DarkRift 2 is released.
 
 -----
 
