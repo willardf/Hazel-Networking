@@ -88,9 +88,9 @@ namespace Hazel.Tcp
                 {
                     socket.Connect(RemoteEndPoint);
                 }
-                catch (SocketException e)
+                catch (Exception e)
                 {
-                    throw new HazelException("Could not connect as a socket exception occured.", e);
+                    throw new HazelException("Could not connect as an exception occured.", e);
                 }
 
                 //Start receiving data
@@ -98,9 +98,9 @@ namespace Hazel.Tcp
                 {
                     StartWaitingForHeader(BodyReadCallback);
                 }
-                catch (SocketException e)       //TODO change these to catch exception, security risk
+                catch (Exception e)
                 {
-                    throw new HazelException("A Socket exception occured while initiating the first receive operation.", e);
+                    throw new HazelException("An exception occured while initiating the first receive operation.", e);
                 }
 
                 //Send handshake
@@ -145,9 +145,9 @@ namespace Hazel.Tcp
                 {
                     socket.BeginSend(fullBytes, 0, fullBytes.Length, SocketFlags.None, null, null);
                 }
-                catch (SocketException e)
+                catch (Exception e)
                 {
-                    HazelException he = new HazelException("Could not send data as a SocketException occured.", e);
+                    HazelException he = new HazelException("Could not send data as an occured.", e);
                     HandleDisconnect(he);
                     throw he;
                 }
@@ -171,9 +171,9 @@ namespace Hazel.Tcp
             {
                 StartWaitingForBytes(length, callback);
             }
-            catch (SocketException e)
+            catch (Exception e)
             {
-                HandleDisconnect(new HazelException("A Socket exception occured while initiating a body receive operation.", e));
+                HandleDisconnect(new HazelException("An exception occured while initiating a body receive operation.", e));
             }
         }
 
@@ -188,9 +188,9 @@ namespace Hazel.Tcp
             {
                 StartWaitingForHeader(BodyReadCallback);
             }
-            catch (SocketException e)
+            catch (Exception e)
             {
-                HandleDisconnect(new HazelException("A Socket exception occured while initiating a header receive operation.", e));
+                HandleDisconnect(new HazelException("An exception occured while initiating a header receive operation.", e));
             }
 
             Statistics.LogReceive(bytes.Length, bytes.Length + 4);
@@ -208,9 +208,9 @@ namespace Hazel.Tcp
             {
                 StartWaitingForHeader(BodyReadCallback);
             }
-            catch (SocketException e)
+            catch (Exception e)
             {
-                HandleDisconnect(new HazelException("A Socket exception occured while initiating the first receive operation.", e));
+                HandleDisconnect(new HazelException("An exception occured while initiating the first receive operation.", e));
             }
         }
 
@@ -233,9 +233,9 @@ namespace Hazel.Tcp
                     }
                 );
             }
-            catch (SocketException e)
+            catch (Exception e)
             {
-                HandleDisconnect(new HazelException("A Socket exception occured while initiating the first receive operation.", e));
+                HandleDisconnect(new HazelException("An exception occured while initiating the first receive operation.", e));
             }
         }
 
@@ -293,9 +293,9 @@ namespace Hazel.Tcp
                 //If the socket's been disposed then we can just end there.
                 return;
             }
-            catch (SocketException e)
+            catch (Exception e)
             {
-                HandleDisconnect(new HazelException("A Socket exception occured while completing a chunk read operation.", e));
+                HandleDisconnect(new HazelException("An exception occured while completing a chunk read operation.", e));
                 return;
             }
 
@@ -317,9 +317,9 @@ namespace Hazel.Tcp
                 {
                     StartWaitingForChunk(state);
                 }
-                catch (SocketException e)
+                catch (Exception e)
                 {
-                    HandleDisconnect(new HazelException("A Socket exception occured while initiating a chunk receive operation.", e));
+                    HandleDisconnect(new HazelException("An exception occured while initiating a chunk receive operation.", e));
                     return;
                 }
             }
