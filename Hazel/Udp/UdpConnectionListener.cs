@@ -180,14 +180,23 @@ namespace Hazel.Udp
         /// <param name="endPoint">The endpoint to send to.</param>
         internal void SendData(byte[] bytes, EndPoint endPoint)
         {
-            SocketAsyncEventArgs args = new SocketAsyncEventArgs();
-            args.SetBuffer(bytes, 0, bytes.Length);
-            args.RemoteEndPoint = endPoint;
-
             try
             {
                 lock (listener)
-                    listener.SendToAsync(args);
+                {
+                    listener.BeginSendTo(
+                        bytes,
+                        0,
+                        bytes.Length,
+                        SocketFlags.None,
+                        endPoint,
+                        delegate (IAsyncResult result)
+                        {
+                            listener.EndSendTo(result);
+                        },
+                        null
+                    );
+                }
             }
             catch (SocketException e)
             {

@@ -59,11 +59,6 @@ namespace Hazel.Udp
         /// <inheritdoc />
         protected override void WriteBytesToConnection(byte[] bytes)
         {
-            //Pack
-            SocketAsyncEventArgs args = new SocketAsyncEventArgs();
-            args.SetBuffer(bytes, 0, bytes.Length);
-            args.RemoteEndPoint = RemoteEndPoint;
-
             lock (socketLock)
             {
                 if (State != ConnectionState.Connected && State != ConnectionState.Connecting)
@@ -71,7 +66,26 @@ namespace Hazel.Udp
 
                 try
                 {
-                    socket.SendToAsync(args);
+                    socket.BeginSendTo(
+                        bytes, 
+                        0, 
+                        bytes.Length, 
+                        SocketFlags.None, 
+                        RemoteEndPoint,
+                        delegate (IAsyncResult result)
+                        {
+                            try
+                            {
+                                lock (socket)
+                                    socket.EndSendTo(result);
+                            }
+                            catch (SocketException e)
+                            {
+                                HandleDisconnect(new HazelException("Could not send data as a SocketException occured.", e));
+                            }
+                        }, 
+                        null
+                    );
                 }
                 catch (ObjectDisposedException)
                 {
