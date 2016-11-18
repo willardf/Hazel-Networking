@@ -270,7 +270,7 @@ namespace Hazel.Tcp
             {
                 //Double check we've not disconnected then begin receiving
                 if (State == ConnectionState.Connected || State == ConnectionState.Connecting)
-                    socket.BeginReceive(state.buffer, state.totalBytesReceived, state.buffer.Length, SocketFlags.None, ChunkReadCallback, state);
+                    socket.BeginReceive(state.buffer, state.totalBytesReceived, state.buffer.Length - state.totalBytesReceived, SocketFlags.None, ChunkReadCallback, state);
             }
         }
 
