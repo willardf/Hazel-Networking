@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>DarkRiftNetworking.Hazel</id>
+    <version>$version$</version>
+    <title>$title$</title>
+    <authors>DarkRiftNetworking</authors>
+    <owners>DarkRiftNetworking</owners>
+    <licenseUrl>https://github.com/DarkRiftNetworking/Hazel-Networking/blob/master/LICENSE</licenseUrl>
+    <projectUrl>https://github.com/DarkRiftNetworking/Hazel-Networking</projectUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>Hazel Networking is a low-level networking library for C# providing connection orientated, message based communication via TCP, UDP and RUDP.</description>
+    <releaseNotes>First release (Beta)</releaseNotes>
+    <copyright>Copyright 2016</copyright>
+    <tags>network networking TCP UDP RUDP socket sockets Unity3d Unity </tags>
+  </metadata>
+</package>
