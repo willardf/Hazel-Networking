@@ -119,9 +119,9 @@ namespace Hazel.Udp
             }
             catch (SocketException e)
             {
-                //Errrr... shit...
-                //Not exactly much we can do if we've got here
-                throw e;
+                //Client no longer reachable, pretend it didn't happen
+                StartListeningForData();
+                return;
             }
 
             //Exit if no bytes read, we've closed.
