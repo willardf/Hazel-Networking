@@ -102,7 +102,7 @@ namespace Hazel.Udp
         }
 
         /// <inheritdoc />
-        public override void Connect(byte[] bytes = null)
+        public override void Connect(byte[] bytes = null, int timeout = 5000)
         {
             lock(socketLock)
             {
@@ -121,6 +121,7 @@ namespace Hazel.Udp
                 }
                 catch (SocketException e)
                 {
+                    State = ConnectionState.NotConnected;
                     throw new HazelException("A socket exception occured while binding to the port.", e);
                 }
 
@@ -137,6 +138,7 @@ namespace Hazel.Udp
                 }
                 catch (SocketException e)
                 {
+                    Dispose();
                     throw new HazelException("A Socket exception occured while initiating a receive operation.", e);
                 }
             }
@@ -146,7 +148,14 @@ namespace Hazel.Udp
             SendHello(bytes, () => { lock (socketLock) State = ConnectionState.Connected; });
 
             //Wait till hello packet is acknowledged and the state is set to Connected
-            WaitOnConnect();
+            bool timedOut = !WaitOnConnect(timeout);
+
+            //If we timed out raise an exception
+            if (timedOut)
+            {
+                Dispose();
+                throw new HazelException("Connection attempt timed out.");
+            }
         }
 
         /// <summary>

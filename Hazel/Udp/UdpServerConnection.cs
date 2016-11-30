@@ -60,7 +60,7 @@ namespace Hazel.Udp
         /// <remarks>
         ///     This will always throw a HazelException.
         /// </remarks>
-        public override void Connect(byte[] bytes)
+        public override void Connect(byte[] bytes = null, int timeout = 5000)
         {
             throw new HazelException("Cannot manually connect a UdpServerConnection, did you mean to use UdpClientConnection?");
         }

@@ -77,7 +77,7 @@ namespace Hazel.Tcp
         }
 
         /// <inheritdoc />
-        public override void Connect(byte[] bytes = null)
+        public override void Connect(byte[] bytes = null, int timeout = 5000)
         {
             lock(socketLock)
             {
@@ -86,7 +86,11 @@ namespace Hazel.Tcp
 
                 try
                 {
-                    socket.Connect(RemoteEndPoint);
+                    IAsyncResult result = socket.BeginConnect(RemoteEndPoint, null, null);
+
+                    result.AsyncWaitHandle.WaitOne(timeout);
+
+                    socket.EndConnect(result);
                 }
                 catch (Exception e)
                 {

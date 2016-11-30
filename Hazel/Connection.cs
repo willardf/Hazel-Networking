@@ -162,12 +162,13 @@ namespace Hazel
         ///     Connects the connection to a server and begins listening.
         /// </summary>
         /// <param name="bytes">The bytes of data to send in the handshake.</param>
+        /// <param name="timeout">The number of milliseconds to wait before giving up on the connect attempt.</param>
         /// <remarks>
         ///     Calling Connect makes the connection attempt to connect to the end point that's specified in the 
         ///     constructor. This method will block until the connection attempt completes and will throw a 
         ///     <see cref="HazelException"/> if there is a problem connecting.
         /// </remarks>
-        public abstract void Connect(byte[] bytes = null);
+        public abstract void Connect(byte[] bytes = null, int timeout = 5000);
 
         /// <summary>
         ///     Invokes the DataReceived event.
@@ -213,14 +214,15 @@ namespace Hazel
         /// <summary>
         ///     Blocks until the Connection is connected.
         /// </summary>
+        /// <param name="timeout">The number of milliseconds to wait before timing out.</param>
         /// <remarks>
         ///     This is a helper method for waiting until the connection is connected. It will block until the 
         ///     <see cref="State"/> property is set to <see cref="ConnectionState.Connected"/> allowing the main thread to 
         ///     wait until specific data is received etc. before returning to the user's code.
         /// </remarks>
-        protected void WaitOnConnect()
+        protected bool WaitOnConnect(int timeout)
         {
-            connectWaitLock.WaitOne();
+            return connectWaitLock.WaitOne(timeout);
         }
 
         /// <summary>
