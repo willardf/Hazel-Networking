@@ -120,6 +120,7 @@ namespace Hazel.Udp
             catch (SocketException e)
             {
                 //Client no longer reachable, pretend it didn't happen
+                //TODO should this not inform the connection this client is lost???
                 StartListeningForData();
                 return;
             }
