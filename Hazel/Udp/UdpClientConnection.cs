@@ -199,11 +199,9 @@ namespace Hazel.Udp
                 return;
             }
 
-            //Decode the data received
-            byte[] buffer = HandleReceive(dataBuffer, bytesReceived);
-            SendOption sendOption = (SendOption)dataBuffer[0];
-
-            //TODO may get better performance with Handle receive after and block copy call added
+            //Copy data to new array
+            byte[] bytes = new byte[bytesReceived];
+            Buffer.BlockCopy(dataBuffer, 0, bytes, 0, bytesReceived);
 
             //Begin receiving again
             try
@@ -219,9 +217,8 @@ namespace Hazel.Udp
                 //If the socket's been disposed then we can just end there.
                 return;
             }
-            
-            if (buffer != null)
-                InvokeDataReceived(buffer, sendOption);
+
+            HandleReceive(bytes);
         }
 
         /// <inheritdoc />

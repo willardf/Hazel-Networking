@@ -56,83 +56,92 @@ namespace Hazel.Udp
         /// <returns>The bytes that should actually be sent.</returns>
         protected void HandleSend(byte[] data, byte sendOption, Action ackCallback = null)
         {
-            byte[] bytes;
+            //Inform keepalive not to send for a while
+            ResetKeepAliveTimer();
+
             switch (sendOption)
             {
                 //Handle reliable header and hellos
                 case (byte)SendOption.Reliable:
                 case (byte)SendOptionInternal.Hello:
-                    bytes = new byte[data.Length + 3];
-                    WriteReliableSendHeader(bytes, ackCallback);
+                    ReliableSend(sendOption, data, ackCallback);
                     break;
-
+                
+                //Treat all else as unreliable
                 default:
-                    bytes = new byte[data.Length + 1];
+                    UnreliableSend(sendOption, data);
                     break;
             }
-
-            //Add message type
-            bytes[0] = sendOption;
-
-            //Copy data into new array
-            Buffer.BlockCopy(data, 0, bytes, bytes.Length - data.Length, data.Length);
-
-            //Inform keepalive not to send for a while
-            ResetKeepAliveTimer();
-
-            //Write to connection
-            WriteBytesToConnection(bytes);
-            
-            Statistics.LogSend(data.Length, bytes.Length);
         }
 
         /// <summary>
         ///     Handles the receiving of data.
         /// </summary>
         /// <param name="buffer">The buffer containing the bytes received.</param>
-        /// <param name="bytesReceived">The number of bytes that were received.</param>
-        /// <returns>The bytes of data received.</returns>
-        protected byte[] HandleReceive(byte[] buffer, int bytesReceived)
+        protected void HandleReceive(byte[] buffer)
         {
             //Inform keepalive not to send for a while
             ResetKeepAliveTimer();
-
-            int headerSize = 1;
+            
             switch (buffer[0])
             {
-                    //Handle reliable receives
+                //Handle reliable receives
                 case (byte)SendOption.Reliable:
-                    headerSize = 3;
-
-                    if (HandleReliableReceive(buffer) == false)
-                        return null;
+                    ReliableReceive(buffer);
                     break;
 
-                    //Handle acknowledgments
+                //Handle acknowledgments
                 case (byte)SendOptionInternal.Acknowledgement:
-                    HandleAcknowledgement(buffer);
+                    AcknowledgementReceive(buffer);
+                    break;
 
-                    return null;
-
-                //We need to acknowledge hello messages so just use the same reliable receive
-                //method
+                //We need to acknowledge hello messages but dont want to invoke any events!
                 case (byte)SendOptionInternal.Hello:
-                    HandleReliableReceive(buffer);
-
-                    return null;
+                    ProcessReliableReceive(buffer);
+                    Statistics.LogReceive(buffer.Length - 3, buffer.Length);
+                    break;
 
                 case (byte)SendOptionInternal.Disconnect:
                     HandleDisconnect();
+                    Statistics.LogReceive(0, buffer.Length);
+                    break;
 
-                    return null;
+                //Treat everything else as unreliable
+                default:
+                    InvokeDataReceived(SendOption.None, buffer, 1);
+                    Statistics.LogReceive(buffer.Length - 1, buffer.Length);
+                    break;
             }
+        }
 
-            byte[] dataBytes = new byte[bytesReceived - headerSize];
-            Buffer.BlockCopy(buffer, headerSize, dataBytes, 0, dataBytes.Length);
+        void UnreliableSend(byte sendOption, byte[] data)
+        {
+            byte[] bytes = new byte[data.Length + 1];
 
-            Statistics.LogReceive(dataBytes.Length, bytesReceived);
+            //Add message type
+            bytes[0] = sendOption;
+            
+            //Copy data into new array
+            Buffer.BlockCopy(data, 0, bytes, bytes.Length - data.Length, data.Length);
 
-            return dataBytes;
+            //Write to connection
+            WriteBytesToConnection(bytes);
+
+            Statistics.LogSend(data.Length, bytes.Length);
+        }
+
+        /// <summary>
+        ///     Helper method to invoke the data received event.
+        /// </summary>
+        /// <param name="sendOption">The send option the message was received with.</param>
+        /// <param name="buffer">The buffer received.</param>
+        /// <param name="dataOffset">The offset of data in the buffer.</param>
+        void InvokeDataReceived(SendOption sendOption, byte[] buffer, int dataOffset)
+        {
+            byte[] dataBytes = new byte[buffer.Length - dataOffset];
+            Buffer.BlockCopy(buffer, dataOffset, dataBytes, 0, dataBytes.Length);
+            
+            InvokeDataReceived(dataBytes, sendOption);
         }
 
         /// <summary>

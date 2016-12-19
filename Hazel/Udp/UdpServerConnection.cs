@@ -71,10 +71,7 @@ namespace Hazel.Udp
         /// <param name="buffer"></param>
         internal void InvokeDataReceived(byte[] buffer)
         {
-           byte[] data = HandleReceive(buffer, buffer.Length);
-
-           if (data != null)
-                InvokeDataReceived(data, (SendOption)buffer[0]);
+           HandleReceive(buffer);
         }
 
         /// <inheritdoc />
