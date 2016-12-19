@@ -157,7 +157,7 @@ namespace Hazel.Tcp
                 }
             }
 
-            Statistics.LogSend(bytes.Length, fullBytes.Length);
+            Statistics.LogFragmentedSend(bytes.Length, fullBytes.Length);
         }
 
         /// <summary>
@@ -197,7 +197,7 @@ namespace Hazel.Tcp
                 HandleDisconnect(new HazelException("An exception occured while initiating a header receive operation.", e));
             }
 
-            Statistics.LogReceive(bytes.Length, bytes.Length + 4);
+            Statistics.LogFragmentedReceive(bytes.Length, bytes.Length + 4);
 
             //Fire DataReceived event
             InvokeDataReceived(bytes, SendOption.FragmentedReliable);

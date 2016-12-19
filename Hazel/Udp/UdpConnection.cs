@@ -98,18 +98,17 @@ namespace Hazel.Udp
                 //We need to acknowledge hello messages but dont want to invoke any events!
                 case (byte)SendOptionInternal.Hello:
                     ProcessReliableReceive(buffer);
-                    Statistics.LogReceive(buffer.Length - 3, buffer.Length);
+                    Statistics.LogHelloReceive(buffer.Length);
                     break;
 
                 case (byte)SendOptionInternal.Disconnect:
-                    HandleDisconnect();
-                    Statistics.LogReceive(0, buffer.Length);
+                    HandleDisconnect();                    
                     break;
 
                 //Treat everything else as unreliable
                 default:
                     InvokeDataReceived(SendOption.None, buffer, 1);
-                    Statistics.LogReceive(buffer.Length - 1, buffer.Length);
+                    Statistics.LogUnreliableReceive(buffer.Length - 1, buffer.Length);
                     break;
             }
         }
@@ -127,7 +126,7 @@ namespace Hazel.Udp
             //Write to connection
             WriteBytesToConnection(bytes);
 
-            Statistics.LogSend(data.Length, bytes.Length);
+            Statistics.LogUnreliableSend(data.Length, bytes.Length);
         }
 
         /// <summary>

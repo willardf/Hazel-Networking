@@ -253,7 +253,7 @@ namespace Hazel.Udp
             //Write to connection
             WriteBytesToConnection(bytes);
 
-            Statistics.LogSend(data.Length, bytes.Length);
+            Statistics.LogReliableSend(data.Length, bytes.Length);
         }
 
         /// <summary>
@@ -265,7 +265,7 @@ namespace Hazel.Udp
             if (ProcessReliableReceive(buffer))
                 InvokeDataReceived(SendOption.Reliable, buffer, 3);
 
-            Statistics.LogReceive(buffer.Length - 3, buffer.Length);
+            Statistics.LogReliableReceive(buffer.Length - 3, buffer.Length);
         }
 
         /// <summary>
@@ -376,7 +376,7 @@ namespace Hazel.Udp
                 }
             }
             
-            Statistics.LogReceive(0, bytes.Length);
+            Statistics.LogReliableReceive(0, bytes.Length);
         }
 
         /// <summary>

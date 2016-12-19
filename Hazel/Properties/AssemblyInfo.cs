@@ -37,3 +37,6 @@ using System.Runtime.InteropServices;
 
 // NuGet version information
 [assembly: AssemblyInformationalVersion("0.0.0-beta")]
+
+// Show internals to unit testing assembly so it can test
+[assembly:InternalsVisibleTo("Hazel.UnitTests")]
