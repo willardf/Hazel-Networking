@@ -4,7 +4,7 @@ Its aim is to provide a standardized interface for web communication so that usi
 
 Hazel is going to be the basis of DarkRift 2 and it is being released completely open source so that members of the community can make use of it, improve it and help find any bugs before DarkRift 2 is released.
 
-Hazel can be downloaded as a NuGet package [here](https://www.nuget.org/packages/DarkRiftNetworking.Hazel/)!
+Hazel can be downloaded as a NuGet package [here](https://www.nuget.org/packages/DarkRiftNetworking.Hazel/) or you can get the latest build directly from the releases page [here](/../../releases)!
 
 -----
 
