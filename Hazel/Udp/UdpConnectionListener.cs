@@ -117,7 +117,7 @@ namespace Hazel.Udp
                 //If the socket's been disposed then we can just end there.
                 return;
             }
-            catch (SocketException e)
+            catch (SocketException)
             {
                 //Client no longer reachable, pretend it didn't happen
                 //TODO should this not inform the connection this client is lost???

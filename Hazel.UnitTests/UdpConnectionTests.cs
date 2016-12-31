@@ -39,7 +39,7 @@ namespace Hazel.UnitTests
         [TestMethod]
         public void UdpHandshakeTest()
         {
-            using (UdpConnectionListener listener = new UdpConnectionListener(IPAddress.Any, 4296, IPMode.IPv4))
+            using (UdpConnectionListener listener = new UdpConnectionListener(new NetworkEndPoint(IPAddress.Any, 4296, IPMode.IPv4)))
             using (UdpConnection connection = new UdpClientConnection(new NetworkEndPoint(IPAddress.Loopback, 4296, IPMode.IPv4)))
             {
                 listener.Start();

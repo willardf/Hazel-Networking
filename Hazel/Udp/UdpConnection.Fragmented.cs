@@ -27,7 +27,7 @@ namespace Hazel.Udp
         void FragmentedSend(byte[] data)
         {
             //Get an ID not used yet.
-            ushort id = ++lastFragmentIDAllocated;      //TODO manage loop around
+            ushort id = ++lastFragmentIDAllocated;      //TODO is extra code needed to manage loop around?
 
             for (ushort i = 0; i < Math.Ceiling(data.Length / (double)FragmentSize); i++)
             {
