@@ -94,7 +94,7 @@ namespace Hazel.UnitTests
             using (TcpConnectionListener listener = new TcpConnectionListener(IPAddress.Any, 4296))
             using (TcpConnection connection = new TcpConnection(new NetworkEndPoint(IPAddress.Loopback, 4296)))
             {
-                TestHelper.RunServerToClientTest(listener, connection, 4, 5, SendOption.FragmentedReliable);
+                TestHelper.RunServerToClientTest(listener, connection, 10, SendOption.FragmentedReliable);
             }
         }
 
@@ -107,7 +107,7 @@ namespace Hazel.UnitTests
             using (TcpConnectionListener listener = new TcpConnectionListener(IPAddress.Any, 4296))
             using (TcpConnection connection = new TcpConnection(new NetworkEndPoint(IPAddress.Loopback, 4296)))
             {
-                TestHelper.RunClientToServerTest(listener, connection, 4, 5, SendOption.FragmentedReliable);
+                TestHelper.RunClientToServerTest(listener, connection, 10, SendOption.FragmentedReliable);
             }
         }
 

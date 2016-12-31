@@ -79,6 +79,10 @@ namespace Hazel.Udp
                                 lock (socket)
                                     socket.EndSendTo(result);
                             }
+                            catch (ObjectDisposedException e)
+                            {
+                                HandleDisconnect(new HazelException("Could not send as the socket was disposed of.", e));
+                            }
                             catch (SocketException e)
                             {
                                 HandleDisconnect(new HazelException("Could not send data as a SocketException occured.", e));

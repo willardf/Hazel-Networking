@@ -63,13 +63,17 @@ namespace Hazel.Udp
             {
                 //Handle reliable header and hellos
                 case (byte)SendOption.Reliable:
-                case (byte)SendOptionInternal.Hello:
+                case (byte)UdpSendOption.Hello:
                     ReliableSend(sendOption, data, ackCallback);
+                    break;
+
+                case (byte)SendOption.FragmentedReliable:
+                    FragmentedSend(data);
                     break;
                 
                 //Treat all else as unreliable
                 default:
-                    UnreliableSend(sendOption, data);
+                    UnreliableSend(data, sendOption);
                     break;
             }
         }
@@ -87,22 +91,31 @@ namespace Hazel.Udp
             {
                 //Handle reliable receives
                 case (byte)SendOption.Reliable:
-                    ReliableReceive(buffer);
+                    ReliableMessageReceive(buffer);
                     break;
 
                 //Handle acknowledgments
-                case (byte)SendOptionInternal.Acknowledgement:
-                    AcknowledgementReceive(buffer);
+                case (byte)UdpSendOption.Acknowledgement:
+                    AcknowledgementMessageReceive(buffer);
                     break;
 
                 //We need to acknowledge hello messages but dont want to invoke any events!
-                case (byte)SendOptionInternal.Hello:
-                    ProcessReliableReceive(buffer);
+                case (byte)UdpSendOption.Hello:
+                    ProcessReliableReceive(buffer, 1);
                     Statistics.LogHelloReceive(buffer.Length);
                     break;
 
-                case (byte)SendOptionInternal.Disconnect:
+                case (byte)UdpSendOption.Disconnect:
                     HandleDisconnect();                    
+                    break;
+
+                //Handle fragmented messages
+                case (byte)SendOption.FragmentedReliable:
+                    FragmentedStartMessageReceive(buffer);
+                    break;
+
+                case (byte)UdpSendOption.Fragment:
+                    FragmentedMessageReceive(buffer);
                     break;
 
                 //Treat everything else as unreliable
@@ -113,7 +126,12 @@ namespace Hazel.Udp
             }
         }
 
-        void UnreliableSend(byte sendOption, byte[] data)
+        /// <summary>
+        ///     Sends bytes using the unreliable UDP protocol.
+        /// </summary>
+        /// <param name="data">The data.</param>
+        /// <param name="sendOption">The SendOption to attach.</param>
+        void UnreliableSend(byte[] data, byte sendOption)
         {
             byte[] bytes = new byte[data.Length + 1];
 
@@ -161,7 +179,7 @@ namespace Hazel.Udp
                 Buffer.BlockCopy(bytes, 0, actualBytes, 1, bytes.Length);
             }
 
-            HandleSend(actualBytes, (byte)SendOptionInternal.Hello, acknowledgeCallback);
+            HandleSend(actualBytes, (byte)UdpSendOption.Hello, acknowledgeCallback);
         }
 
         /// <summary>
@@ -175,7 +193,7 @@ namespace Hazel.Udp
         /// </summary>
         protected void SendDisconnect()
         {
-            HandleSend(new byte[0], (byte)SendOptionInternal.Disconnect);       //TODO Should disconnect wait for an ack?
+            HandleSend(new byte[0], (byte)UdpSendOption.Disconnect);       //TODO Should disconnect wait for an ack?
         }
 
         /// <inheritdoc/>

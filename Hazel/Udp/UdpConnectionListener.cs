@@ -150,7 +150,7 @@ namespace Hazel.Udp
                 else
                 {
                     //Check for malformed connection attempts
-                    if (buffer[0] != (byte)SendOptionInternal.Hello)
+                    if (buffer[0] != (byte)UdpSendOption.Hello)
                         return;
 
                     connection = new UdpServerConnection(this, remoteEndPoint, IPMode);

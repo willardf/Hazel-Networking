@@ -69,7 +69,7 @@
     <Compile Include="ObjectPool.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SendOption.cs" />
-    <Compile Include="SendOptionInternal.cs" />
+    <Compile Include="Udp\SendOptionInternal.cs" />
     <Compile Include="Tcp\StateObject.cs" />
     <Compile Include="ConnectionStatistics.cs" />
     <Compile Include="Tcp\TcpConnection.cs" />
@@ -78,6 +78,7 @@
     <Compile Include="Udp\UdpConnection.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="Udp\UdpConnection.Fragmented.cs" />
     <Compile Include="Udp\UdpConnection.KeepAlive.cs" />
     <Compile Include="Udp\UdpConnection.Reliable.cs" />
     <Compile Include="Udp\UdpConnectionListener.cs" />

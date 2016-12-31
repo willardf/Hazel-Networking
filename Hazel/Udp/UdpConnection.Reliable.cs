@@ -177,17 +177,13 @@ namespace Hazel.Udp
         }
 
         /// <summary>
-        ///     Sends the bytes reliably and stores the send.
+        ///     Adds a 2 byte ID to the packet at offset and stores the packet reference for retransmission.
         /// </summary>
-        /// <param name="bytes">The byte array to write to.</param>
+        /// <param name="buffer">The buffer to attach to.</param>
+        /// <param name="offset">The offset to attach at.</param>
         /// <param name="ackCallback">The callback to make once the packet has been acknowledged.</param>
-        void ReliableSend(byte sendOption, byte[] data, Action ackCallback)
+        void AttachReliableID(byte[] buffer, int offset, Action ackCallback = null)
         {
-            byte[] bytes = new byte[data.Length + 3];
-
-            //Add message type
-            bytes[0] = sendOption;
-
             //Find and reliable ID
             lock (reliableDataPacketsSent)
             {
@@ -199,13 +195,13 @@ namespace Hazel.Udp
                 while (reliableDataPacketsSent.ContainsKey(id));
 
                 //Write ID
-                bytes[1] = (byte)((id >> 8) & 0xFF);
-                bytes[2] = (byte)id;
+                buffer[offset] = (byte)((id >> 8) & 0xFF);
+                buffer[offset + 1] = (byte)id;
 
                 //Create packet object
                 Packet packet = Packet.GetObject();
                 packet.Set(
-                    bytes,
+                    buffer,
                     (Packet p) =>
                     {
                         //Double packet timeout
@@ -217,7 +213,7 @@ namespace Hazel.Udp
                                 if (++p.Retransmissions > ResendsBeforeDisconnect)
                                 {
                                     HandleDisconnect();
-                                    
+
                                     //Set acknowledged so we dont change the timer again
                                     p.Acknowledged = true;
 
@@ -246,6 +242,22 @@ namespace Hazel.Udp
                 //Remember packet
                 reliableDataPacketsSent.Add(id, packet);
             }
+        }
+
+        /// <summary>
+        ///     Sends the bytes reliably and stores the send.
+        /// </summary>
+        /// <param name="bytes">The byte array to write to.</param>
+        /// <param name="ackCallback">The callback to make once the packet has been acknowledged.</param>
+        void ReliableSend(byte sendOption, byte[] data, Action ackCallback = null)
+        {
+            byte[] bytes = new byte[data.Length + 3];
+
+            //Add message type
+            bytes[0] = sendOption;
+
+            //Add reliable ID
+            AttachReliableID(bytes, 1, ackCallback);
             
             //Copy data into new array
             Buffer.BlockCopy(data, 0, bytes, bytes.Length - data.Length, data.Length);
@@ -260,9 +272,9 @@ namespace Hazel.Udp
         ///     Handles a reliable message being received and invokes the data event.
         /// </summary>
         /// <param name="buffer">The buffer received.</param>
-        void ReliableReceive(byte[] buffer)
+        void ReliableMessageReceive(byte[] buffer)
         {
-            if (ProcessReliableReceive(buffer))
+            if (ProcessReliableReceive(buffer, 1))
                 InvokeDataReceived(SendOption.Reliable, buffer, 3);
 
             Statistics.LogReliableReceive(buffer.Length - 3, buffer.Length);
@@ -272,14 +284,15 @@ namespace Hazel.Udp
         ///     Handles receives from reliable packets.
         /// </summary>
         /// <param name="bytes">The buffer containing the data.</param>
+        /// <param name="offset">The offset of the reliable header.</param>
         /// <returns>Whether the packet was a new packet or not.</returns>
-        bool ProcessReliableReceive(byte[] bytes)
+        bool ProcessReliableReceive(byte[] bytes, int offset)
         {
             //Get the ID form the packet
-            ushort id = (ushort)((bytes[1] << 8) + bytes[2]);
+            ushort id = (ushort)((bytes[offset] << 8) + bytes[offset + 1]);
 
             //Send an acknowledgement
-            SendAck(bytes[1], bytes[2]);
+            SendAck(bytes[offset], bytes[offset + 1]);
 
             /*
              * It gets a little complicated here (note the fact I'm actually using a multiline comment for once...)
@@ -348,7 +361,7 @@ namespace Hazel.Udp
         ///     Handles acknowledgement packets to us.
         /// </summary>
         /// <param name="bytes">The buffer containing the data.</param>
-        void AcknowledgementReceive(byte[] bytes)
+        void AcknowledgementMessageReceive(byte[] bytes)
         {
             //Get ID
             ushort id = (ushort)((bytes[1] << 8) + bytes[2]);
@@ -390,7 +403,7 @@ namespace Hazel.Udp
             WriteBytesToConnection(     //TODO group acks together
                 new byte[]
                 {
-                    (byte)SendOptionInternal.Acknowledgement,
+                    (byte)UdpSendOption.Acknowledgement,
                     byte1,
                     byte2
                 }

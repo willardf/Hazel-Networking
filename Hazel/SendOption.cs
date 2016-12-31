@@ -31,18 +31,7 @@ namespace Hazel
         ///     a larger number of protocol bytes and can be slower than unreliable delivery.
         /// </remarks>
         Reliable = 1,
-
-        /// <summary>
-        ///     Requests data be sent so that large messages are fragmented into smaller chunks of
-        ///     data and reassembled when received.
-        /// </summary>
-        /// <remarks>
-        ///     Fragmented messages allow large amounts of data to be transmitted in smaller chunks when using connections 
-        ///     that do not support the transmission of large messages. Without specifying reliable delivery there is no 
-        ///     guarentee that the message will arrive but any incomplete messages will be simply be discarded.
-        /// </remarks>
-        Fragmented = 2,
-
+        
         /// <summary>
         ///     Requests data be sent so that large messages are fragmented into smaller chunks of
         ///     data and reassembled when received.
@@ -53,6 +42,6 @@ namespace Hazel
         ///     guaranteed to arrive and to arrive only once but the sending process may require more memory, processing,
         ///     a larger number protocol bytes and may be slower than sending unreliably.
         /// </remarks>
-        FragmentedReliable = 3
+        FragmentedReliable = 2
     }
 }

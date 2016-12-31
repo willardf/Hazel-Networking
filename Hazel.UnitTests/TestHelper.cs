@@ -16,10 +16,10 @@ namespace Hazel.UnitTests
         /// </summary>
         /// <param name="listener">The listener to test.</param>
         /// <param name="connection">The connection to test.</param>
-        internal static void RunServerToClientTest(ConnectionListener listener, Connection connection, int headerSize, int totalHandshakeSize, SendOption sendOption)
+        internal static void RunServerToClientTest(ConnectionListener listener, Connection connection, int dataSize, SendOption sendOption)
         {
             //Setup meta stuff 
-            byte[] data = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+            byte[] data = BuildData(dataSize);
             ManualResetEvent mutex = new ManualResetEvent(false);
 
             //Setup listener
@@ -56,10 +56,10 @@ namespace Hazel.UnitTests
         /// </summary>
         /// <param name="listener">The listener to test.</param>
         /// <param name="connection">The connection to test.</param>
-        internal static void RunClientToServerTest(ConnectionListener listener, Connection connection, int headerSize, int totalHandshakeSize, SendOption sendOption)
+        internal static void RunClientToServerTest(ConnectionListener listener, Connection connection, int dataSize, SendOption sendOption)
         {
             //Setup meta stuff 
-            byte[] data = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+            byte[] data = BuildData(dataSize);
             ManualResetEvent mutex = new ManualResetEvent(false);
             ManualResetEvent mutex2 = new ManualResetEvent(false);
 
@@ -151,6 +151,19 @@ namespace Hazel.UnitTests
             connection.Close();
 
             mutex2.WaitOne();
+        }
+
+        /// <summary>
+        ///     Builds new data of increaseing value bytes.
+        /// </summary>
+        /// <param name="dataSize">The number of bytes to generate.</param>
+        /// <returns>The data.</returns>
+        static byte[] BuildData(int dataSize)
+        {
+            byte[] data = new byte[dataSize];
+            for (int i = 0; i < dataSize; i++)
+                data[i] = (byte)i;
+            return data;
         }
     }
 }
