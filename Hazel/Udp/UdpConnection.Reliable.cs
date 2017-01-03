@@ -26,7 +26,7 @@ namespace Hazel.Udp
         ///     </para>
         /// </remarks>
         public int ResendTimeout { get { return resendTimeout; } set { resendTimeout = value; } }
-        private volatile int resendTimeout = 200;
+        private volatile int resendTimeout = 0;
 
         /// <summary>
         ///     Holds the last ID allocated.
