@@ -95,14 +95,6 @@ namespace Hazel.Udp
             {
                 return;
             }
-            catch (SocketException)
-            {
-                //Client no longer reachable, pretend it didn't happen
-                //TODO possibly able to disconnect failed client from this, see other TODO.
-
-                StartListeningForData();
-                return;
-            }
         }
 
         /// <summary>
@@ -129,11 +121,6 @@ namespace Hazel.Udp
             {
                 //Client no longer reachable, pretend it didn't happen
                 //TODO should this not inform the connection this client is lost???
-                
-                //Note, this thread suggests that the IP is not passed back from WinSoc on ICMP receipt so
-                //more research is probably needed to answer that, provisionally no. :(
-                //http://stackoverflow.com/questions/2576926/python-socket-error-on-udp-data-receive-10054
-                
                 StartListeningForData();
                 return;
             }
