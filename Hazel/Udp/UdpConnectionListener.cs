@@ -95,6 +95,13 @@ namespace Hazel.Udp
             {
                 return;
             }
+            catch (SocketException)
+            {
+                //Client no longer reachable, pretend it didn't happen
+                //TODO possibly able to disconnect client, see other TODO
+                StartListeningForData();
+                return;
+            }
         }
 
         /// <summary>
@@ -121,6 +128,10 @@ namespace Hazel.Udp
             {
                 //Client no longer reachable, pretend it didn't happen
                 //TODO should this not inform the connection this client is lost???
+
+                //This thread suggests the IP is not passed out from WinSoc so maybe not
+                //http://stackoverflow.com/questions/2576926/python-socket-error-on-udp-data-receive-10054
+
                 StartListeningForData();
                 return;
             }
