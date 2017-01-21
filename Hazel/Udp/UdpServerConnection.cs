@@ -65,15 +65,6 @@ namespace Hazel.Udp
             throw new HazelException("Cannot manually connect a UdpServerConnection, did you mean to use UdpClientConnection?");
         }
 
-        /// <summary>
-        ///     Called by the listener when we have data.
-        /// </summary>
-        /// <param name="buffer"></param>
-        internal void InvokeDataReceived(byte[] buffer)
-        {
-           HandleReceive(buffer);
-        }
-
         /// <inheritdoc />
         protected override void HandleDisconnect(HazelException e = null)
         {

@@ -82,7 +82,7 @@ namespace Hazel.Udp
         ///     Handles the receiving of data.
         /// </summary>
         /// <param name="buffer">The buffer containing the bytes received.</param>
-        protected void HandleReceive(byte[] buffer)
+        protected internal void HandleReceive(byte[] buffer)
         {
             //Inform keepalive not to send for a while
             ResetKeepAliveTimer();

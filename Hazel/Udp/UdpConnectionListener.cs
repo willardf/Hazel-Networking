@@ -166,18 +166,14 @@ namespace Hazel.Udp
 
                     connection = new UdpServerConnection(this, remoteEndPoint, IPMode);
                     connections.Add(remoteEndPoint, connection);
-
-                    //Then ping back an ack to make sure they're happy (unless we rejected them...)
-                    connection.SendAck(buffer[1], buffer[2]);
                 }
             }
 
-            //And fire the corresponding event
-            if (aware)
-            {
-                connection.InvokeDataReceived(buffer);
-            }
-            else
+            //Inform the connection of the buffer (new connections need to send an ack back to client)
+            connection.HandleReceive(buffer);
+            
+            //If it's a new connection invoke the NewConnection event.
+            if (!aware)
             {
                 byte[] dataBuffer = new byte[buffer.Length - 1];
                 Buffer.BlockCopy(buffer, 1, dataBuffer, 0, buffer.Length - 1);
