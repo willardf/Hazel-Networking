@@ -1,4 +1,4 @@
- ####Hazel Networking is a low-level networking library for C# providing connection orientated, message based communication via TCP, UDP and RUDP.
+#### Hazel Networking is a low-level networking library for C# providing connection orientated, message based communication via TCP, UDP and RUDP.
 
 Its aim is to provide a standardized interface for web communication so that using and switching between protocols is incredibly simple.
 
