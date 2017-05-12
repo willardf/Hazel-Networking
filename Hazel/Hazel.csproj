@@ -55,10 +55,6 @@
     <Compile Include="ConnectionState.cs" />
     <Compile Include="DataReceivedEventArgs.cs" />
     <Compile Include="DisconnectedEventArgs.cs" />
-    <None Include="DocInclude\TcpClientExample.cs" />
-    <None Include="DocInclude\UdpClientExample.cs" />
-    <None Include="DocInclude\TcpListenerExample.cs" />
-    <None Include="DocInclude\UdpListenerExample.cs" />
     <Compile Include="HazelException.cs" />
     <Compile Include="IPMode.cs" />
     <Compile Include="IRecyclable.cs" />
@@ -83,11 +79,6 @@
     <Compile Include="Udp\UdpConnection.Reliable.cs" />
     <Compile Include="Udp\UdpConnectionListener.cs" />
     <Compile Include="Udp\UdpServerConnection.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="DocInclude\common.xml">
-      <SubType>Designer</SubType>
-    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

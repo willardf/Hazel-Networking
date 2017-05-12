@@ -44,7 +44,7 @@ namespace Hazel
         ///     <include file="DocInclude/common.xml" path="docs/item[@name='Event_Thread_Safety_Warning']/*" />
         /// </remarks>
         /// <example>
-        ///     <code language="C#" source="../DocInclude/TcpListenerExample.cs"/>
+        ///     <code language="C#" source="DocInclude/TcpListenerExample.cs"/>
         /// </example>
         public event EventHandler<NewConnectionEventArgs> NewConnection;
 
@@ -61,7 +61,7 @@ namespace Hazel
         ///     </para>
         /// </remarks>
         /// <example>
-        ///     <code language="C#" source="../DocInclude/TcpListenerExample.cs"/>
+        ///     <code language="C#" source="DocInclude/TcpListenerExample.cs"/>
         /// </example>
         public abstract void Start();
 

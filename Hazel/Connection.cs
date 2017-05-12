@@ -46,7 +46,7 @@ namespace Hazel
         ///     <include file="DocInclude/common.xml" path="docs/item[@name='Event_Thread_Safety_Warning']/*" />
         /// </remarks>
         /// <example>
-        ///     <code language="C#" source="../DocInclude/TcpClientExample.cs"/>
+        ///     <code language="C#" source="DocInclude/TcpClientExample.cs"/>
         /// </example>
         public event EventHandler<DataReceivedEventArgs> DataReceived;
 
@@ -62,7 +62,7 @@ namespace Hazel
         ///     <include file="DocInclude/common.xml" path="docs/item[@name='Event_Thread_Safety_Warning']/*" />
         /// </remarks>
         /// <example>
-        ///     <code language="C#" source="../DocInclude/TcpClientExample.cs"/>
+        ///     <code language="C#" source="DocInclude/TcpClientExample.cs"/>
         /// </example>
         public event EventHandler<DisconnectedEventArgs> Disconnected;
 

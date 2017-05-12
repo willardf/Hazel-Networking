@@ -50,18 +50,13 @@
   </PropertyGroup>
   <ItemGroup>
     <Folder Include="Content" />
-    <Folder Include="Content\DocInclude" />
     <Folder Include="Content\Technical Details" />
     <Folder Include="Content\Technical Details\Protocols" />
+    <Folder Include="DocInclude\" />
     <Folder Include="icons" />
     <Folder Include="media" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Content\DocInclude\common.xml" />
-    <None Include="Content\DocInclude\TcpClientExample.cs" />
-    <None Include="Content\DocInclude\TcpListenerExample.cs" />
-    <None Include="Content\DocInclude\UdpClientExample.cs" />
-    <None Include="Content\DocInclude\UdpListenerExample.cs" />
     <None Include="Content\Introduction.aml" />
     <None Include="Content\Quickstart.aml" />
     <None Include="Content\Technical Details\Protocols\Protocols.aml" />
@@ -69,10 +64,14 @@
     <None Include="Content\Technical Details\Protocols\UDP-RUDP.aml" />
     <None Include="Content\Technical Details\Technical Details.aml" />
     <None Include="Content\Welcome.aml" />
+    <None Include="DocInclude\common.xml" />
+    <None Include="DocInclude\TcpClientExample.cs" />
+    <None Include="DocInclude\TcpListenerExample.cs" />
+    <None Include="DocInclude\UdpClientExample.cs" />
+    <None Include="DocInclude\UdpListenerExample.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ContentLayout Include="ContentLayout.content" />
-    <ContentLayout Include="Content\Content Layout.content" />
+    <ContentLayout Include="Content Layout.content" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="icons\Help.png" />
