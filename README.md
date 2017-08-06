@@ -24,7 +24,7 @@ Hazel can be downloaded as a NuGet package [here](https://www.nuget.org/packages
 
 -----
 
-HTML documentation, tutorials and quickstarts are available on the DarkRift Website [here](http://www.darkriftnetworking.com/docs); support is available through [email](jamie@darkriftnetworking.com) or alternatively Hazel has a thread on the [Unity forum](http://forum.unity3d.com/threads/hazel-networking-open-source-rudp-tcp-library.409863/) where you'll also find updates and other news.
+HTML documentation, tutorials and quickstarts are available on the DarkRift Website [here](http://www.darkriftnetworking.com/Hazel/Docs); support is available through [email](jamie@darkriftnetworking.com) or alternatively Hazel has a thread on the [Unity forum](http://forum.unity3d.com/threads/hazel-networking-open-source-rudp-tcp-library.409863/) where you'll also find updates and other news.
 
 If you want to make improvements, do so! If you find bugs, raise issues!
 
