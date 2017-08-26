@@ -10,7 +10,8 @@ namespace Hazel.Udp
         /// <summary>
         ///     The amount of data that can be put into a fragment.
         /// </summary>
-        public int FragmentSize { get; } = 65507 - 1 - 2 - 2 - 2;
+        public int FragmentSize { get { return _fragmentSize; } }
+        int _fragmentSize = 65507 - 1 - 2 - 2 - 2;
 
         /// <summary>
         ///     The last fragmented message ID that was written.
