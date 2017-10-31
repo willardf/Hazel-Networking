@@ -175,8 +175,8 @@ namespace Hazel.Udp
             //If it's a new connection invoke the NewConnection event.
             if (!aware)
             {
-                byte[] dataBuffer = new byte[buffer.Length - 1];
-                Buffer.BlockCopy(buffer, 1, dataBuffer, 0, buffer.Length - 1);
+                byte[] dataBuffer = new byte[buffer.Length - 3];
+                Buffer.BlockCopy(buffer, 3, dataBuffer, 0, buffer.Length - 3);
                 InvokeNewConnection(dataBuffer, connection);
             }
         }

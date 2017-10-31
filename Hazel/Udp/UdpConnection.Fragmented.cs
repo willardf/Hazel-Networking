@@ -154,8 +154,9 @@ namespace Hazel.Udp
         void FinalizeFragmentedMessage(FragmentedMessage message)
         {
             IEnumerable<FragmentedMessage.Fragment> orderedFragments = message.received.OrderBy((x) => x.fragmentID);
+            FragmentedMessage.Fragment last = orderedFragments.Last();
 
-            byte[] completeData = new byte[(orderedFragments.Count() - 1) * FragmentSize + orderedFragments.Last().data.Length];
+            byte[] completeData = new byte[(orderedFragments.Count() - 1) * FragmentSize + last.data.Length - last.offset];
             int ptr = 0;
             foreach (FragmentedMessage.Fragment fragment in orderedFragments)
             {

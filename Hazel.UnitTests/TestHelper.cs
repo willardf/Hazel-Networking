@@ -35,6 +35,8 @@ namespace Hazel.UnitTests
             {
                 Trace.WriteLine("Data was received correctly.");
 
+                Assert.AreEqual(data.Length, args.Bytes.Length);
+
                 for (int i = 0; i < data.Length; i++)
                 {
                     Assert.AreEqual(data[i], args.Bytes[i]);
@@ -69,6 +71,8 @@ namespace Hazel.UnitTests
                 args.Connection.DataReceived += delegate(object innerSender, DataReceivedEventArgs innerArgs)
                 {
                     Trace.WriteLine("Data was received correctly.");
+
+                    Assert.AreEqual(data.Length, innerArgs.Bytes.Length);
 
                     for (int i = 0; i < data.Length; i++)
                     {
