@@ -51,9 +51,9 @@ namespace Hazel.Udp
             {
                 if (State != ConnectionState.Connected)
                     throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
-
-                Listener.SendData(bytes, RemoteEndPoint);
             }
+
+            Listener.SendData(bytes, RemoteEndPoint);
         }
 
         /// <inheritdoc />
@@ -96,15 +96,18 @@ namespace Hazel.Udp
             if (disposing)
             {
                 //Send disconnect message if we're not already disconnecting
-                if (State == ConnectionState.Connected)
-                    SendDisconnect();
+                bool connected;
 
                 lock (stateLock)
-                {
-                    Listener.RemoveConnectionTo(RemoteEndPoint);
+                    connected = State == ConnectionState.Connected;
 
+                if (connected)
+                    SendDisconnect();
+                
+                Listener.RemoveConnectionTo(RemoteEndPoint);
+
+                lock (stateLock)
                     State = ConnectionState.NotConnected;
-                }
             }
 
             base.Dispose(disposing);

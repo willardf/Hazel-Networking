@@ -68,8 +68,7 @@ namespace Hazel.Udp
         {
             try
             {
-                lock (listener)
-                    listener.Bind(EndPoint);
+                listener.Bind(EndPoint);
             }
             catch (SocketException e)
             {
@@ -88,8 +87,7 @@ namespace Hazel.Udp
             
             try
             {
-                lock (listener)
-                    listener.BeginReceiveFrom(dataBuffer, 0, dataBuffer.Length, SocketFlags.None, ref remoteEP, ReadCallback, dataBuffer);
+                listener.BeginReceiveFrom(dataBuffer, 0, dataBuffer.Length, SocketFlags.None, ref remoteEP, ReadCallback, dataBuffer);
             }
             catch (ObjectDisposedException)
             {
@@ -116,8 +114,7 @@ namespace Hazel.Udp
             //End the receive operation
             try
             {
-                lock (listener)
-                    bytesReceived = listener.EndReceiveFrom(result, ref remoteEndPoint);
+                bytesReceived = listener.EndReceiveFrom(result, ref remoteEndPoint);
             }
             catch (ObjectDisposedException)
             {
@@ -190,21 +187,18 @@ namespace Hazel.Udp
         {
             try
             {
-                lock (listener)
-                {
-                    listener.BeginSendTo(
-                        bytes,
-                        0,
-                        bytes.Length,
-                        SocketFlags.None,
-                        endPoint,
-                        delegate (IAsyncResult result)
-                        {
-                            listener.EndSendTo(result);
-                        },
-                        null
-                    );
-                }
+                listener.BeginSendTo(
+                    bytes,
+                    0,
+                    bytes.Length,
+                    SocketFlags.None,
+                    endPoint,
+                    delegate (IAsyncResult result)
+                    {
+                        listener.EndSendTo(result);
+                    },
+                    null
+                );
             }
             catch (SocketException e)
             {
@@ -231,10 +225,7 @@ namespace Hazel.Udp
         protected override void Dispose(bool disposing)
         {
             if (disposing)
-            {
-                lock (listener)
-                    listener.Close();
-            }
+                listener.Close();
 
             base.Dispose(disposing);
         }
