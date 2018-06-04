@@ -2,8 +2,6 @@
 
 Its aim is to provide a standardized interface for web communication so that using and switching between protocols is incredibly simple.
 
-Hazel is going to be the basis of DarkRift 2 and it is being released completely open source so that members of the community can make use of it, improve it and help find any bugs before DarkRift 2 is released.
-
 Hazel can be downloaded as a NuGet package [here](https://www.nuget.org/packages/DarkRiftNetworking.Hazel/) or you can get the latest build directly from the releases page [here](/../../releases)!
 
 -----
@@ -16,7 +14,6 @@ Hazel can be downloaded as a NuGet package [here](https://www.nuget.org/packages
 - IPv4 and IPv6 support
 - Automatic statistics about data passing in and out of connections
 - Designed to be as fast and leightweight as possible
-- Continued support as it's improved and maintained for DarkRift 2
 
 -----
 
