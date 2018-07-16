@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -48,6 +49,50 @@ namespace Hazel.Udp
         }
 
         /// <summary>
+        ///     Sends a number of bytes to the end point of the connection using the specified <see cref="SendOption"/>.
+        /// </summary>
+        /// <param name="bytes">The bytes of the message to send.</param>
+        /// <param name="offset"></param>
+        /// <param name="length"></param>
+        /// <param name="sendOption">The option specifying how the message should be sent.</param>
+        /// <remarks>
+        ///     <include file="DocInclude/common.xml" path="docs/item[@name='Connection_SendBytes_General']/*" />
+        ///     <para>
+        ///         The sendOptions parameter is only a request to use those options and the actual method used to send the
+        ///         data is up to the implementation. There are circumstances where this parameter may be ignored but in 
+        ///         general any implementer should aim to always follow the user's request.
+        ///     </para>
+        /// </remarks>
+        public override void SendBytes(byte[] bytes, int offset, int length, SendOption sendOption = SendOption.None)
+        {
+            //Early check
+            if (State != ConnectionState.Connected)
+                throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
+
+
+            //Inform keepalive not to send for a while
+            ResetKeepAliveTimer();
+
+            switch (sendOption)
+            {
+                //Handle reliable header and hellos
+                case SendOption.Reliable:
+                    ReliableSend((byte)sendOption, bytes, offset, length);
+                    break;
+
+                case SendOption.FragmentedReliable:
+                    throw new NotImplementedException();
+                    // FragmentedSend(data);
+                    // break;
+
+                //Treat all else as unreliable
+                default:
+                    UnreliableSend((byte)sendOption, bytes, offset, length);
+                    break;
+            }
+        }
+
+        /// <summary>
         ///     Handles the reliable/fragmented sending from this connection.
         /// </summary>
         /// <param name="data">The data being sent.</param>
@@ -73,7 +118,7 @@ namespace Hazel.Udp
                 
                 //Treat all else as unreliable
                 default:
-                    UnreliableSend(data, sendOption);
+                    UnreliableSend(sendOption, data);
                     break;
             }
         }
@@ -129,22 +174,34 @@ namespace Hazel.Udp
         /// <summary>
         ///     Sends bytes using the unreliable UDP protocol.
         /// </summary>
+        /// <param name="sendOption">The SendOption to attach.</param>
+        /// <param name="data">The data.</param>
+        void UnreliableSend(byte sendOption, byte[] data)
+        {
+            this.UnreliableSend(sendOption, data, 0, data.Length);
+        }
+
+        /// <summary>
+        ///     Sends bytes using the unreliable UDP protocol.
+        /// </summary>
         /// <param name="data">The data.</param>
         /// <param name="sendOption">The SendOption to attach.</param>
-        void UnreliableSend(byte[] data, byte sendOption)
+        /// <param name="offset"></param>
+        /// <param name="length"></param>
+        void UnreliableSend(byte sendOption, byte[] data, int offset, int length)
         {
-            byte[] bytes = new byte[data.Length + 1];
+            byte[] bytes = new byte[length + 1];
 
             //Add message type
             bytes[0] = sendOption;
-            
+
             //Copy data into new array
-            Buffer.BlockCopy(data, 0, bytes, bytes.Length - data.Length, data.Length);
+            Buffer.BlockCopy(data, offset, bytes, bytes.Length - length, length);
 
             //Write to connection
             WriteBytesToConnection(bytes);
 
-            Statistics.LogUnreliableSend(data.Length, bytes.Length);
+            Statistics.LogUnreliableSend(length, bytes.Length);
         }
 
         /// <summary>

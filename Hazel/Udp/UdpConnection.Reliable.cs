@@ -247,25 +247,39 @@ namespace Hazel.Udp
         /// <summary>
         ///     Sends the bytes reliably and stores the send.
         /// </summary>
-        /// <param name="bytes">The byte array to write to.</param>
+        /// <param name="sendOption"></param>
+        /// <param name="data">The byte array to write to.</param>
         /// <param name="ackCallback">The callback to make once the packet has been acknowledged.</param>
         void ReliableSend(byte sendOption, byte[] data, Action ackCallback = null)
         {
-            byte[] bytes = new byte[data.Length + 3];
+            this.ReliableSend(sendOption, data, 0, data.Length, ackCallback);
+        }
+
+        /// <summary>
+        ///     Sends the bytes reliably and stores the send.
+        /// </summary>
+        /// <param name="sendOption"></param>
+        /// <param name="data">The byte array to write to.</param>
+        /// <param name="offset"></param>
+        /// <param name="length"></param>
+        /// <param name="ackCallback">The callback to make once the packet has been acknowledged.</param>
+        void ReliableSend(byte sendOption, byte[] data, int offset, int length, Action ackCallback = null)
+        {
+            byte[] bytes = new byte[length + 3];
 
             //Add message type
             bytes[0] = sendOption;
 
             //Add reliable ID
             AttachReliableID(bytes, 1, ackCallback);
-            
+
             //Copy data into new array
-            Buffer.BlockCopy(data, 0, bytes, bytes.Length - data.Length, data.Length);
+            Buffer.BlockCopy(data, offset, bytes, bytes.Length - length, length);
 
             //Write to connection
             WriteBytesToConnection(bytes);
 
-            Statistics.LogReliableSend(data.Length, bytes.Length);
+            Statistics.LogReliableSend(length, bytes.Length);
         }
 
         /// <summary>

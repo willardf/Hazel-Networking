@@ -53,6 +53,27 @@ namespace Hazel.UnitTests
             }
         }
 
+
+        [TestMethod]
+        public void UdpUnreliableDataSubsetSendTest()
+        {
+            using (UdpConnectionListener listener = new UdpConnectionListener(new NetworkEndPoint(IPAddress.Any, 4296, IPMode.IPv4)))
+            using (UdpConnection connection = new UdpClientConnection(new NetworkEndPoint(IPAddress.Loopback, 4296, IPMode.IPv4)))
+            {
+                listener.Start();
+                listener.NewConnection += delegate (object sender, NewConnectionEventArgs e)
+                {
+                    e.Connection.DataReceived += delegate (object s, DataReceivedEventArgs evt)
+                    {
+                        Assert.IsTrue(Enumerable.SequenceEqual(evt.Bytes, new byte[] { 3, 4 }));
+                    };
+                };
+
+                connection.Connect();
+                connection.SendBytes(new byte[] { 1, 2, 3, 4, 5, 6 }, 2, 2, SendOption.None);
+            }
+        }
+
         /// <summary>
         ///     Tests IPv4 connectivity.
         /// </summary>
@@ -120,7 +141,7 @@ namespace Hazel.UnitTests
             using (UdpConnectionListener listener = new UdpConnectionListener(new NetworkEndPoint(IPAddress.Any, 4296)))
             using (UdpConnection connection = new UdpClientConnection(new NetworkEndPoint(IPAddress.Loopback, 4296)))
             {
-                TestHelper.RunServerToClientTest(listener, connection, (int)(connection.FragmentSize * 9.5), SendOption.FragmentedReliable);
+                TestHelper.RunServerToClientTest(listener, connection, (int)(UdpConnection.FragmentSize * 9.5), SendOption.FragmentedReliable);
             }
         }
 
@@ -159,7 +180,7 @@ namespace Hazel.UnitTests
             using (UdpConnectionListener listener = new UdpConnectionListener(new NetworkEndPoint(IPAddress.Any, 4296)))
             using (UdpConnection connection = new UdpClientConnection(new NetworkEndPoint(IPAddress.Loopback, 4296)))
             {
-                TestHelper.RunClientToServerTest(listener, connection, (int)(connection.FragmentSize * 9.5), SendOption.FragmentedReliable);
+                TestHelper.RunClientToServerTest(listener, connection, (int)(UdpConnection.FragmentSize * 9.5), SendOption.FragmentedReliable);
             }
         }
 

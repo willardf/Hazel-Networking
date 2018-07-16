@@ -202,7 +202,7 @@ namespace Hazel.Udp
             //Copy data to new array
             byte[] bytes = new byte[bytesReceived];
             Buffer.BlockCopy(dataBuffer, 0, bytes, 0, bytesReceived);
-
+            
             //Begin receiving again
             try
             {
