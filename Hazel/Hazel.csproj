@@ -66,10 +66,9 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SendOption.cs" />
     <Compile Include="Udp\SendOptionInternal.cs" />
-    <Compile Include="Tcp\StateObject.cs" />
     <Compile Include="ConnectionStatistics.cs" />
-    <Compile Include="Tcp\TcpConnection.cs" />
-    <Compile Include="Tcp\TcpConnectionListener.cs" />
+    <Compile Include="Udp\UdpBroadcaster.cs" />
+    <Compile Include="Udp\UdpBroadcastListener.cs" />
     <Compile Include="Udp\UdpClientConnection.cs" />
     <Compile Include="Udp\UdpConnection.cs">
       <SubType>Code</SubType>
