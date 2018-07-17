@@ -27,7 +27,37 @@ namespace Hazel.Udp
         ///     Writes the given bytes to the connection.
         /// </summary>
         /// <param name="bytes">The bytes to write.</param>
-        protected abstract void WriteBytesToConnection(byte[] bytes);
+        protected abstract void WriteBytesToConnection(byte[] bytes, int length);
+
+        /// <inheritdoc/>
+        public override void Send(MessageWriter msg)
+        {
+            //Early check
+            if (State != ConnectionState.Connected)
+                throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
+
+
+            //Inform keepalive not to send for a while
+            ResetKeepAliveTimer();
+
+            int length = (int)msg.Stream.Length;
+            switch (msg.SendOption)
+            {
+                case SendOption.Reliable:
+                    AttachReliableID(msg.Buffer, 1, length);
+                    WriteBytesToConnection(msg.Buffer, length);
+                    Statistics.LogReliableSend(length - 3, length);
+                    break;
+
+                case SendOption.FragmentedReliable:
+                    throw new NotImplementedException("Not yet");
+
+                default:
+                    WriteBytesToConnection(msg.Buffer, length);
+                    Statistics.LogUnreliableSend(length - 1, length);;
+                    break;
+            }
+        }
 
         /// <inheritdoc/>
         /// <remarks>
@@ -199,7 +229,7 @@ namespace Hazel.Udp
             Buffer.BlockCopy(data, offset, bytes, bytes.Length - length, length);
 
             //Write to connection
-            WriteBytesToConnection(bytes);
+            WriteBytesToConnection(bytes, bytes.Length);
 
             Statistics.LogUnreliableSend(length, bytes.Length);
         }

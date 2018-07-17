@@ -49,6 +49,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BinaryWriterExtensions.cs" />
     <Compile Include="Connection.cs" />
     <Compile Include="ConnectionEndPoint.cs" />
     <Compile Include="ConnectionListener.cs" />
@@ -61,6 +62,7 @@
     <Compile Include="NetworkConnection.cs" />
     <Compile Include="NetworkConnectionListener.cs" />
     <Compile Include="NetworkEndPoint.cs" />
+    <Compile Include="MessageWriter.cs" />
     <Compile Include="NewConnectionEventArgs.cs" />
     <Compile Include="ObjectPool.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

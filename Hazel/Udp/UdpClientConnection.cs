@@ -54,7 +54,7 @@ namespace Hazel.Udp
         }
 
         /// <inheritdoc />
-        protected override void WriteBytesToConnection(byte[] bytes)
+        protected override void WriteBytesToConnection(byte[] bytes, int length)
         {
             lock (stateLock)
             {
@@ -67,7 +67,7 @@ namespace Hazel.Udp
                 socket.BeginSendTo(
                     bytes, 
                     0, 
-                    bytes.Length, 
+                    length, 
                     SocketFlags.None, 
                     RemoteEndPoint,
                     delegate (IAsyncResult result)

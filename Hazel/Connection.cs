@@ -146,6 +146,20 @@ namespace Hazel
         /// <summary>
         ///     Sends a number of bytes to the end point of the connection using the specified <see cref="SendOption"/>.
         /// </summary>
+        /// <param name="msg">The message to send.</param>
+        /// <remarks>
+        ///     <include file="DocInclude/common.xml" path="docs/item[@name='Connection_SendBytes_General']/*" />
+        ///     <para>
+        ///         The sendOptions parameter is only a request to use those options and the actual method used to send the
+        ///         data is up to the implementation. There are circumstances where this parameter may be ignored but in 
+        ///         general any implementer should aim to always follow the user's request.
+        ///     </para>
+        /// </remarks>
+        public abstract void Send(MessageWriter msg);
+
+        /// <summary>
+        ///     Sends a number of bytes to the end point of the connection using the specified <see cref="SendOption"/>.
+        /// </summary>
         /// <param name="bytes">The bytes of the message to send.</param>
         /// <param name="sendOption">The option specifying how the message should be sent.</param>
         /// <remarks>

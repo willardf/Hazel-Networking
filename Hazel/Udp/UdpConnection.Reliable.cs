@@ -182,7 +182,7 @@ namespace Hazel.Udp
         /// <param name="buffer">The buffer to attach to.</param>
         /// <param name="offset">The offset to attach at.</param>
         /// <param name="ackCallback">The callback to make once the packet has been acknowledged.</param>
-        void AttachReliableID(byte[] buffer, int offset, Action ackCallback = null)
+        void AttachReliableID(byte[] buffer, int offset, int sendLength, Action ackCallback = null)
         {
             //Find and reliable ID
             lock (reliableDataPacketsSent)
@@ -225,7 +225,7 @@ namespace Hazel.Udp
 
                         try
                         {
-                            WriteBytesToConnection(p.Data);
+                            WriteBytesToConnection(p.Data, sendLength);
                         }
                         catch (InvalidOperationException e)
                         {
@@ -271,13 +271,13 @@ namespace Hazel.Udp
             bytes[0] = sendOption;
 
             //Add reliable ID
-            AttachReliableID(bytes, 1, ackCallback);
+            AttachReliableID(bytes, 1, bytes.Length, ackCallback);
 
             //Copy data into new array
             Buffer.BlockCopy(data, offset, bytes, bytes.Length - length, length);
 
             //Write to connection
-            WriteBytesToConnection(bytes);
+            WriteBytesToConnection(bytes, bytes.Length);
 
             Statistics.LogReliableSend(length, bytes.Length);
         }
@@ -413,15 +413,16 @@ namespace Hazel.Udp
         /// <param name="byte2">The second identification byte.</param>
         internal void SendAck(byte byte1, byte byte2)
         {
-            //Always reply with acknowledgement in order to stop the sender repeatedly sending it
-            WriteBytesToConnection(     //TODO group acks together
-                new byte[]
-                {
-                    (byte)UdpSendOption.Acknowledgement,
-                    byte1,
-                    byte2
-                }
-            );
+            byte[] bytes = new byte[]
+            {
+                (byte)UdpSendOption.Acknowledgement,
+                byte1,
+                byte2
+            };
+
+            // Always reply with acknowledgement in order to stop the sender repeatedly sending it
+            // TODO: group acks together
+            WriteBytesToConnection(bytes, bytes.Length);
         }
     }
 }

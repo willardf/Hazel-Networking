@@ -183,14 +183,14 @@ namespace Hazel.Udp
         /// </summary>
         /// <param name="bytes">The bytes to send.</param>
         /// <param name="endPoint">The endpoint to send to.</param>
-        internal void SendData(byte[] bytes, EndPoint endPoint)
+        internal void SendData(byte[] bytes, int length, EndPoint endPoint)
         {
             try
             {
                 listener.BeginSendTo(
                     bytes,
                     0,
-                    bytes.Length,
+                    length,
                     SocketFlags.None,
                     endPoint,
                     delegate (IAsyncResult result)

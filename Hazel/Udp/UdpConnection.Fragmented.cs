@@ -54,13 +54,13 @@ namespace Hazel.Udp
                 }
 
                 //Pass fragment to reliable send code to ensure it will arrive
-                AttachReliableID(buffer, 5);
+                AttachReliableID(buffer, 5, buffer.Length);
 
                 //Copy data into fragment
                 Buffer.BlockCopy(data, FragmentSize * i, buffer, 7, buffer.Length - 7);
 
                 //Send
-                WriteBytesToConnection(buffer);
+                WriteBytesToConnection(buffer, buffer.Length);
             }
         }
 

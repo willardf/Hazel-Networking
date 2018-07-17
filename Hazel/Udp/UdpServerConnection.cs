@@ -45,7 +45,7 @@ namespace Hazel.Udp
         }
 
         /// <inheritdoc />
-        protected override void WriteBytesToConnection(byte[] bytes)
+        protected override void WriteBytesToConnection(byte[] bytes, int length)
         {
             lock (stateLock)
             {
@@ -53,7 +53,7 @@ namespace Hazel.Udp
                     throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
             }
 
-            Listener.SendData(bytes, RemoteEndPoint);
+            Listener.SendData(bytes, length, RemoteEndPoint);
         }
 
         /// <inheritdoc />
