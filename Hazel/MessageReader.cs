@@ -76,6 +76,14 @@ namespace Hazel
             return output;
         }
 
+        public short ReadInt16()
+        {
+            short output =
+                (short)(this.Buffer[Position++]
+                | this.Buffer[Position++] << 8);
+            return output;
+        }
+
         public int ReadInt32()
         {
             int output = this.Buffer[Position++]

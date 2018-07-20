@@ -113,6 +113,13 @@ namespace Hazel
             if (this.Position > this.Length) this.Length = this.Position;
         }
 
+        public void Write(short value)
+        {
+            this.Buffer[this.Position++] = (byte)value;
+            this.Buffer[this.Position++] = (byte)(value >> 8);
+            if (this.Position > this.Length) this.Length = this.Position;
+        }
+
         public void Write(ushort value)
         {
             this.Buffer[this.Position++] = (byte)value;
@@ -152,7 +159,7 @@ namespace Hazel
             this.Write(bytes);
         }
 
-        public void WriteBytesFull(byte[] bytes)
+        public void WriteBytesAndSize(byte[] bytes)
         {
             this.WritePacked((uint)bytes.Length);
             this.Write(bytes);
