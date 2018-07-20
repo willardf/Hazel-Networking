@@ -56,6 +56,8 @@ namespace Hazel.Udp
         /// <inheritdoc />
         protected override void WriteBytesToConnection(byte[] bytes, int length)
         {
+            InvokeDataSentRaw(bytes, length);
+
             lock (stateLock)
             {
                 if (State != ConnectionState.Connected && State != ConnectionState.Connecting)
@@ -105,6 +107,22 @@ namespace Hazel.Udp
         /// <inheritdoc />
         public override void Connect(byte[] bytes = null, int timeout = 5000)
         {
+            this.ConnectAsync(bytes, timeout);
+
+            //Wait till hello packet is acknowledged and the state is set to Connected
+            bool timedOut = !WaitOnConnect(timeout);
+
+            //If we timed out raise an exception
+            if (timedOut)
+            {
+                Dispose();
+                throw new HazelException("Connection attempt timed out.");
+            }
+        }
+
+        /// <inheritdoc />
+        public override void ConnectAsync(byte[] bytes = null, int timeout = 5000)
+        {
             lock (stateLock)
             {
                 if (State != ConnectionState.NotConnected)
@@ -112,7 +130,7 @@ namespace Hazel.Udp
 
                 State = ConnectionState.Connecting;
             }
-                
+
             //Begin listening
             try
             {
@@ -148,16 +166,6 @@ namespace Hazel.Udp
             //Write bytes to the server to tell it hi (and to punch a hole in our NAT, if present)
             //When acknowledged set the state to connected
             SendHello(bytes, () => { lock (stateLock) State = ConnectionState.Connected; });
-
-            //Wait till hello packet is acknowledged and the state is set to Connected
-            bool timedOut = !WaitOnConnect(timeout);
-
-            //If we timed out raise an exception
-            if (timedOut)
-            {
-                Dispose();
-                throw new HazelException("Connection attempt timed out.");
-            }
         }
 
         /// <summary>

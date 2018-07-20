@@ -53,15 +53,7 @@ namespace Hazel.Udp
         /// </summary>
         volatile bool hasReceivedSomething = false;
 
-        /// <summary>
-        ///     The total time it has taken reliable packets to make a round trip.
-        /// </summary>
-        long totalRoundTime = 0;
-
-        /// <summary>
-        ///     The number of reliable messages that have been sent.
-        /// </summary>
-        long totalReliableMessages = 0;
+        object PingLock = new object();
 
         /// <summary>
         ///     Returns the average ping to this endpoint.
@@ -70,17 +62,7 @@ namespace Hazel.Udp
         ///     This returns the average ping for a one-way trip as calculated from the reliable packets that have been sent 
         ///     and acknowledged by the endpoint.
         /// </remarks>
-        public double AveragePing
-        {
-            get
-            {
-                long t = Interlocked.Read(ref totalReliableMessages);
-                if (t == 0)
-                    return 0;
-                else
-                    return Interlocked.Read(ref totalRoundTime) / t / 2;
-            }
-        }
+        public volatile float AveragePingMs = 500;
 
         /// <summary>
         ///     The maximum times a message should be resent before marking the endpoint as disconnected.
@@ -235,7 +217,7 @@ namespace Hazel.Udp
 
                         Trace.WriteLine("Resend.");
                     },
-                    resendTimeout > 0 ? resendTimeout : (AveragePing != 0 ? (int)AveragePing * 4 : 200),
+                    resendTimeout > 0 ? resendTimeout : (AveragePingMs != 0 ? (int)AveragePingMs * 4 : 200),
                     ackCallback
                 );
 
@@ -394,8 +376,10 @@ namespace Hazel.Udp
 
                     //Add to average ping
                     packet.Stopwatch.Stop();
-                    Interlocked.Add(ref totalRoundTime, packet.Stopwatch.Elapsed.Milliseconds);
-                    Interlocked.Increment(ref totalReliableMessages);
+                    lock (PingLock)
+                    {
+                        this.AveragePingMs = this.AveragePingMs * .7f + (float)packet.Stopwatch.Elapsed.TotalMilliseconds * .3f;
+                    }
 
                     packet.Recycle();
 

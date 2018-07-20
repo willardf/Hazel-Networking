@@ -36,25 +36,26 @@ namespace Hazel.Udp
             if (State != ConnectionState.Connected)
                 throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
 
+            byte[] buffer = new byte[msg.Length];
+            Buffer.BlockCopy(msg.Buffer, 0, buffer, 0, msg.Length);
 
             //Inform keepalive not to send for a while
             ResetKeepAliveTimer();
 
-            int length = (int)msg.Stream.Length;
             switch (msg.SendOption)
             {
                 case SendOption.Reliable:
-                    AttachReliableID(msg.Buffer, 1, length);
-                    WriteBytesToConnection(msg.Buffer, length);
-                    Statistics.LogReliableSend(length - 3, length);
+                    AttachReliableID(buffer, 1, buffer.Length);
+                    WriteBytesToConnection(buffer, buffer.Length);
+                    Statistics.LogReliableSend(buffer.Length - 3, buffer.Length);
                     break;
 
                 case SendOption.FragmentedReliable:
                     throw new NotImplementedException("Not yet");
 
                 default:
-                    WriteBytesToConnection(msg.Buffer, length);
-                    Statistics.LogUnreliableSend(length - 1, length);;
+                    WriteBytesToConnection(buffer, buffer.Length);
+                    Statistics.LogUnreliableSend(buffer.Length - 1, buffer.Length);;
                     break;
             }
         }
@@ -159,6 +160,8 @@ namespace Hazel.Udp
         /// <param name="buffer">The buffer containing the bytes received.</param>
         protected internal void HandleReceive(byte[] buffer)
         {
+            InvokeDataReceivedRaw(buffer);
+
             //Inform keepalive not to send for a while
             ResetKeepAliveTimer();
             

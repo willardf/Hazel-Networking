@@ -50,6 +50,18 @@ namespace Hazel
         /// </example>
         public event EventHandler<DataReceivedEventArgs> DataReceived;
 
+        public event Action<byte[], int> DataSentRaw;
+        protected void InvokeDataSentRaw(byte[] data, int length)
+        {
+            this.DataSentRaw?.Invoke(data, length);
+        }
+
+        public event Action<byte[]> DataReceivedRaw;
+        protected void InvokeDataReceivedRaw(byte[] data)
+        {
+            this.DataReceivedRaw?.Invoke(data);
+        }
+
         /// <summary>
         ///     Called when the end point disconnects or an error occurs.
         /// </summary>
@@ -201,6 +213,19 @@ namespace Hazel
         /// </remarks>
         public abstract void Connect(byte[] bytes = null, int timeout = 5000);
 
+
+        /// <summary>
+        ///     Connects the connection to a server and begins listening.
+        /// </summary>
+        /// <param name="bytes">The bytes of data to send in the handshake.</param>
+        /// <param name="timeout">The number of milliseconds to wait before giving up on the connect attempt.</param>
+        /// <remarks>
+        ///     Calling Connect makes the connection attempt to connect to the end point that's specified in the 
+        ///     constructor. This method will block until the connection attempt completes and will throw a 
+        ///     <see cref="HazelException"/> if there is a problem connecting.
+        /// </remarks>
+        public abstract void ConnectAsync(byte[] bytes = null, int timeout = 5000);
+        
         /// <summary>
         ///     Invokes the DataReceived event.
         /// </summary>

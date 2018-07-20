@@ -53,6 +53,32 @@ namespace Hazel.UnitTests
             }
         }
 
+        [TestMethod]
+        public void UdpUnreliableMessageSendTest()
+        {
+            using (UdpConnectionListener listener = new UdpConnectionListener(new NetworkEndPoint(IPAddress.Any, 4296, IPMode.IPv4)))
+            using (UdpConnection connection = new UdpClientConnection(new NetworkEndPoint(IPAddress.Loopback, 4296, IPMode.IPv4)))
+            {
+                listener.NewConnection += delegate (object sender, NewConnectionEventArgs e)
+                {
+                    e.Connection.DataReceived += delegate (object s, DataReceivedEventArgs evt)
+                    {
+                        Assert.IsTrue(Enumerable.SequenceEqual(evt.Bytes, new byte[] { 1, 2, 3, 4, 5, 6 }));
+                    };
+                };
+
+                listener.Start();
+                connection.Connect();
+
+                for (int i = 0; i < 4; ++i)
+                {
+                    var msg = MessageWriter.Get(SendOption.None);
+                    msg.Write(new byte[] { 1, 2, 3, 4, 5, 6 });
+                    connection.Send(msg);
+                    msg.Recycle();
+                }
+            }
+        }
 
         [TestMethod]
         public void UdpUnreliableDataSubsetSendTest()

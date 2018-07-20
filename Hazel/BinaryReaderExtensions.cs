@@ -3,24 +3,8 @@
 namespace Hazel
 {
     ///
-    public static class BinaryWriterExtensions
+    public static class BinaryReaderExtensions
     {
-        ///
-        public static void WritePacked(this BinaryWriter writer, uint value)
-        {
-            do
-            {
-                byte b = (byte)(value & 0xFF);
-                if (value >= 0x80)
-                {
-                    b |= 0x80;
-                }
-
-                writer.Write(b);
-                value >>= 7;
-            } while (value > 0);
-        }
-
         ///
         public static uint ReadPackedUInt32(this BinaryReader reader)
         {
@@ -49,10 +33,9 @@ namespace Hazel
         }
 
         ///
-        public static void WriteBytesFull(this BinaryWriter writer, byte[] bytes)
+        public static int ReadPackedInt32(this BinaryReader reader)
         {
-            writer.WritePacked((uint)bytes.Length);
-            writer.Write(bytes);
+            return (int)reader.ReadPackedUInt32();
         }
 
         ///

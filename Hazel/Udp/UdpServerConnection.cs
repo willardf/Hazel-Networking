@@ -47,6 +47,8 @@ namespace Hazel.Udp
         /// <inheritdoc />
         protected override void WriteBytesToConnection(byte[] bytes, int length)
         {
+            InvokeDataSentRaw(bytes, length);
+
             lock (stateLock)
             {
                 if (State != ConnectionState.Connected)
@@ -61,6 +63,15 @@ namespace Hazel.Udp
         ///     This will always throw a HazelException.
         /// </remarks>
         public override void Connect(byte[] bytes = null, int timeout = 5000)
+        {
+            throw new HazelException("Cannot manually connect a UdpServerConnection, did you mean to use UdpClientConnection?");
+        }
+
+        /// <inheritdoc />
+        /// <remarks>
+        ///     This will always throw a HazelException.
+        /// </remarks>
+        public override void ConnectAsync(byte[] bytes = null, int timeout = 5000)
         {
             throw new HazelException("Cannot manually connect a UdpServerConnection, did you mean to use UdpClientConnection?");
         }
