@@ -32,7 +32,8 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>bin\Release\Hazel.XML</DocumentationFile>
+    <DocumentationFile>
+    </DocumentationFile>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup>
@@ -51,7 +52,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="BinaryReaderExtensions.cs" />
     <Compile Include="Connection.cs" />
     <Compile Include="ConnectionEndPoint.cs" />
     <Compile Include="ConnectionListener.cs" />
@@ -61,6 +61,7 @@
     <Compile Include="HazelException.cs" />
     <Compile Include="IPMode.cs" />
     <Compile Include="IRecyclable.cs" />
+    <Compile Include="MessageReader.cs" />
     <Compile Include="NetworkConnection.cs" />
     <Compile Include="NetworkConnectionListener.cs" />
     <Compile Include="NetworkEndPoint.cs" />
