@@ -184,7 +184,7 @@ namespace Hazel.Udp
                     break;
 
                 case (byte)UdpSendOption.Disconnect:
-                    HandleDisconnect();                    
+                    HandleDisconnect(new HazelException("The remote sent a disconnect request"));                    
                     break;
 
                 //Handle fragmented messages

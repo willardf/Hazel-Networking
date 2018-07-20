@@ -17,11 +17,10 @@ namespace Hazel.Udp
         ///     <para>
         ///         For reliable delivery data is resent at specified intervals unless an acknowledgement is received from the 
         ///         receiving device. The ResendTimeout specifies the interval between the packets being resent, each time a packet
-        ///         is resent the interval is doubled for that packet until the number of resends exceeds the 
-        ///         <see cref="ResendsBeforeDisconnect"/> value.
+        ///         is resent the interval is increased for that packet until the duration exceeds the <see cref="DisconnectTimeout"/> value.
         ///     </para>
         ///     <para>
-        ///         Setting this to its default of 0 will mean the timout is 4 times the value of the average ping, usually 
+        ///         Setting this to its default of 0 will mean the timeout is 2 times the value of the average ping, usually 
         ///         resulting in a more dynamic resend that responds to endpoints on slower or faster connections.
         ///     </para>
         /// </remarks>
@@ -73,8 +72,8 @@ namespace Hazel.Udp
         ///     connection will be marked as disconnected and the <see cref="Connection.Disconnected">Disconnected</see> event
         ///     will be invoked.
         /// </remarks>
-        public int ResendsBeforeDisconnect { get { return resendsBeforeDisconnect; } set { resendsBeforeDisconnect = value; } }
-        private volatile int resendsBeforeDisconnect = 3;
+        public int DisconnectTimeout { get { return disconnectTimeout; } set { disconnectTimeout = value; } }
+        private volatile int disconnectTimeout = 2500;
 
         /// <summary>
         ///     Class to hold packet data
@@ -186,15 +185,17 @@ namespace Hazel.Udp
                     buffer,
                     (Packet p) =>
                     {
-                        //Double packet timeout
                         lock (p.Timer)
                         {
                             if (!p.Acknowledged)
                             {
-                                p.Timer.Change(p.LastTimeout *= 2, Timeout.Infinite);
-                                if (++p.Retransmissions > ResendsBeforeDisconnect)
+                                // Backoff retry frequency to avoid congestion
+                                p.LastTimeout = (int)Math.Min(p.LastTimeout * 1.5f, this.disconnectTimeout / 2f);
+                                p.Timer.Change(p.LastTimeout, Timeout.Infinite);
+
+                                if (p.Stopwatch.ElapsedMilliseconds > this.disconnectTimeout)
                                 {
-                                    HandleDisconnect();
+                                    HandleDisconnect(new HazelException($"Reliable packet {id} was not ack'd after {p.Retransmissions} resends"));
 
                                     //Set acknowledged so we dont change the timer again
                                     p.Acknowledged = true;
@@ -208,6 +209,7 @@ namespace Hazel.Udp
                         try
                         {
                             WriteBytesToConnection(p.Data, sendLength);
+                            p.Retransmissions++;
                         }
                         catch (InvalidOperationException e)
                         {
@@ -217,7 +219,7 @@ namespace Hazel.Udp
 
                         Trace.WriteLine("Resend.");
                     },
-                    resendTimeout > 0 ? resendTimeout : (AveragePingMs != 0 ? (int)AveragePingMs * 4 : 200),
+                    resendTimeout > 0 ? resendTimeout : (AveragePingMs != 0 ? (int)AveragePingMs * 2 : 200),
                     ackCallback
                 );
 

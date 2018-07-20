@@ -203,7 +203,7 @@ namespace Hazel.Udp
             //Exit if no bytes read, we've failed.
             if (bytesReceived == 0)
             {
-                HandleDisconnect();
+                HandleDisconnect(new HazelException("Recieved 0 bytes"));
                 return;
             }
 
