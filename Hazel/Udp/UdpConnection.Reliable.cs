@@ -345,9 +345,7 @@ namespace Hazel.Udp
                 else
                 {
                     //See if we're missing it, else this packet is a duplicate as so we return false
-                    if (reliableDataPacketsMissing.Contains(id))
-                        reliableDataPacketsMissing.Remove(id);
-                    else
+                    if (!reliableDataPacketsMissing.Remove(id))
                         return false;
                 }
             }
@@ -367,10 +365,9 @@ namespace Hazel.Udp
             lock (reliableDataPacketsSent)
             {
                 //Dispose of timer and remove from dictionary
-                if (reliableDataPacketsSent.ContainsKey(id))
-                {
-                    Packet packet = reliableDataPacketsSent[id];
-                    
+                Packet packet;
+                if (reliableDataPacketsSent.TryGetValue(id, out packet))
+                {                    
                     packet.Acknowledged = true;
 
                     if (packet.AckCallback != null)

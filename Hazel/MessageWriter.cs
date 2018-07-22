@@ -165,10 +165,23 @@ namespace Hazel
             this.Write(bytes);
         }
 
+        public void WriteBytesAndSize(byte[] bytes, int length)
+        {
+            this.WritePacked((uint)length);
+            this.Write(bytes, length);
+        }
+
         public void Write(byte[] bytes)
         {
             Array.Copy(bytes, 0, this.Buffer, this.Position, bytes.Length);
             this.Position += bytes.Length;
+            if (this.Position > this.Length) this.Length = this.Position;
+        }
+
+        public void Write(byte[] bytes, int length)
+        {
+            Array.Copy(bytes, 0, this.Buffer, this.Position, length);
+            this.Position += length;
             if (this.Position > this.Length) this.Length = this.Position;
         }
 

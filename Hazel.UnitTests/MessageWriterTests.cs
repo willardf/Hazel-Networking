@@ -57,6 +57,7 @@ namespace Hazel.UnitTests
             var msg = new MessageWriter(2048);
             msg.Write(Test1);
             msg.Write(Test2);
+            msg.Write(string.Empty);
 
             Assert.AreEqual(msg.Length, msg.Position);
 
@@ -65,6 +66,7 @@ namespace Hazel.UnitTests
             {
                 Assert.AreEqual(Test1, reader.ReadString());
                 Assert.AreEqual(Test2, reader.ReadString());
+                Assert.AreEqual(string.Empty, reader.ReadString());
             }
         }
 
@@ -83,6 +85,55 @@ namespace Hazel.UnitTests
             {
                 Assert.AreEqual(Test1, reader.ReadSingle());
             }
+        }
+
+        [TestMethod]
+        public void WritePackedUint()
+        {
+            var msg = new MessageWriter(2048);
+            msg.StartMessage(0);
+            msg.WritePacked(8u);
+            msg.WritePacked(250u);
+            msg.WritePacked(68000u);
+            msg.EndMessage();
+
+            Assert.AreEqual(3 + 1 + 2 + 3, msg.Position);
+            Assert.AreEqual(msg.Length, msg.Position);
+
+            MessageReader reader = MessageReader.Get(msg.Buffer, 0);
+
+            Assert.AreEqual(8u, reader.ReadPackedUInt32());
+            Assert.AreEqual(250u, reader.ReadPackedUInt32());
+            Assert.AreEqual(68000u, reader.ReadPackedUInt32());
+        }
+
+
+        [TestMethod]
+        public void WritePackedInt()
+        {
+            var msg = new MessageWriter(2048);
+            msg.StartMessage(0);
+            msg.WritePacked(8);
+            msg.WritePacked(250);
+            msg.WritePacked(68000);
+            msg.WritePacked(-68000);
+            msg.WritePacked(-250);
+            msg.WritePacked(-8);
+            msg.EndMessage();
+
+            Assert.AreEqual(3 + 1 + 2 + 3 + 5 + 5 + 5, msg.Position);
+            Assert.AreEqual(msg.Length, msg.Position);
+
+            MessageReader reader = MessageReader.Get(msg.Buffer, 0);
+
+            Assert.AreEqual(8, reader.ReadPackedInt32());
+            Assert.AreEqual(250, reader.ReadPackedInt32());
+            Assert.AreEqual(68000, reader.ReadPackedInt32());
+            
+            
+            Assert.AreEqual(-68000, reader.ReadPackedInt32());
+            Assert.AreEqual(-250, reader.ReadPackedInt32());
+            Assert.AreEqual(-8, reader.ReadPackedInt32());
         }
 
         [TestMethod]

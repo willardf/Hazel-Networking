@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace Hazel
@@ -8,20 +9,35 @@ namespace Hazel
     {
         private static readonly ObjectPool<MessageReader> objectPool = new ObjectPool<MessageReader>(() => new MessageReader());
 
-        private byte[] Buffer;
+        public byte[] Buffer;
         public byte Tag;
-        public int End;
 
-        public int Position;
+        public int Length;
 
+        public int Offset { get; private set; }
+        public int Position
+        {
+            get { return this._position; }
+            set
+            {
+                this._position = value;
+                this.readHead = this._position + Offset;
+            }
+        }
+
+        private int _position;
+
+        private int readHead;
+        
         public static MessageReader Get(byte[] buffer, int offset, int length)
         {
             var output = objectPool.GetObject();
             output.Buffer = buffer;
-            output.Position = offset;
-            output.End = length + offset;
+            output.Offset = offset;
+            output.Position = 0;
+            output.Length = length;
             output.Tag = output.ReadByte();
-
+            
             return output;
         }
 
@@ -29,9 +45,14 @@ namespace Hazel
         {
             var output = objectPool.GetObject();
             output.Buffer = buffer;
-            output.Position = offset;
-            output.End = output.ReadUInt16() + offset;
+            output.Offset = offset;
+            output.Position = 0;
+
+            output.Length = output.ReadUInt16();
             output.Tag = output.ReadByte();
+
+            output.Offset += 3;
+            output.Position = 0;
 
             return output;
         }
@@ -39,57 +60,57 @@ namespace Hazel
         ///
         public MessageReader ReadMessage()
         {
-            var output = MessageReader.Get(this.Buffer, this.Position);
-            this.Position += output.End;
+            var output = MessageReader.Get(this.Buffer, this.readHead);
+            this.Position += output.Length + 3;
             return output;
         }
 
         ///
         public void Recycle()
         {
-            this.Position = this.End = 0;
+            this.Position = this.Length = 0;
             objectPool.PutObject(this);
         }
 
         #region Read Methods
         public bool ReadBoolean()
         {
-            byte val = this.Buffer[this.Position++];
+            byte val = this.FastByte();
             return val != 0;
         }
 
         public sbyte ReadSByte()
         {
-            return (sbyte)this.Buffer[this.Position++];
+            return (sbyte)this.FastByte();
         }
 
         public byte ReadByte()
         {
-            return this.Buffer[this.Position++];
+            return this.FastByte();
         }
 
         public ushort ReadUInt16()
         {
-            ushort output = 
-                (ushort)(this.Buffer[Position++]
-                | this.Buffer[Position++] << 8);
+            ushort output =
+                (ushort)(this.FastByte()
+                | this.FastByte() << 8);
             return output;
         }
 
         public short ReadInt16()
         {
             short output =
-                (short)(this.Buffer[Position++]
-                | this.Buffer[Position++] << 8);
+                (short)(this.FastByte()
+                | this.FastByte() << 8);
             return output;
         }
 
         public int ReadInt32()
         {
-            int output = this.Buffer[Position++]
-                | this.Buffer[Position++] << 8
-                | this.Buffer[Position++] << 16
-                | this.Buffer[Position++] << 24;
+            int output = this.FastByte()
+                | this.FastByte() << 8
+                | this.FastByte() << 16
+                | this.FastByte() << 24;
 
             return output;
         }
@@ -97,7 +118,7 @@ namespace Hazel
         public unsafe float ReadSingle()
         {
             float output = 0;
-            fixed (byte* bufPtr = &this.Buffer[this.Position])
+            fixed (byte* bufPtr = &this.Buffer[this.readHead])
             {
                 byte* outPtr = (byte*)&output;
 
@@ -114,7 +135,7 @@ namespace Hazel
         public string ReadString()
         {
             int len = this.ReadPackedInt32();
-            string output = UTF8Encoding.UTF8.GetString(this.Buffer, this.Position, len);
+            string output = UTF8Encoding.UTF8.GetString(this.Buffer, this.readHead, len);
 
             this.Position += len;
             return output;
@@ -129,7 +150,7 @@ namespace Hazel
         public byte[] ReadBytes(int length)
         {
             byte[] output = new byte[length];
-            Array.Copy(this.Buffer, this.Position, output, 0, output.Length);
+            Array.Copy(this.Buffer, this.readHead, output, 0, output.Length);
             this.Position += output.Length;
             return output;
         }
@@ -167,6 +188,13 @@ namespace Hazel
             return output;
         }
         #endregion
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private byte FastByte()
+        {
+            this._position++;
+            return this.Buffer[this.readHead++];
+        }
 
         public unsafe static bool IsLittleEndian()
         {
