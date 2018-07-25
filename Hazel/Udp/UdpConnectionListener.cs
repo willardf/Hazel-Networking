@@ -63,6 +63,11 @@ namespace Hazel.Udp
             }
         }
 
+        ~UdpConnectionListener()
+        {
+            this.Dispose(false);
+        }
+
         /// <inheritdoc />
         public override void Start()
         {
@@ -224,8 +229,12 @@ namespace Hazel.Udp
         /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
-            if (disposing)
+            if (listener != null)
+            {
                 listener.Close();
+                this.listener.Dispose();
+                this.listener = null;
+            }
 
             base.Dispose(disposing);
         }

@@ -219,7 +219,7 @@ namespace Hazel.Udp
 
                         Trace.WriteLine("Resend.");
                     },
-                    resendTimeout > 0 ? resendTimeout : (AveragePingMs != 0 ? (int)AveragePingMs * 2 : 200),
+                    resendTimeout > 0 ? resendTimeout : (AveragePingMs != 0 ? (int)AveragePingMs * 4 : 200),
                     ackCallback
                 );
 
@@ -272,8 +272,9 @@ namespace Hazel.Udp
         /// <param name="buffer">The buffer received.</param>
         void ReliableMessageReceive(byte[] buffer)
         {
-            if (ProcessReliableReceive(buffer, 1))
-                InvokeDataReceived(SendOption.Reliable, buffer, 3);
+            ushort id;
+            if (ProcessReliableReceive(buffer, 1, out id))
+                InvokeDataReceived(SendOption.Reliable, buffer, 3, id);
 
             Statistics.LogReliableReceive(buffer.Length - 3, buffer.Length);
         }
@@ -284,10 +285,10 @@ namespace Hazel.Udp
         /// <param name="bytes">The buffer containing the data.</param>
         /// <param name="offset">The offset of the reliable header.</param>
         /// <returns>Whether the packet was a new packet or not.</returns>
-        bool ProcessReliableReceive(byte[] bytes, int offset)
+        bool ProcessReliableReceive(byte[] bytes, int offset, out ushort id)
         {
             //Get the ID form the packet
-            ushort id = (ushort)((bytes[offset] << 8) + bytes[offset + 1]);
+            id = (ushort)((bytes[offset] << 8) + bytes[offset + 1]);
 
             //Send an acknowledgement
             SendAck(bytes[offset], bytes[offset + 1]);
@@ -334,7 +335,9 @@ namespace Hazel.Udp
                 {
                     //Mark items between the most recent receive and the id received as missing
                     for (ushort i = (ushort)(reliableReceiveLast + 1); i < id; i++)
+                    {
                         reliableDataPacketsMissing.Add(i);
+                    }
 
                     //Update the most recently received
                     reliableReceiveLast = id;
@@ -346,7 +349,9 @@ namespace Hazel.Udp
                 {
                     //See if we're missing it, else this packet is a duplicate as so we return false
                     if (!reliableDataPacketsMissing.Remove(id))
+                    {
                         return false;
+                    }
                 }
             }
 

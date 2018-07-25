@@ -125,88 +125,63 @@ namespace Hazel.UnitTests
         [TestMethod]
         public void TestMessage()
         {
-            string test = "5 32 0 0 0 22 0 4 4 2 3 208 52 4 0 1 0 0 0 2 209 52 0 0 1 210 52 0 0 1 40 0 2 208 52 4 36 0 0 128 63 0 0 128 63 0 0 192 63 0 0 112 65 1 0 0 0 1 0 0 0 2 0 0 0 1 0 0 0 1 0 0 0 22 0 4 4 2 3 211 52 4 0 1 0 0 0 2 212 52 0 0 1 213 52 0 0 1 40 0 2 211 52 4 36 0 0 128 63 0 0 128 63 0 0 192 63 0 0 112 65 1 0 0 0 1 0 0 0 2 0 0 0 1 0 0 0 1 0 0 0";
+            string test = "5 32 0 0 0 5 0 5 255 255 255 255 15 2 0 2 2 2 9 0 1 4 110 123 233 131 255 127 255 127";
             byte[] testValues = test.Replace("-", "").Split(' ').Select(b => byte.Parse(b)).ToArray();
-
-
-            MessageWriter dataWriter = new MessageWriter(1024);
-            dataWriter.Write((byte)5);
-            dataWriter.Write(32);
-            dataWriter.StartMessage(4); // Start spawn
-            dataWriter.WritePacked(4); // Spawn Id = Player
-            dataWriter.WritePacked(2); // Owner Id
-            dataWriter.WritePacked(3); // Number children
-
-            dataWriter.Write((byte)208); // NetId (packed)
-            dataWriter.Write((byte)52);  // NetId (packed)
-
-            dataWriter.StartMessage(1); // Start data
-            dataWriter.Write(""); // Name
-            dataWriter.Write((byte)0); // Color
-            dataWriter.Write((byte)0); // Important Flags
-            dataWriter.Write((byte)2); // Player Id
-            dataWriter.EndMessage();
-
-            dataWriter.Write((byte)209); // NetId (packed)
-            dataWriter.Write((byte)52);  // NetId (packed)
-
-            dataWriter.StartMessage(1); // Start data (None)
-            dataWriter.EndMessage();
-
-            dataWriter.Write((byte)210); // NetId (packed)
-            dataWriter.Write((byte)52);  // NetId (packed)
-
-            dataWriter.StartMessage(1); // Start data (None)
-            dataWriter.EndMessage();
-
-            dataWriter.EndMessage();
-
-            Console.WriteLine($"{string.Join(" ", dataWriter.Buffer.Take(dataWriter.Length))}");
-            Console.WriteLine($"{string.Join(" ", testValues.Take(dataWriter.Length))}");
-
-            Assert.AreEqual(22 + 4 + 1 + 3, dataWriter.Length);
-
-
             
             MessageReader msg = MessageReader.Get(testValues, 0, testValues.Length);
 
-            Assert.AreEqual(5, msg.Tag);
-            Assert.AreEqual(32, msg.ReadInt32());
+            msg.ReadInt32();
+            msg.ReadByte();
 
             while (msg.Position < msg.Length)
             {
                 var sub = msg.ReadMessage();
-                
+                Console.WriteLine($"Position: {msg.Position}/{msg.Length}");
+
                 if (sub.Tag == 4) // Spawn
                 {
                     uint spawnId = sub.ReadPackedUInt32();
-                    int ownerId = sub.ReadPackedInt32();
-                    int numChild = sub.ReadPackedInt32();
-                    Console.WriteLine($"Spawning {spawnId} for {ownerId} with {numChild} children");
-                    for (int i = 0; i < numChild; ++i)
+                    if (spawnId == 4)
                     {
-                        uint childId = sub.ReadPackedUInt32();
-                        var childReader = sub.ReadMessage();
-                        if (childId == 6736)
+                        int ownerId = sub.ReadPackedInt32();
+                        int numChild = sub.ReadPackedInt32();
+                        Console.WriteLine($"Spawning {spawnId} for {ownerId} with {numChild} children");
+                        for (int i = 0; i < numChild; ++i)
                         {
-                            string name = childReader.ReadString();
-                            byte color = childReader.ReadByte();
-                            byte flags = childReader.ReadByte();
-                            uint playerId = childReader.ReadByte();
-                            Console.WriteLine($"Child {childId} has name='{name}' {color} {flags} {playerId}");
-                        }
-                        else
-                        {
+                            uint childId = sub.ReadPackedUInt32();
+                            var childReader = sub.ReadMessage();
                             Console.WriteLine($"Child {childId} has data ({childReader.Tag}) len={childReader.Length}");
                         }
+                    }
+                    else if (spawnId == 3)
+                    {
+                        int ownerId = sub.ReadPackedInt32();
+                        int numChild = sub.ReadPackedInt32();
+                        Console.WriteLine($"Spawning {spawnId} for {ownerId} with {numChild} children");
+                        for (int i = 0; i < numChild; ++i)
+                        {
+                            uint childId = sub.ReadPackedUInt32();
+                            var childReader = sub.ReadMessage();
+                            
+                            var gameGuid = new Guid(childReader.ReadBytesAndSize());
+                            var numPlayers = childReader.ReadByte();
+                            Console.WriteLine($"Child {childId} has data: {gameGuid} NumPlayers= {numPlayers}");
+                            Console.WriteLine($"Remainder Data = {string.Join(" ", childReader.ReadBytes(childReader.Length - childReader.Position))}");
+                            
+                        }
+                    }
+                    else
+                    {
+                        sub.Position = 0;
+                        Console.WriteLine($"Tag: {sub.Tag}\tLength: {sub.Length}\tData = {string.Join(" ", sub.ReadBytes(sub.Length).Select(s => s.ToString()).ToArray())}");
                     }
                 }
                 else
                 {
+                    sub.Position = 0;
                     Console.WriteLine($"Tag: {sub.Tag}\tLength: {sub.Length}\tData = {string.Join(" ", sub.ReadBytes(sub.Length).Select(s => s.ToString()).ToArray())}");
                 }
 
-                Console.WriteLine($"Position: {msg.Position}/{msg.Length}");
             }
         }
 
@@ -214,6 +189,15 @@ namespace Hazel.UnitTests
         public void GetLittleEndian()
         {
             Assert.IsTrue(MessageWriter.IsLittleEndian());
+        }
+
+        [TestMethod]
+        public void Test()
+        {
+            sbyte s = -1;
+            Assert.AreEqual(255, (byte)s);
+            byte b = 255;
+            Assert.AreEqual(-1, (sbyte)b);
         }
     }
 }

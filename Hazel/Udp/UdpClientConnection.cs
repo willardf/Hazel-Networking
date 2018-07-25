@@ -53,6 +53,11 @@ namespace Hazel.Udp
             }
         }
 
+        ~UdpClientConnection()
+        {
+            this.Dispose(false);
+        }
+
         /// <inheritdoc />
         protected override void WriteBytesToConnection(byte[] bytes, int length)
         {
@@ -67,10 +72,10 @@ namespace Hazel.Udp
             try
             {
                 socket.BeginSendTo(
-                    bytes, 
-                    0, 
-                    length, 
-                    SocketFlags.None, 
+                    bytes,
+                    0,
+                    length,
+                    SocketFlags.None,
                     RemoteEndPoint,
                     delegate (IAsyncResult result)
                     {
@@ -87,7 +92,7 @@ namespace Hazel.Udp
                         {
                             HandleDisconnect(new HazelException("Could not send data as a SocketException occured.", e));
                         }
-                    }, 
+                    },
                     null
                 );
             }
@@ -210,7 +215,7 @@ namespace Hazel.Udp
             //Copy data to new array
             byte[] bytes = new byte[bytesReceived];
             Buffer.BlockCopy(dataBuffer, 0, bytes, 0, bytesReceived);
-            
+
             //Begin receiving again
             try
             {
@@ -269,8 +274,13 @@ namespace Hazel.Udp
                 //Dispose of the socket
                 lock (stateLock)
                     State = ConnectionState.NotConnected;
+            }
 
+            if (socket != null)
+            {
                 socket.Close();
+                socket.Dispose();
+                socket = null;
             }
 
             base.Dispose(disposing);

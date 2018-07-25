@@ -42,6 +42,8 @@ namespace Hazel
         /// </summary>
         public SendOption SendOption { get; private set; }
 
+        public ushort ReliableId { get; private set; }
+
         /// <summary>
         ///     Private constructor for object pool.
         /// </summary>
@@ -55,10 +57,11 @@ namespace Hazel
         /// </summary>
         /// <param name="bytes">The bytes received.</param>
         /// <param name="sendOption">The send option used to send the data.</param>
-        internal void Set(byte[] bytes, SendOption sendOption)
+        internal void Set(byte[] bytes, SendOption sendOption, ushort reliableId)
         {
             this.Bytes = bytes;
             this.SendOption = sendOption;
+            this.ReliableId = reliableId;
         }
 
         /// <inheritdoc />

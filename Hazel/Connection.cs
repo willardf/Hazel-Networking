@@ -236,10 +236,10 @@ namespace Hazel
         ///     received. The bytes and the send option that the message was sent with should be passed in to give to the
         ///     subscribers.
         /// </remarks>
-        protected void InvokeDataReceived(byte[] bytes, SendOption sendOption)
+        protected void InvokeDataReceived(byte[] bytes, SendOption sendOption, ushort reliableId)
         {
             DataReceivedEventArgs args = DataReceivedEventArgs.GetObject();
-            args.Set(bytes, sendOption);
+            args.Set(bytes, sendOption, reliableId);
 
             //Make a copy to avoid race condition between null check and invocation
             EventHandler<DataReceivedEventArgs> handler = DataReceived;

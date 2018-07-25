@@ -96,7 +96,8 @@ namespace Hazel.Udp
         void FragmentedStartMessageReceive(byte[] buffer)
         {
             //Send to reliable code to send the acknowledgement
-            if (!ProcessReliableReceive(buffer, 5))
+            ushort reliableId;
+            if (!ProcessReliableReceive(buffer, 5, out reliableId))
                 return;
 
             ushort id = (ushort)((buffer[1] << 8) + buffer[2]);
@@ -125,7 +126,8 @@ namespace Hazel.Udp
         void FragmentedMessageReceive(byte[] buffer)
         {
             //Send to reliable code to send the acknowledgement
-            if (!ProcessReliableReceive(buffer, 5))
+            ushort reliableId;
+            if (!ProcessReliableReceive(buffer, 5, out reliableId))
                 return;
 
             ushort id = (ushort)((buffer[1] << 8) + buffer[2]);
@@ -163,7 +165,7 @@ namespace Hazel.Udp
                 ptr += fragment.data.Length - fragment.offset;
             }
 
-            InvokeDataReceived(completeData, SendOption.FragmentedReliable);
+            InvokeDataReceived(completeData, SendOption.FragmentedReliable, 0);
         }
 
         /// <summary>

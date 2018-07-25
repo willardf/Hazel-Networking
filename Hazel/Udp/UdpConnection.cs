@@ -179,7 +179,8 @@ namespace Hazel.Udp
 
                 //We need to acknowledge hello messages but dont want to invoke any events!
                 case (byte)UdpSendOption.Hello:
-                    ProcessReliableReceive(buffer, 1);
+                    ushort id;
+                    ProcessReliableReceive(buffer, 1, out id);
                     Statistics.LogHelloReceive(buffer.Length);
                     break;
 
@@ -198,7 +199,7 @@ namespace Hazel.Udp
 
                 //Treat everything else as unreliable
                 default:
-                    InvokeDataReceived(SendOption.None, buffer, 1);
+                    InvokeDataReceived(SendOption.None, buffer, 1, 0);
                     Statistics.LogUnreliableReceive(buffer.Length - 1, buffer.Length);
                     break;
             }
@@ -243,12 +244,12 @@ namespace Hazel.Udp
         /// <param name="sendOption">The send option the message was received with.</param>
         /// <param name="buffer">The buffer received.</param>
         /// <param name="dataOffset">The offset of data in the buffer.</param>
-        void InvokeDataReceived(SendOption sendOption, byte[] buffer, int dataOffset)
+        void InvokeDataReceived(SendOption sendOption, byte[] buffer, int dataOffset, ushort reliableId)
         {
             byte[] dataBytes = new byte[buffer.Length - dataOffset];
             Buffer.BlockCopy(buffer, dataOffset, dataBytes, 0, dataBytes.Length);
             
-            InvokeDataReceived(dataBytes, sendOption);
+            InvokeDataReceived(dataBytes, sendOption, reliableId);
         }
 
         /// <summary>
