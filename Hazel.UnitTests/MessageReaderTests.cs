@@ -123,69 +123,6 @@ namespace Hazel.UnitTests
         }
 
         [TestMethod]
-        public void TestMessage()
-        {
-            string test = "5 32 0 0 0 5 0 5 255 255 255 255 15 2 0 2 2 2 9 0 1 4 110 123 233 131 255 127 255 127";
-            byte[] testValues = test.Replace("-", "").Split(' ').Select(b => byte.Parse(b)).ToArray();
-            
-            MessageReader msg = MessageReader.Get(testValues, 0, testValues.Length);
-
-            msg.ReadInt32();
-            msg.ReadByte();
-
-            while (msg.Position < msg.Length)
-            {
-                var sub = msg.ReadMessage();
-                Console.WriteLine($"Position: {msg.Position}/{msg.Length}");
-
-                if (sub.Tag == 4) // Spawn
-                {
-                    uint spawnId = sub.ReadPackedUInt32();
-                    if (spawnId == 4)
-                    {
-                        int ownerId = sub.ReadPackedInt32();
-                        int numChild = sub.ReadPackedInt32();
-                        Console.WriteLine($"Spawning {spawnId} for {ownerId} with {numChild} children");
-                        for (int i = 0; i < numChild; ++i)
-                        {
-                            uint childId = sub.ReadPackedUInt32();
-                            var childReader = sub.ReadMessage();
-                            Console.WriteLine($"Child {childId} has data ({childReader.Tag}) len={childReader.Length}");
-                        }
-                    }
-                    else if (spawnId == 3)
-                    {
-                        int ownerId = sub.ReadPackedInt32();
-                        int numChild = sub.ReadPackedInt32();
-                        Console.WriteLine($"Spawning {spawnId} for {ownerId} with {numChild} children");
-                        for (int i = 0; i < numChild; ++i)
-                        {
-                            uint childId = sub.ReadPackedUInt32();
-                            var childReader = sub.ReadMessage();
-                            
-                            var gameGuid = new Guid(childReader.ReadBytesAndSize());
-                            var numPlayers = childReader.ReadByte();
-                            Console.WriteLine($"Child {childId} has data: {gameGuid} NumPlayers= {numPlayers}");
-                            Console.WriteLine($"Remainder Data = {string.Join(" ", childReader.ReadBytes(childReader.Length - childReader.Position))}");
-                            
-                        }
-                    }
-                    else
-                    {
-                        sub.Position = 0;
-                        Console.WriteLine($"Tag: {sub.Tag}\tLength: {sub.Length}\tData = {string.Join(" ", sub.ReadBytes(sub.Length).Select(s => s.ToString()).ToArray())}");
-                    }
-                }
-                else
-                {
-                    sub.Position = 0;
-                    Console.WriteLine($"Tag: {sub.Tag}\tLength: {sub.Length}\tData = {string.Join(" ", sub.ReadBytes(sub.Length).Select(s => s.ToString()).ToArray())}");
-                }
-
-            }
-        }
-
-        [TestMethod]
         public void GetLittleEndian()
         {
             Assert.IsTrue(MessageWriter.IsLittleEndian());

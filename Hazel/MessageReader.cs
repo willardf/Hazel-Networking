@@ -29,14 +29,25 @@ namespace Hazel
 
         private int readHead;
         
-        public static MessageReader Get(byte[] buffer, int offset, int length)
+        public static MessageReader Get(MessageReader srcMsg)
+        {
+            var output = objectPool.GetObject();
+            output.Buffer = srcMsg.Buffer;
+            output.Offset = srcMsg.Offset;
+            output.Position = srcMsg.Position;
+            output.Length = srcMsg.Length;
+            output.Tag = srcMsg.Tag;
+            return output;
+        }
+
+        public static MessageReader Get(byte[] buffer)
         {
             var output = objectPool.GetObject();
             output.Buffer = buffer;
-            output.Offset = offset;
+            output.Offset = 0;
             output.Position = 0;
-            output.Length = length;
-            output.Tag = output.ReadByte();
+            output.Length = buffer.Length;
+            output.Tag = byte.MaxValue;
             
             return output;
         }
@@ -48,6 +59,7 @@ namespace Hazel
             output.Offset = offset;
             output.Position = 0;
 
+            if (output.readHead + 3 > output.Buffer.Length) return null;
             output.Length = output.ReadUInt16();
             output.Tag = output.ReadByte();
 
@@ -61,6 +73,8 @@ namespace Hazel
         public MessageReader ReadMessage()
         {
             var output = MessageReader.Get(this.Buffer, this.readHead);
+            if (output == null) return null;
+
             this.Position += output.Length + 3;
             return output;
         }

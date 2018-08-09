@@ -25,6 +25,37 @@ namespace Hazel
             this.Buffer = new byte[bufferSize];
         }
 
+        public byte[] ToByteArray(bool includeHeader)
+        {
+            if (includeHeader)
+            {
+                byte[] output = new byte[this.Length];
+                System.Buffer.BlockCopy(this.Buffer, 0, output, 0, this.Length);
+                return output;
+            }
+            else
+            {
+                switch (this.SendOption)
+                {
+                    case Hazel.SendOption.Reliable:
+                        {
+                            byte[] output = new byte[this.Length - 3];
+                            System.Buffer.BlockCopy(this.Buffer, 3, output, 0, this.Length - 3);
+                            return output;
+                        }
+                    case Hazel.SendOption.None:
+                        {
+                            byte[] output = new byte[this.Length - 1];
+                            System.Buffer.BlockCopy(this.Buffer, 1, output, 0, this.Length - 1);
+                            return output;
+                        }
+
+                }
+            }
+
+            throw new NotImplementedException();
+        }
+
         ///
         /// <param name="sendOption">The option specifying how the message should be sent.</param>
         public static MessageWriter Get(SendOption sendOption = SendOption.None)
