@@ -26,5 +26,10 @@ namespace Hazel
         ///     The <see cref="IPMode">IPMode</see> the client is connected using.
         /// </summary>
         public IPMode IPMode { get; protected set; }
+
+        public long GetIP4Address()
+        {
+            return ((IPEndPoint)this.RemoteEndPoint).Address.Address;
+        }
     }
 }

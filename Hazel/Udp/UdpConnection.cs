@@ -29,6 +29,12 @@ namespace Hazel.Udp
         /// <param name="bytes">The bytes to write.</param>
         protected abstract void WriteBytesToConnection(byte[] bytes, int length);
 
+        /// <summary>
+        ///     Writes the given bytes to the connection synchronously.
+        /// </summary>
+        /// <param name="bytes">The bytes to write.</param>
+        protected abstract void WriteBytesToConnectionSync(byte[] bytes, int length);
+
         /// <inheritdoc/>
         public override void Send(MessageWriter msg)
         {
@@ -282,9 +288,9 @@ namespace Hazel.Udp
         /// <summary>
         ///     Sends a disconnect message to the end point.
         /// </summary>
-        protected void SendDisconnect()
+        public override void SendDisconnect()
         {
-            HandleSend(new byte[0], (byte)UdpSendOption.Disconnect);       //TODO Should disconnect wait for an ack?
+            WriteBytesToConnectionSync(new byte[] { (byte)UdpSendOption.Disconnect }, 1);
         }
 
         /// <inheritdoc/>

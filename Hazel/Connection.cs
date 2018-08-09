@@ -225,7 +225,12 @@ namespace Hazel
         ///     <see cref="HazelException"/> if there is a problem connecting.
         /// </remarks>
         public abstract void ConnectAsync(byte[] bytes = null, int timeout = 5000);
-        
+
+        /// <summary>
+        ///     Sends a disconnect message to the end point.
+        /// </summary>
+        public abstract void SendDisconnect();
+
         /// <summary>
         ///     Invokes the DataReceived event.
         /// </summary>

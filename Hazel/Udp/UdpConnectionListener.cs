@@ -217,6 +217,34 @@ namespace Hazel.Udp
         }
 
         /// <summary>
+        ///     Sends data from the listener socket.
+        /// </summary>
+        /// <param name="bytes">The bytes to send.</param>
+        /// <param name="endPoint">The endpoint to send to.</param>
+        internal void SendDataSync(byte[] bytes, int length, EndPoint endPoint)
+        {
+            try
+            {
+                listener.SendTo(
+                    bytes,
+                    0,
+                    length,
+                    SocketFlags.None,
+                    endPoint
+                );
+            }
+            catch (SocketException e)
+            {
+                throw new HazelException("Could not send data as a SocketException occured.", e);
+            }
+            catch (ObjectDisposedException)
+            {
+                //Keep alive timer probably ran, ignore
+                return;
+            }
+        }
+
+        /// <summary>
         ///     Removes a virtual connection from the list.
         /// </summary>
         /// <param name="endPoint">The endpoint of the virtual connection.</param>

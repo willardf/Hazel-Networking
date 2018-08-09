@@ -59,6 +59,20 @@ namespace Hazel.Udp
         }
 
         /// <inheritdoc />
+        protected override void WriteBytesToConnectionSync(byte[] bytes, int length)
+        {
+            InvokeDataSentRaw(bytes, length);
+
+            lock (stateLock)
+            {
+                if (State != ConnectionState.Connected)
+                    throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
+            }
+
+            Listener.SendDataSync(bytes, length, RemoteEndPoint);
+        }
+
+        /// <inheritdoc />
         /// <remarks>
         ///     This will always throw a HazelException.
         /// </remarks>

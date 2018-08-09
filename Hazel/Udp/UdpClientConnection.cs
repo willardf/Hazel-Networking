@@ -110,6 +110,40 @@ namespace Hazel.Udp
         }
 
         /// <inheritdoc />
+        protected override void WriteBytesToConnectionSync(byte[] bytes, int length)
+        {
+            InvokeDataSentRaw(bytes, length);
+
+            lock (stateLock)
+            {
+                if (State != ConnectionState.Connected && State != ConnectionState.Connecting)
+                    throw new InvalidOperationException("Could not send data as this Connection is not connected and is not connecting. Did you disconnect?");
+            }
+
+            try
+            {
+                socket.SendTo(
+                    bytes,
+                    0,
+                    length,
+                    SocketFlags.None,
+                    RemoteEndPoint
+                );
+            }
+            catch (ObjectDisposedException)
+            {
+                //User probably called Disconnect in between this method starting and here so report the issue
+                throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
+            }
+            catch (SocketException e)
+            {
+                HazelException he = new HazelException("Could not send data as a SocketException occured.", e);
+                HandleDisconnect(he);
+                throw he;
+            }
+        }
+
+        /// <inheritdoc />
         public override void Connect(byte[] bytes = null, int timeout = 5000)
         {
             this.ConnectAsync(bytes, timeout);
