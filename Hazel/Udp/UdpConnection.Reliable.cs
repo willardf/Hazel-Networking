@@ -249,6 +249,9 @@ namespace Hazel.Udp
         /// <param name="ackCallback">The callback to make once the packet has been acknowledged.</param>
         void ReliableSend(byte sendOption, byte[] data, int offset, int length, Action ackCallback = null)
         {
+            //Inform keepalive not to send for a while
+            ResetKeepAliveTimer();
+
             byte[] bytes = new byte[length + 3];
 
             //Add message type

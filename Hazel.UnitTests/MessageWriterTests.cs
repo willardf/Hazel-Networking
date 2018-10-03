@@ -7,6 +7,44 @@ namespace Hazel.UnitTests
     [TestClass]
     public class MessageWriterTests
     {
+
+        [TestMethod]
+        public void CancelMessages()
+        {
+            var msg = new MessageWriter(128);
+
+            msg.StartMessage(1);
+            msg.Write(32);
+
+            msg.StartMessage(2);
+            msg.Write(2);
+            msg.CancelMessage();
+
+            Assert.AreEqual(7, msg.Length);
+            Assert.IsFalse(msg.HasBytes(7));
+
+            msg.CancelMessage();
+
+            Assert.AreEqual(0, msg.Length);
+            Assert.IsFalse(msg.HasBytes(1));
+        }
+
+        [TestMethod]
+        public void HasBytes()
+        {
+            var msg = new MessageWriter(128);
+
+            msg.StartMessage(1);
+            msg.Write(32);
+
+            msg.StartMessage(2);
+            msg.Write(2);
+            msg.EndMessage();
+
+            // Assert.AreEqual(7, msg.Length);
+            Assert.IsTrue(msg.HasBytes(7));
+        }
+
         [TestMethod]
         public void WriteProperInt()
         {

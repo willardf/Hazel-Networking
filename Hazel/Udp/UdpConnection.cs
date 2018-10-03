@@ -45,12 +45,11 @@ namespace Hazel.Udp
             byte[] buffer = new byte[msg.Length];
             Buffer.BlockCopy(msg.Buffer, 0, buffer, 0, msg.Length);
 
-            //Inform keepalive not to send for a while
-            ResetKeepAliveTimer();
-
             switch (msg.SendOption)
             {
                 case SendOption.Reliable:
+                    // Inform keepalive not to send for a while
+                    ResetKeepAliveTimer();
                     AttachReliableID(buffer, 1, buffer.Length);
                     WriteBytesToConnection(buffer, buffer.Length);
                     Statistics.LogReliableSend(buffer.Length - 3, buffer.Length);
@@ -106,10 +105,6 @@ namespace Hazel.Udp
             if (State != ConnectionState.Connected)
                 throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
 
-
-            //Inform keepalive not to send for a while
-            ResetKeepAliveTimer();
-
             switch (sendOption)
             {
                 //Handle reliable header and hellos
@@ -138,9 +133,6 @@ namespace Hazel.Udp
         /// <returns>The bytes that should actually be sent.</returns>
         protected void HandleSend(byte[] data, byte sendOption, Action ackCallback = null)
         {
-            //Inform keepalive not to send for a while
-            ResetKeepAliveTimer();
-
             switch (sendOption)
             {
                 //Handle reliable header and hellos
@@ -167,10 +159,7 @@ namespace Hazel.Udp
         protected internal void HandleReceive(byte[] buffer)
         {
             InvokeDataReceivedRaw(buffer);
-
-            //Inform keepalive not to send for a while
-            ResetKeepAliveTimer();
-            
+                        
             switch (buffer[0])
             {
                 //Handle reliable receives

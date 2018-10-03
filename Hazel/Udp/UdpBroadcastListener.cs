@@ -42,6 +42,8 @@ namespace Hazel.Udp
 
         private List<BroadcastPacket> packets = new List<BroadcastPacket>();
 
+        public bool Running { get; private set; }
+
         ///
         public UdpBroadcastListener(int port)
         {
@@ -53,7 +55,8 @@ namespace Hazel.Udp
         ///
         public void StartListen()
         {
-            if (this.socket == null) return;
+            if (this.Running) return;
+            this.Running = true;
             
             try
             {
@@ -70,9 +73,10 @@ namespace Hazel.Udp
             }
         }
 
-        ///
-        public void HandleData(IAsyncResult result)
+        private void HandleData(IAsyncResult result)
         {
+            this.Running = false;
+
             int numBytes;
             EndPoint endpt = new IPEndPoint(IPAddress.Any, 0);
             try
@@ -85,8 +89,12 @@ namespace Hazel.Udp
                 return;
             }
 
-            if (numBytes < 2) return;
-            if (buffer[0] != 4 || buffer[1] != 2) return;
+            if (numBytes < 2
+                || buffer[0] != 4 || buffer[1] != 2)
+            {
+                this.StartListen();
+                return;
+            }
 
             IPEndPoint ipEnd = (IPEndPoint)endpt;
             string data = ASCIIEncoding.ASCII.GetString(buffer, 2, numBytes - 2);

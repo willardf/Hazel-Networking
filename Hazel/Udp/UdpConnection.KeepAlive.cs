@@ -65,8 +65,16 @@ namespace Hazel.Udp
                 keepAliveTimer = new Timer(
                     (o) =>
                     {
-                        Trace.WriteLine("Keepalive packet sent.");
-                        SendHello(null, null);
+                        try
+                        {
+                            SendHello(null, null);
+                            Trace.WriteLine("Keepalive packet sent.");
+                        }
+                        catch
+                        {
+                            Trace.WriteLine("Keepalive packet failed to send.");
+                            DisposeKeepAliveTimer();
+                        }
                     },
                     null,
                     keepAliveInterval,

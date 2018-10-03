@@ -257,6 +257,23 @@ namespace Hazel.Udp
         /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
+            lock (connections)
+            {
+                foreach (var kvp in this.connections)
+                {
+                    if (kvp.Value.State == ConnectionState.Connected)
+                    {
+                        try
+                        {
+                            kvp.Value.SendDisconnect();
+                        }
+                        catch { }
+                    }
+                }
+
+                connections.Clear();
+            }
+
             if (listener != null)
             {
                 listener.Close();

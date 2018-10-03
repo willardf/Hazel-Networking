@@ -131,10 +131,73 @@ namespace Hazel.UnitTests
         [TestMethod]
         public void Test()
         {
-            sbyte s = -1;
-            Assert.AreEqual(255, (byte)s);
-            byte b = 255;
-            Assert.AreEqual(-1, (sbyte)b);
+            string dataStr = "4 0 5 32 0 0 0 6 0 1 5";
+            byte[] data = dataStr.Split(' ').Select(b => byte.Parse(b)).ToArray();
+            MessageReader readerParent1 = MessageReader.Get(data);
+            while (readerParent1.Position < readerParent1.Length)
+            {
+                var readerParent = readerParent1.ReadMessage(); // Loop of InnerNetClient
+                while (readerParent.Position < readerParent.Length)
+                {
+
+                    Console.WriteLine($"{readerParent.Tag} = {readerParent.Length}");
+                    switch (readerParent.Tag)
+                    {
+                        case 1:
+                            {
+                                int gameIdConfirm = readerParent.ReadInt32();
+                                break;
+                            }
+                        case 5:
+                            {
+                                int gameIdConfirm = readerParent.ReadInt32();
+                                HandleGameData(readerParent);
+                                break;
+                            }
+                        case 6:
+                            {
+                                int gameIdConfirm = readerParent.ReadInt32();
+                                int targetId = readerParent.ReadPackedInt32(); // Skip target id
+                                HandleGameData(readerParent);
+                            }
+                            break;
+                    }
+                }
+            }
+        }
+
+        private static void HandleGameData(MessageReader readerParent)
+        {
+            while (readerParent.Position < readerParent.Length)
+            {
+                var reader = readerParent.ReadMessage();
+
+                switch (reader.Tag)
+                {
+                    case 4:
+                        {
+                            Console.WriteLine($"\t{reader.Tag} = SpawnId: {reader.ReadPackedUInt32()}");
+                            Console.WriteLine($"\t{reader.Tag} = OwnerId: {reader.ReadPackedInt32()}");
+                            Console.WriteLine($"\t{reader.Tag} = Flags: {reader.ReadByte()}");
+                            var numChildren = reader.ReadPackedInt32();
+                            Console.WriteLine($"\t{reader.Tag} = NumChildren: {numChildren}");
+                            for (int i = 0; i < numChildren; ++i)
+                            {
+                                Console.WriteLine($"\t{reader.Tag} = NetId: {reader.ReadPackedUInt32()}");
+                                var datam = reader.ReadMessage();
+                                Console.WriteLine($"\t{reader.Tag} = Data: {string.Join(" ", datam.ReadBytes(datam.Length))}");
+                            }
+                            break;
+                        }
+                    default:
+                        {
+                            Console.WriteLine($"\t{reader.Tag} = {string.Join(" ", reader.ReadBytes(reader.Length))}");
+                        }
+                        break;
+                }
+
+                Console.WriteLine();
+            }
         }
     }
 }

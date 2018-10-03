@@ -97,6 +97,7 @@ namespace Hazel
         public void CancelMessage()
         {
             this.Position = this.messageStarts.Pop();
+            this.Length = this.Position;
         }
 
         public void Clear(SendOption sendOption)

@@ -15,8 +15,8 @@ namespace Hazel.UnitTests
         {
             const string TestData = "pwerowerower";
 
-            using (UdpBroadcaster caster = new UdpBroadcaster(4777))
-            using (UdpBroadcastListener listener = new UdpBroadcastListener(4777))
+            using (UdpBroadcaster caster = new UdpBroadcaster(47777))
+            using (UdpBroadcastListener listener = new UdpBroadcastListener(47777))
             {
                 listener.StartListen();
 
