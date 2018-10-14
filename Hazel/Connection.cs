@@ -50,6 +50,8 @@ namespace Hazel
         /// </example>
         public event EventHandler<DataReceivedEventArgs> DataReceived;
 
+        public int TestLagMs = -1;
+
         public event Action<byte[], int> DataSentRaw;
         protected void InvokeDataSentRaw(byte[] data, int length)
         {
@@ -248,8 +250,7 @@ namespace Hazel
 
             //Make a copy to avoid race condition between null check and invocation
             EventHandler<DataReceivedEventArgs> handler = DataReceived;
-            if (handler != null)
-                handler(this, args);
+            if (handler != null) handler.Invoke(this, args);
         }
 
         /// <summary>
@@ -268,8 +269,7 @@ namespace Hazel
 
             //Make a copy to avoid race condition between null check and invocation
             EventHandler<DisconnectedEventArgs> handler = Disconnected;
-            if (handler != null)
-                handler(this, args);
+            if (handler != null) handler.Invoke(this, args);
         }
 
         /// <summary>

@@ -219,7 +219,7 @@ namespace Hazel.Udp
 
                         Trace.WriteLine("Resend.");
                     },
-                    resendTimeout > 0 ? resendTimeout : (AveragePingMs != 0 ? (int)AveragePingMs * 4 : 200),
+                    resendTimeout > 0 ? resendTimeout : (int)Math.Max(40, Math.Min(AveragePingMs * 4, 750)),
                     ackCallback
                 );
 
@@ -385,7 +385,7 @@ namespace Hazel.Udp
                     packet.Stopwatch.Stop();
                     lock (PingLock)
                     {
-                        this.AveragePingMs = this.AveragePingMs * .7f + (float)packet.Stopwatch.Elapsed.TotalMilliseconds * .3f;
+                        this.AveragePingMs = Math.Max(10, this.AveragePingMs * .7f + (float)packet.Stopwatch.Elapsed.TotalMilliseconds * .3f);
                     }
 
                     packet.Recycle();
@@ -413,7 +413,11 @@ namespace Hazel.Udp
 
             // Always reply with acknowledgement in order to stop the sender repeatedly sending it
             // TODO: group acks together
-            WriteBytesToConnection(bytes, bytes.Length);
+            try
+            {
+                WriteBytesToConnection(bytes, bytes.Length);
+            }
+            catch (InvalidOperationException) { }
         }
     }
 }

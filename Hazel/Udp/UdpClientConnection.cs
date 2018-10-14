@@ -107,6 +107,11 @@ namespace Hazel.Udp
                 HandleDisconnect(he);
                 throw he;
             }
+            catch (ArgumentOutOfRangeException e)
+            {
+                HazelException he = new HazelException("Something wonk with the buffer: " + bytes.Length, e);
+                HandleDisconnect(he);
+            }
         }
 
         /// <inheritdoc />
@@ -265,6 +270,11 @@ namespace Hazel.Udp
                 return;
             }
 
+            if (this.TestLagMs > 0)
+            {
+                Thread.Sleep(this.TestLagMs);
+            }
+
             HandleReceive(bytes);
         }
 
@@ -286,7 +296,11 @@ namespace Hazel.Udp
             //Invoke event outide lock if need be
             if (invoke)
             {
-                InvokeDisconnected(e);
+                try
+                {
+                    InvokeDisconnected(e);
+                }
+                catch { }
 
                 Dispose();
             }

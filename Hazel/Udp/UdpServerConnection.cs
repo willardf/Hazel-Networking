@@ -108,7 +108,11 @@ namespace Hazel.Udp
             //Invoke event outide lock if need be
             if (invoke)
             {
-                InvokeDisconnected(e);
+                try
+                {
+                    InvokeDisconnected(e);
+                }
+                catch { }
 
                 Dispose();
             }

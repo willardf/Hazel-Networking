@@ -128,7 +128,7 @@ namespace Hazel.UnitTests
             Assert.IsTrue(MessageWriter.IsLittleEndian());
         }
 
-        [TestMethod]
+        // [TestMethod]
         public void Test()
         {
             string dataStr = "4 0 5 32 0 0 0 6 0 1 5";

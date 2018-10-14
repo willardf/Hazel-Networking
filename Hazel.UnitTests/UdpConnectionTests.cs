@@ -114,6 +114,35 @@ namespace Hazel.UnitTests
                 connection.Connect();
             }
         }
+        
+        /// <summary>
+        ///     Tests dual mode connectivity.
+        /// </summary>
+        [TestMethod]
+        public void MixedConnectionTest()
+        {
+            using (UdpConnectionListener listener2 = new UdpConnectionListener(new NetworkEndPoint(IPAddress.IPv6Any, 4296, IPMode.IPv6)))
+            {
+                listener2.Start();
+
+                listener2.NewConnection += (sender, evt) =>
+                {
+                    Console.WriteLine("v6 connection: " + ((NetworkConnection)evt.Connection).GetIP4Address());
+                };
+
+                using (UdpConnection connection = new UdpClientConnection(new NetworkEndPoint("127.0.0.1", 4296, IPMode.IPv4)))
+                {
+                    connection.Connect();
+                    Assert.AreEqual(ConnectionState.Connected, connection.State);
+                }
+
+                using (UdpConnection connection = new UdpClientConnection(new NetworkEndPoint(IPAddress.IPv6Loopback, 4296, IPMode.IPv6)))
+                {
+                    connection.Connect();
+                    Assert.AreEqual(ConnectionState.Connected, connection.State);
+                }
+            }
+        }
 
         /// <summary>
         ///     Tests dual mode connectivity.
@@ -125,7 +154,7 @@ namespace Hazel.UnitTests
             {
                 listener.Start();
 
-                using (UdpConnection connection = new UdpClientConnection(new NetworkEndPoint(IPAddress.IPv6Loopback, 4296, IPMode.IPv6)))
+                using (UdpConnection connection = new UdpClientConnection(new NetworkEndPoint("127.0.0.1", 4296, IPMode.IPv6)))
                 {
                     connection.Connect();
                 }

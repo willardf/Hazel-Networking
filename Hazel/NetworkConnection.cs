@@ -29,7 +29,15 @@ namespace Hazel
 
         public long GetIP4Address()
         {
-            return ((IPEndPoint)this.RemoteEndPoint).Address.Address;
+            if (IPMode == IPMode.IPv4)
+            {
+                return ((IPEndPoint)this.RemoteEndPoint).Address.Address;
+            }
+            else
+            {
+                var bytes = ((IPEndPoint)this.RemoteEndPoint).Address.GetAddressBytes();
+                return BitConverter.ToInt64(bytes, bytes.Length - 8);
+            }
         }
     }
 }
