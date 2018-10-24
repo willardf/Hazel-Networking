@@ -322,6 +322,10 @@ namespace Hazel
         {
             if (disposing)
             {
+                this.DataReceived = null;
+                this.DataReceivedRaw = null;
+                this.DataSentRaw = null;
+                this.Disconnected = null;
             }
         }
     }

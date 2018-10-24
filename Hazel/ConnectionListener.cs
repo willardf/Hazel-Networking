@@ -112,7 +112,7 @@ namespace Hazel
         /// <param name="disposing">Are we disposing?</param>
         protected virtual void Dispose(bool disposing)
         {
-
+            this.NewConnection = null;
         }
     }
 }

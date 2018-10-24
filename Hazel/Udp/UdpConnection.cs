@@ -288,6 +288,7 @@ namespace Hazel.Udp
             if (disposing)
             {
                 DisposeKeepAliveTimer();
+                DisposeReliablePackets();
             }
 
             base.Dispose(disposing);

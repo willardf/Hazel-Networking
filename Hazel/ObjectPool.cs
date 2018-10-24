@@ -14,8 +14,10 @@ namespace Hazel
     /// </summary>
     /// <typeparam name="T">The type that is pooled.</typeparam>
     /// <threadsafety static="true" instance="true"/>
-    sealed class ObjectPool<T> where T : IRecyclable
+    public sealed class ObjectPool<T> where T : IRecyclable
     {
+        public int Size { get { return this.pool.Count; } }
+
         /// <summary>
         ///     Our pool of objects
         /// </summary>

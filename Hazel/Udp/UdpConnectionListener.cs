@@ -190,6 +190,8 @@ namespace Hazel.Udp
         /// <param name="endPoint">The endpoint to send to.</param>
         internal void SendData(byte[] bytes, int length, EndPoint endPoint)
         {
+            if (length > bytes.Length) return;
+
             try
             {
                 listener.BeginSendTo(
@@ -259,7 +261,8 @@ namespace Hazel.Udp
         {
             lock (connections)
             {
-                foreach (var kvp in this.connections)
+                var connects = this.connections.ToArray();
+                foreach (var kvp in connects)
                 {
                     if (kvp.Value.State == ConnectionState.Connected)
                     {
@@ -269,6 +272,8 @@ namespace Hazel.Udp
                         }
                         catch { }
                     }
+
+                    kvp.Value.Dispose();
                 }
 
                 connections.Clear();

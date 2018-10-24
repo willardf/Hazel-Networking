@@ -7,7 +7,7 @@ namespace Hazel
     ///
     public class MessageReader : IRecyclable
     {
-        private static readonly ObjectPool<MessageReader> objectPool = new ObjectPool<MessageReader>(() => new MessageReader());
+        public static readonly ObjectPool<MessageReader> ReaderPool = new ObjectPool<MessageReader>(() => new MessageReader());
 
         public byte[] Buffer;
         public byte Tag;
@@ -31,7 +31,7 @@ namespace Hazel
         
         public static MessageReader Get(MessageReader srcMsg)
         {
-            var output = objectPool.GetObject();
+            var output = ReaderPool.GetObject();
             output.Buffer = srcMsg.Buffer;
             output.Offset = srcMsg.Offset;
             output.Position = srcMsg.Position;
@@ -42,7 +42,7 @@ namespace Hazel
 
         public static MessageReader Get(byte[] buffer)
         {
-            var output = objectPool.GetObject();
+            var output = ReaderPool.GetObject();
             output.Buffer = buffer;
             output.Offset = 0;
             output.Position = 0;
@@ -54,7 +54,7 @@ namespace Hazel
 
         public static MessageReader Get(byte[] buffer, int offset)
         {
-            var output = objectPool.GetObject();
+            var output = ReaderPool.GetObject();
             output.Buffer = buffer;
             output.Offset = offset;
             output.Position = 0;
@@ -83,7 +83,7 @@ namespace Hazel
         public void Recycle()
         {
             this.Position = this.Length = 0;
-            objectPool.PutObject(this);
+            ReaderPool.PutObject(this);
         }
 
         #region Read Methods

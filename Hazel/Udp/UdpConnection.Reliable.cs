@@ -419,5 +419,20 @@ namespace Hazel.Udp
             }
             catch (InvalidOperationException) { }
         }
+
+        void DisposeReliablePackets()
+        {
+            lock (this.reliableDataPacketsSent)
+            {
+                var packets = this.reliableDataPacketsSent.Keys.ToArray();
+                foreach (var kvp in this.reliableDataPacketsSent)
+                {
+                    Packet pkt = kvp.Value;
+                    pkt.Recycle();
+                }
+
+                this.reliableDataPacketsSent.Clear();
+            }
+        }
     }
 }

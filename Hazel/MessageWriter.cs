@@ -9,7 +9,7 @@ namespace Hazel
     public class MessageWriter : IRecyclable
     {
         public static int BufferSize = 64000;
-        private static readonly ObjectPool<MessageWriter> objectPool = new ObjectPool<MessageWriter>(() => new MessageWriter(BufferSize));
+        public static readonly ObjectPool<MessageWriter> WriterPool = new ObjectPool<MessageWriter>(() => new MessageWriter(BufferSize));
 
         internal byte[] Buffer;
         public int Length;
@@ -60,7 +60,7 @@ namespace Hazel
         /// <param name="sendOption">The option specifying how the message should be sent.</param>
         public static MessageWriter Get(SendOption sendOption = SendOption.None)
         {
-            var output = objectPool.GetObject();
+            var output = WriterPool.GetObject();
             output.Clear(sendOption);
 
             return output;
@@ -123,7 +123,7 @@ namespace Hazel
         public void Recycle()
         {
             this.Position = this.Length = 0;
-            objectPool.PutObject(this);
+            WriterPool.PutObject(this);
         }
 
         #region WriteMethods
