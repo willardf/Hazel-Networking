@@ -17,6 +17,11 @@ namespace Hazel.Udp
         Hello = 8,
 
         /// <summary>
+        /// A single byte of continued existence
+        /// </summary>
+        Ping = 12,
+
+        /// <summary>
         ///     Message for discontinuing communication.
         /// </summary>
         Disconnect = 9,
@@ -29,6 +34,6 @@ namespace Hazel.Udp
         /// <summary>
         ///     Message that is part of a larger, fragmented message.
         /// </summary>
-        Fragment = 11
+        Fragment = 11,
     }
 }

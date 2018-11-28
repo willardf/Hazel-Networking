@@ -61,6 +61,16 @@ namespace Hazel.Udp
         /// <inheritdoc />
         protected override void WriteBytesToConnection(byte[] bytes, int length)
         {
+            if (TestLagMs > 0)
+            {
+                ThreadPool.QueueUserWorkItem(a => { Thread.Sleep(this.TestLagMs); WriteBytesToConnectionReal(bytes, length); });
+            }
+
+            WriteBytesToConnectionReal(bytes, length);
+        }
+
+        private void WriteBytesToConnectionReal(byte[] bytes, int length)
+        { 
             InvokeDataSentRaw(bytes, length);
 
             lock (stateLock)

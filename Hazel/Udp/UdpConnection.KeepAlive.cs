@@ -49,12 +49,7 @@ namespace Hazel.Udp
         ///     Lock for keep alive timer.
         /// </summary>
         Object keepAliveTimerLock = new Object();
-
-        /// <summary>
-        ///     Has the keep alive timer been disposed already?
-        /// </summary>
-        bool keepAliveTimerDisposed;
-
+        
         /// <summary>
         ///     Starts the keepalive timer.
         /// </summary>
@@ -67,7 +62,7 @@ namespace Hazel.Udp
                     {
                         try
                         {
-                            SendHello(null, null);
+                            ReliableSend((byte)UdpSendOption.Hello); // TODO: Change to ping after server can handle it, before clients update
                             Trace.WriteLine("Keepalive packet sent.");
                         }
                         catch
@@ -89,7 +84,9 @@ namespace Hazel.Udp
         void ResetKeepAliveTimer()
         {
             lock (keepAliveTimerLock)
+            {
                 keepAliveTimer.Change(keepAliveInterval, keepAliveInterval);
+            }
         }
 
         /// <summary>
@@ -97,11 +94,13 @@ namespace Hazel.Udp
         /// </summary>
         void DisposeKeepAliveTimer()
         {
-            lock(keepAliveTimerLock)
+            lock (keepAliveTimerLock)
             {
-                if (!keepAliveTimerDisposed)
+                if (keepAliveTimer != null)
+                {
                     keepAliveTimer.Dispose();
-                keepAliveTimerDisposed = true;
+                    keepAliveTimer = null;
+                }
             }
         }
     }

@@ -269,6 +269,20 @@ namespace Hazel.Udp
             Statistics.LogReliableSend(length, bytes.Length);
         }
 
+        void ReliableSend(byte sendOption)
+        {
+            byte[] bytes = new byte[3];
+            bytes[0] = sendOption;
+
+            //Add reliable ID
+            AttachReliableID(bytes, 1, bytes.Length, null);
+
+            //Write to connection
+            WriteBytesToConnection(bytes, bytes.Length);
+
+            Statistics.LogReliableSend(0, bytes.Length);
+        }
+
         /// <summary>
         ///     Handles a reliable message being received and invokes the data event.
         /// </summary>
