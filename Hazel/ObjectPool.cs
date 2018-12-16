@@ -1,11 +1,8 @@
 ﻿using System;
-#if NET_45
 using System.Collections.Concurrent;
-#else
-using System.Collections.Generic;
-#endif
 using System.Linq;
 using System.Text;
+using System.Threading;
 
 namespace Hazel
 {
@@ -16,16 +13,15 @@ namespace Hazel
     /// <threadsafety static="true" instance="true"/>
     public sealed class ObjectPool<T> where T : IRecyclable
     {
+        private int numberCreated;
+        public int NumberCreated { get { return numberCreated; } }
+
         public int Size { get { return this.pool.Count; } }
 
         /// <summary>
         ///     Our pool of objects
         /// </summary>
-#if NET_45
         ConcurrentBag<T> pool = new ConcurrentBag<T>();
-#else
-        Queue<T> pool = new Queue<T>();
-#endif
 
         /// <summary>
         ///     The generator for creating new objects.
@@ -47,17 +43,11 @@ namespace Hazel
         /// <returns>An instance of T.</returns>
         internal T GetObject()
         {
-#if NET_45
             T item;
             if (pool.TryTake(out item))
                 return item;
-#else
-            lock (pool)
-            {
-                if (pool.Count > 0)
-                    return pool.Dequeue();
-            }
-#endif
+
+            Interlocked.Increment(ref numberCreated);
             return objectFactory.Invoke();
         }
 
@@ -67,12 +57,7 @@ namespace Hazel
         /// <param name="item">The item to return.</param>
         internal void PutObject(T item)
         {
-#if NET_45
             pool.Add(item);
-#else
-            lock (pool)
-                pool.Enqueue(item);
-#endif
         }
     }
 }

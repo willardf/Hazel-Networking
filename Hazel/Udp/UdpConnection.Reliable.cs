@@ -101,7 +101,7 @@ namespace Hazel.Udp
             public volatile bool Acknowledged;
             public volatile int Retransmissions;
             public Stopwatch Stopwatch = new Stopwatch();
-
+            
             Packet()
             {
 
@@ -189,10 +189,6 @@ namespace Hazel.Udp
                         {
                             if (!p.Acknowledged)
                             {
-                                // Backoff retry frequency to avoid congestion
-                                p.LastTimeout = (int)Math.Min(p.LastTimeout * 1.5f, this.disconnectTimeout / 2f);
-                                p.Timer.Change(p.LastTimeout, Timeout.Infinite);
-
                                 if (p.Stopwatch.ElapsedMilliseconds > this.disconnectTimeout)
                                 {
                                     HandleDisconnect(new HazelException($"Reliable packet {id} was not ack'd after {p.Retransmissions} resends"));
@@ -203,6 +199,10 @@ namespace Hazel.Udp
                                     p.Recycle();
                                     return;
                                 }
+
+                                // Backoff retry frequency to avoid congestion
+                                p.LastTimeout = (int)Math.Min(p.LastTimeout * 1.5f, this.disconnectTimeout / 2f);
+                                p.Timer.Change(p.LastTimeout, Timeout.Infinite);
                             }
                         }
 
@@ -438,10 +438,10 @@ namespace Hazel.Udp
         {
             lock (this.reliableDataPacketsSent)
             {
-                var packets = this.reliableDataPacketsSent.Keys.ToArray();
                 foreach (var kvp in this.reliableDataPacketsSent)
                 {
                     Packet pkt = kvp.Value;
+                    pkt.Acknowledged = true;
                     pkt.Recycle();
                 }
 
