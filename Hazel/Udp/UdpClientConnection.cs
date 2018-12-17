@@ -285,7 +285,8 @@ namespace Hazel.Udp
                 Thread.Sleep(this.TestLagMs);
             }
 
-            HandleReceive(bytes);
+            MessageReader msg = MessageReader.GetRaw(bytes, 0, bytesReceived);
+            HandleReceive(msg);
         }
 
         /// <inheritdoc />

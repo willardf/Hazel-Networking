@@ -76,14 +76,18 @@ namespace Hazel
         /// </remarks>
         protected void InvokeNewConnection(MessageReader msg, Connection connection)
         {
-            //Get new args
-            NewConnectionEventArgs args = NewConnectionEventArgs.GetObject();
-            args.Set(msg, connection);
-
             //Make a copy to avoid race condition between null check and invocation
             EventHandler<NewConnectionEventArgs> handler = NewConnection;
             if (handler != null)
+            {
+                NewConnectionEventArgs args = NewConnectionEventArgs.GetObject();
+                args.Set(msg, connection);
                 handler(this, args);
+            }
+            else
+            {
+                msg.Recycle();
+            }
         }
 
         /// <summary>

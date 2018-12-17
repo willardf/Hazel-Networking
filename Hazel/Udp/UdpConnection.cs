@@ -55,9 +55,6 @@ namespace Hazel.Udp
                     Statistics.LogReliableSend(buffer.Length - 3, buffer.Length);
                     break;
 
-                case SendOption.FragmentedReliable:
-                    throw new NotImplementedException("Not yet");
-
                 default:
                     WriteBytesToConnection(buffer, buffer.Length);
                     Statistics.LogUnreliableSend(buffer.Length - 1, buffer.Length);;
@@ -111,12 +108,7 @@ namespace Hazel.Udp
                 case SendOption.Reliable:
                     ReliableSend((byte)sendOption, bytes, offset, length);
                     break;
-
-                case SendOption.FragmentedReliable:
-                    throw new NotImplementedException();
-                    // FragmentedSend(data);
-                    // break;
-
+                    
                 //Treat all else as unreliable
                 default:
                     UnreliableSend((byte)sendOption, bytes, offset, length);
@@ -140,11 +132,7 @@ namespace Hazel.Udp
                 case (byte)UdpSendOption.Hello:
                     ReliableSend(sendOption, data, ackCallback);
                     break;
-
-                case (byte)SendOption.FragmentedReliable:
-                    FragmentedSend(data);
-                    break;
-                
+                                    
                 //Treat all else as unreliable
                 default:
                     UnreliableSend(sendOption, data);
@@ -155,48 +143,39 @@ namespace Hazel.Udp
         /// <summary>
         ///     Handles the receiving of data.
         /// </summary>
-        /// <param name="buffer">The buffer containing the bytes received.</param>
-        protected internal void HandleReceive(byte[] buffer)
+        /// <param name="message">The buffer containing the bytes received.</param>
+        protected internal void HandleReceive(MessageReader message)
         {
-            InvokeDataReceivedRaw(buffer);
+            InvokeDataReceivedRaw(message.Buffer);
                         
-            switch (buffer[0])
+            switch (message.Buffer[0])
             {
                 //Handle reliable receives
                 case (byte)SendOption.Reliable:
-                    ReliableMessageReceive(buffer);
+                    ReliableMessageReceive(message);
                     break;
 
                 //Handle acknowledgments
                 case (byte)UdpSendOption.Acknowledgement:
-                    AcknowledgementMessageReceive(buffer);
+                    AcknowledgementMessageReceive(message.Buffer);
                     break;
 
                 //We need to acknowledge hello and ping messages but dont want to invoke any events!
                 case (byte)UdpSendOption.Ping:
                 case (byte)UdpSendOption.Hello:
                     ushort id;
-                    ProcessReliableReceive(buffer, 1, out id);
-                    Statistics.LogHelloReceive(buffer.Length);
+                    ProcessReliableReceive(message.Buffer, 1, out id);
+                    Statistics.LogHelloReceive(message.Length);
                     break;
 
                 case (byte)UdpSendOption.Disconnect:
                     HandleDisconnect(new HazelException("The remote sent a disconnect request"));                    
                     break;
-
-                //Handle fragmented messages
-                case (byte)SendOption.FragmentedReliable:
-                    FragmentedStartMessageReceive(buffer);
-                    break;
-
-                case (byte)UdpSendOption.Fragment:
-                    FragmentedMessageReceive(buffer);
-                    break;
-
+                    
                 //Treat everything else as unreliable
                 default:
-                    InvokeDataReceived(SendOption.None, buffer, 1, 0);
-                    Statistics.LogUnreliableReceive(buffer.Length - 1, buffer.Length);
+                    InvokeDataReceived(SendOption.None, message, 1, 0);
+                    Statistics.LogUnreliableReceive(message.Length - 1, message.Length);
                     break;
             }
         }
@@ -240,17 +219,13 @@ namespace Hazel.Udp
         /// <param name="sendOption">The send option the message was received with.</param>
         /// <param name="buffer">The buffer received.</param>
         /// <param name="dataOffset">The offset of data in the buffer.</param>
-        void InvokeDataReceived(SendOption sendOption, byte[] buffer, int dataOffset, ushort reliableId)
+        void InvokeDataReceived(SendOption sendOption, MessageReader buffer, int dataOffset, ushort reliableId)
         {
-            var reader = MessageReader.GetRaw(buffer, dataOffset, buffer.Length - dataOffset);
-            try
-            {
-                InvokeDataReceived(reader, sendOption, reliableId);
-            }
-            finally
-            {
-                reader.Recycle();
-            }
+            buffer.Offset = dataOffset;
+            buffer.Length = buffer.Length - dataOffset;
+            buffer.Position = 0;
+
+            InvokeDataReceived(buffer, sendOption, reliableId);
         }
 
         /// <summary>

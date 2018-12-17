@@ -245,12 +245,18 @@ namespace Hazel
         /// </remarks>
         protected void InvokeDataReceived(MessageReader msg, SendOption sendOption, ushort reliableId)
         {
-            DataReceivedEventArgs args = DataReceivedEventArgs.GetObject();
-            args.Set(msg, sendOption, reliableId);
-
             //Make a copy to avoid race condition between null check and invocation
             EventHandler<DataReceivedEventArgs> handler = DataReceived;
-            if (handler != null) handler.Invoke(this, args);
+            if (handler != null)
+            {
+                DataReceivedEventArgs args = DataReceivedEventArgs.GetObject();
+                args.Set(msg, sendOption, reliableId);
+                handler.Invoke(this, args);
+            }
+            else
+            {
+                msg.Recycle();
+            }
         }
 
         /// <summary>
@@ -264,12 +270,14 @@ namespace Hazel
         /// </remarks>
         protected void InvokeDisconnected(Exception e = null)
         {
-            DisconnectedEventArgs args = DisconnectedEventArgs.GetObject();
-            args.Set(e);
-
             //Make a copy to avoid race condition between null check and invocation
             EventHandler<DisconnectedEventArgs> handler = Disconnected;
-            if (handler != null) handler.Invoke(this, args);
+            if (handler != null)
+            {
+                DisconnectedEventArgs args = DisconnectedEventArgs.GetObject();
+                args.Set(e);
+                handler.Invoke(this, args);
+            }
         }
 
         /// <summary>

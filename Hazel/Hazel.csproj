@@ -80,7 +80,6 @@
     <Compile Include="Udp\UdpConnection.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="Udp\UdpConnection.Fragmented.cs" />
     <Compile Include="Udp\UdpConnection.KeepAlive.cs" />
     <Compile Include="Udp\UdpConnection.Reliable.cs" />
     <Compile Include="Udp\UdpConnectionListener.cs" />

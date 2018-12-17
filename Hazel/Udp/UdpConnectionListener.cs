@@ -4,7 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-
+using System.Threading;
 
 namespace Hazel.Udp
 {
@@ -18,12 +18,7 @@ namespace Hazel.Udp
         ///     The socket listening for connections.
         /// </summary>
         Socket listener;
-
-        /// <summary>
-        ///     Buffer to store incoming data in.
-        /// </summary>
-        byte[] dataBuffer = new byte[ushort.MaxValue];
-
+        
         /// <summary>
         ///     The connections we currently hold
         /// </summary>
@@ -92,7 +87,9 @@ namespace Hazel.Udp
             
             try
             {
-                listener.BeginReceiveFrom(dataBuffer, 0, dataBuffer.Length, SocketFlags.None, ref remoteEP, ReadCallback, dataBuffer);
+                var message = MessageReader.GetSized(ushort.MaxValue);
+                listener.BeginReceiveFrom(message.Buffer, 0, message.Buffer.Length, SocketFlags.None, ref remoteEP, ReadCallback, message);
+                Interlocked.Increment(ref ActiveThreads);
             }
             catch (ObjectDisposedException)
             {
@@ -111,6 +108,8 @@ namespace Hazel.Udp
         ///     Called when data has been received by the listener.
         /// </summary>
         /// <param name="result">The asyncronous operation's result.</param>
+
+        private int ActiveThreads;
         void ReadCallback(IAsyncResult result)
         {
             int bytesReceived;
@@ -119,6 +118,7 @@ namespace Hazel.Udp
             //End the receive operation
             try
             {
+                Interlocked.Decrement(ref ActiveThreads);
                 bytesReceived = listener.EndReceiveFrom(result, ref remoteEndPoint);
             }
             catch (ObjectDisposedException)
@@ -133,7 +133,6 @@ namespace Hazel.Udp
 
                 //This thread suggests the IP is not passed out from WinSoc so maybe not possible
                 //http://stackoverflow.com/questions/2576926/python-socket-error-on-udp-data-receive-10054
-
                 StartListeningForData();
                 return;
             }
@@ -141,13 +140,12 @@ namespace Hazel.Udp
             //Exit if no bytes read, we've closed.
             if (bytesReceived == 0)
                 return;
-
-            //Copy to new buffer
-            byte[] buffer = new byte[bytesReceived];
-            Buffer.BlockCopy((byte[])result.AsyncState, 0, buffer, 0, bytesReceived);
-
+            
             //Begin receiving again
             StartListeningForData();
+
+            var message = (MessageReader)result.AsyncState;
+            message.Length = bytesReceived;
 
             bool aware;
             UdpServerConnection connection;
@@ -158,7 +156,7 @@ namespace Hazel.Udp
                 if (!(aware = connections.TryGetValue(remoteEndPoint, out connection)))
                 {
                     //Check for malformed connection attempts
-                    if (buffer[0] != (byte)UdpSendOption.Hello)
+                    if (message.Buffer[0] != (byte)UdpSendOption.Hello)
                         return;
 
                     connection = new UdpServerConnection(this, remoteEndPoint, IPMode);
@@ -167,20 +165,16 @@ namespace Hazel.Udp
             }
 
             //Inform the connection of the buffer (new connections need to send an ack back to client)
-            connection.HandleReceive(buffer);
-            
+            connection.HandleReceive(message);
+
             //If it's a new connection invoke the NewConnection event.
             if (!aware)
             {
-                var reader = MessageReader.GetRaw(buffer, 4, buffer.Length - 4);
-                try
-                {
-                    InvokeNewConnection(reader, connection);
-                }
-                finally
-                {
-                    reader.Recycle();
-                }
+                // Skip header and hello byte;
+                message.Offset = 4; 
+                message.Length = bytesReceived - 4;
+                message.Position = 0;
+                InvokeNewConnection(message, connection);
             }
         }
 

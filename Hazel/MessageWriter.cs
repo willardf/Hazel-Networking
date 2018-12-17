@@ -19,6 +19,12 @@ namespace Hazel
 
         private Stack<int> messageStarts = new Stack<int>();
         
+        public MessageWriter(byte[] buffer)
+        {
+            this.Buffer = buffer;
+            this.Length = this.Buffer.Length;
+        }
+
         ///
         public MessageWriter(int bufferSize)
         {
@@ -114,8 +120,6 @@ namespace Hazel
                 case SendOption.Reliable:
                     this.Length = this.Position = 3;
                     break;
-                case SendOption.FragmentedReliable:
-                    throw new NotImplementedException("Sry bruh");
             }
         }
 
@@ -127,6 +131,26 @@ namespace Hazel
         }
 
         #region WriteMethods
+
+        public void CopyFrom(MessageReader target)
+        {
+            int offset, length;
+            if (target.Tag == byte.MaxValue)
+            {
+                offset = target.Offset;
+                length = target.Length;
+            }
+            else
+            {
+                offset = target.Offset - 3;
+                length = target.Length + 3;
+            }
+
+            System.Buffer.BlockCopy(target.Buffer, offset, this.Buffer, this.Position, length);
+            this.Position += length;
+            if (this.Position > this.Length) this.Length = this.Position;
+        }
+
         public void Write(bool value)
         {
             this.Buffer[this.Position++] = (byte)(value ? 1 : 0);

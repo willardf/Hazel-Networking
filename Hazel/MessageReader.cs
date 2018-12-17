@@ -13,8 +13,8 @@ namespace Hazel
         public byte Tag;
 
         public int Length;
+        public int Offset;
 
-        public int Offset { get; private set; }
         public int Position
         {
             get { return this._position; }
@@ -28,6 +28,21 @@ namespace Hazel
         private int _position;
 
         private int readHead;
+
+        public static MessageReader GetSized(int minSize)
+        {
+            var output = ReaderPool.GetObject();
+            if (output.Buffer == null || output.Buffer.Length < minSize)
+            {
+                output.Buffer = new byte[minSize];
+            }
+
+            output.Offset = 0;
+            output.Position = 0;
+            output.Length = minSize;
+            output.Tag = byte.MaxValue;
+            return output;
+        }
         
         public static MessageReader GetRaw(byte[] bytes, int offset, int length)
         {
@@ -36,6 +51,7 @@ namespace Hazel
             output.Offset = offset;
             output.Position = 0;
             output.Length = length;
+            output.Tag = byte.MaxValue;
             return output;
         }
 

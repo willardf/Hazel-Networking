@@ -23,34 +23,42 @@ namespace Hazel.UnitTests
             ManualResetEvent mutex = new ManualResetEvent(false);
 
             //Setup listener
-            listener.NewConnection += delegate(object sender, NewConnectionEventArgs args)
+            listener.NewConnection += delegate(object sender, NewConnectionEventArgs ncArgs)
             {
-                args.Connection.SendBytes(data, sendOption);
+                ncArgs.Connection.SendBytes(data, sendOption);
             };
 
             listener.Start();
 
+            DataReceivedEventArgs args = null;
             //Setup conneciton
-            connection.DataReceived += delegate(object sender, DataReceivedEventArgs args)
+            connection.DataReceived += delegate(object sender, DataReceivedEventArgs a)
             {
                 Trace.WriteLine("Data was received correctly.");
 
-                Assert.AreEqual(data.Length, args.Message.Length);
-
-                for (int i = 0; i < data.Length; i++)
+                try
                 {
-                    Assert.AreEqual(data[i], args.Message.ReadByte());
+                    args = a;
                 }
-
-                Assert.AreEqual(sendOption, args.SendOption);
-                
-                mutex.Set();
+                finally
+                {
+                    mutex.Set();
+                }
             };
 
             connection.Connect();
 
             //Wait until data is received
             mutex.WaitOne();
+
+            Assert.AreEqual(data.Length, args.Message.Length);
+
+            for (int i = 0; i < data.Length; i++)
+            {
+                Assert.AreEqual(data[i], args.Message.ReadByte());
+            }
+
+            Assert.AreEqual(sendOption, args.SendOption);
         }
 
         /// <summary>
@@ -66,20 +74,14 @@ namespace Hazel.UnitTests
             ManualResetEvent mutex2 = new ManualResetEvent(false);
 
             //Setup listener
+            DataReceivedEventArgs result = null;
             listener.NewConnection += delegate(object sender, NewConnectionEventArgs args)
             {
                 args.Connection.DataReceived += delegate(object innerSender, DataReceivedEventArgs innerArgs)
                 {
                     Trace.WriteLine("Data was received correctly.");
 
-                    Assert.AreEqual(data.Length, innerArgs.Message.Length);
-
-                    for (int i = 0; i < data.Length; i++)
-                    {
-                        Assert.AreEqual(data[i], innerArgs.Message.ReadByte());
-                    }
-
-                    Assert.AreEqual(sendOption, innerArgs.SendOption);
+                    result = innerArgs;
 
                     mutex2.Set();
                 };
@@ -98,6 +100,15 @@ namespace Hazel.UnitTests
 
             //Wait until data is received
             mutex2.WaitOne();
+
+            Assert.AreEqual(data.Length, result.Message.Length);
+
+            for (int i = 0; i < data.Length; i++)
+            {
+                Assert.AreEqual(data[i], result.Message.ReadByte());
+            }
+
+            Assert.AreEqual(sendOption, result.SendOption);
         }
 
         /// <summary>

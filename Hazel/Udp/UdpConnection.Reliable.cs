@@ -286,14 +286,14 @@ namespace Hazel.Udp
         /// <summary>
         ///     Handles a reliable message being received and invokes the data event.
         /// </summary>
-        /// <param name="buffer">The buffer received.</param>
-        void ReliableMessageReceive(byte[] buffer)
+        /// <param name="message">The buffer received.</param>
+        void ReliableMessageReceive(MessageReader message)
         {
             ushort id;
-            if (ProcessReliableReceive(buffer, 1, out id))
-                InvokeDataReceived(SendOption.Reliable, buffer, 3, id);
+            if (ProcessReliableReceive(message.Buffer, 1, out id))
+                InvokeDataReceived(SendOption.Reliable, message, 3, id);
 
-            Statistics.LogReliableReceive(buffer.Length - 3, buffer.Length);
+            Statistics.LogReliableReceive(message.Length - 3, message.Length);
         }
 
         /// <summary>

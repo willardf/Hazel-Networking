@@ -202,20 +202,7 @@ namespace Hazel.UnitTests
                 TestHelper.RunServerToClientTest(listener, connection, 10, SendOption.Reliable);
             }
         }
-
-        /// <summary>
-        ///     Tests server to client reliable communication on the UdpConnection.
-        /// </summary>
-        [TestMethod]
-        public void UdpFragmentedServerToClientTest()
-        {
-            using (UdpConnectionListener listener = new UdpConnectionListener(new NetworkEndPoint(IPAddress.Any, 4296)))
-            using (UdpConnection connection = new UdpClientConnection(new NetworkEndPoint(IPAddress.Loopback, 4296)))
-            {
-                TestHelper.RunServerToClientTest(listener, connection, (int)(UdpConnection.FragmentSize * 9.5), SendOption.FragmentedReliable);
-            }
-        }
-
+        
         /// <summary>
         ///     Tests server to client unreliable communication on the UdpConnection.
         /// </summary>
@@ -241,20 +228,7 @@ namespace Hazel.UnitTests
                 TestHelper.RunClientToServerTest(listener, connection, 10, SendOption.Reliable);
             }
         }
-
-        /// <summary>
-        ///     Tests server to client reliable communication on the UdpConnection.
-        /// </summary>
-        [TestMethod]
-        public void UdpFragmentedClientToServerTest()
-        {
-            using (UdpConnectionListener listener = new UdpConnectionListener(new NetworkEndPoint(IPAddress.Any, 4296)))
-            using (UdpConnection connection = new UdpClientConnection(new NetworkEndPoint(IPAddress.Loopback, 4296)))
-            {
-                TestHelper.RunClientToServerTest(listener, connection, (int)(UdpConnection.FragmentSize * 9.5), SendOption.FragmentedReliable);
-            }
-        }
-
+        
         /// <summary>
         ///     Tests the keepalive functionality from the client,
         /// </summary>
