@@ -242,10 +242,15 @@ namespace Hazel.Udp
         /// <param name="dataOffset">The offset of data in the buffer.</param>
         void InvokeDataReceived(SendOption sendOption, byte[] buffer, int dataOffset, ushort reliableId)
         {
-            byte[] dataBytes = new byte[buffer.Length - dataOffset];
-            Buffer.BlockCopy(buffer, dataOffset, dataBytes, 0, dataBytes.Length);
-            
-            InvokeDataReceived(dataBytes, sendOption, reliableId);
+            var reader = MessageReader.GetRaw(buffer, dataOffset, buffer.Length - dataOffset);
+            try
+            {
+                InvokeDataReceived(reader, sendOption, reliableId);
+            }
+            finally
+            {
+                reader.Recycle();
+            }
         }
 
         /// <summary>

@@ -236,17 +236,17 @@ namespace Hazel
         /// <summary>
         ///     Invokes the DataReceived event.
         /// </summary>
-        /// <param name="bytes">The bytes received.</param>
+        /// <param name="msg">The bytes received.</param>
         /// <param name="sendOption">The <see cref="SendOption"/> the message was received with.</param>
         /// <remarks>
         ///     Invokes the <see cref="DataReceived"/> event on this connection to alert subscribers a new message has been
         ///     received. The bytes and the send option that the message was sent with should be passed in to give to the
         ///     subscribers.
         /// </remarks>
-        protected void InvokeDataReceived(byte[] bytes, SendOption sendOption, ushort reliableId)
+        protected void InvokeDataReceived(MessageReader msg, SendOption sendOption, ushort reliableId)
         {
             DataReceivedEventArgs args = DataReceivedEventArgs.GetObject();
-            args.Set(bytes, sendOption, reliableId);
+            args.Set(msg, sendOption, reliableId);
 
             //Make a copy to avoid race condition between null check and invocation
             EventHandler<DataReceivedEventArgs> handler = DataReceived;

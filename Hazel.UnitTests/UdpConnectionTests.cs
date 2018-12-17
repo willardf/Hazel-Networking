@@ -39,31 +39,41 @@ namespace Hazel.UnitTests
         [TestMethod]
         public void UdpHandshakeTest()
         {
+            byte[] TestData = new byte[] { 1, 2, 3, 4, 5, 6 };
             using (UdpConnectionListener listener = new UdpConnectionListener(new NetworkEndPoint(IPAddress.Any, 4296, IPMode.IPv4)))
             using (UdpConnection connection = new UdpClientConnection(new NetworkEndPoint(IPAddress.Loopback, 4296, IPMode.IPv4)))
             {
                 listener.Start();
 
+                MessageReader output = null;
                 listener.NewConnection += delegate (object sender, NewConnectionEventArgs e)
                 {
-                    Assert.IsTrue(Enumerable.SequenceEqual(e.HandshakeData, new byte[] { 1, 2, 3, 4, 5, 6 }));
+                    output = e.HandshakeData;
                 };
 
-                connection.Connect(new byte[] { 1, 2, 3, 4, 5, 6 });
+                connection.Connect(TestData);
+
+                Thread.Sleep(10);
+                for (int i = 0; i < TestData.Length; ++i)
+                {
+                    Assert.AreEqual(TestData[i], output.ReadByte());
+                }
             }
         }
 
         [TestMethod]
         public void UdpUnreliableMessageSendTest()
         {
+            byte[] TestData = new byte[] { 1, 2, 3, 4, 5, 6 };
             using (UdpConnectionListener listener = new UdpConnectionListener(new NetworkEndPoint(IPAddress.Any, 4296, IPMode.IPv4)))
             using (UdpConnection connection = new UdpClientConnection(new NetworkEndPoint(IPAddress.Loopback, 4296, IPMode.IPv4)))
             {
+                MessageReader output = null;
                 listener.NewConnection += delegate (object sender, NewConnectionEventArgs e)
                 {
                     e.Connection.DataReceived += delegate (object s, DataReceivedEventArgs evt)
                     {
-                        Assert.IsTrue(Enumerable.SequenceEqual(evt.Bytes, new byte[] { 1, 2, 3, 4, 5, 6 }));
+                        output = evt.Message;
                     };
                 };
 
@@ -73,9 +83,15 @@ namespace Hazel.UnitTests
                 for (int i = 0; i < 4; ++i)
                 {
                     var msg = MessageWriter.Get(SendOption.None);
-                    msg.Write(new byte[] { 1, 2, 3, 4, 5, 6 });
+                    msg.Write(TestData);
                     connection.Send(msg);
                     msg.Recycle();
+                }
+
+                Thread.Sleep(10);
+                for (int i = 0; i < TestData.Length; ++i)
+                {
+                    Assert.AreEqual(TestData[i], output.ReadByte());
                 }
             }
         }
@@ -91,7 +107,7 @@ namespace Hazel.UnitTests
                 {
                     e.Connection.DataReceived += delegate (object s, DataReceivedEventArgs evt)
                     {
-                        Assert.IsTrue(Enumerable.SequenceEqual(evt.Bytes, new byte[] { 3, 4 }));
+                        Assert.IsTrue(Enumerable.SequenceEqual(evt.Message.Buffer, new byte[] { 3, 4 }));
                     };
                 };
 
@@ -280,13 +296,18 @@ namespace Hazel.UnitTests
 
                     Thread.Sleep(1050);    //Enough time for ~10 keep alive packets
 
-                    Assert.IsTrue(
-                        args.Connection.Statistics.TotalBytesSent >= 30 &&
-                        args.Connection.Statistics.TotalBytesSent <= 50,
-                        "Sent: " + args.Connection.Statistics.TotalBytesSent
-                    );
-
-                    mutex.Set();
+                    try
+                    {
+                        Assert.IsTrue(
+                            args.Connection.Statistics.TotalBytesSent >= 30 &&
+                            args.Connection.Statistics.TotalBytesSent <= 50,
+                            "Sent: " + args.Connection.Statistics.TotalBytesSent
+                        );
+                    }
+                    finally
+                    {
+                        mutex.Set();
+                    }
                 };
 
                 listener.Start();

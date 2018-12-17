@@ -35,7 +35,7 @@ namespace Hazel
         /// <summary>
         ///     The bytes received from the client.
         /// </summary>
-        public byte[] Bytes { get; private set; }
+        public MessageReader Message { get; private set; }
 
         /// <summary>
         ///     The <see cref="SendOption"/> the data was sent with.
@@ -57,9 +57,9 @@ namespace Hazel
         /// </summary>
         /// <param name="bytes">The bytes received.</param>
         /// <param name="sendOption">The send option used to send the data.</param>
-        internal void Set(byte[] bytes, SendOption sendOption, ushort reliableId)
+        internal void Set(MessageReader msg, SendOption sendOption, ushort reliableId)
         {
-            this.Bytes = bytes;
+            this.Message = msg;
             this.SendOption = sendOption;
             this.ReliableId = reliableId;
         }

@@ -35,11 +35,11 @@ namespace Hazel.UnitTests
             {
                 Trace.WriteLine("Data was received correctly.");
 
-                Assert.AreEqual(data.Length, args.Bytes.Length);
+                Assert.AreEqual(data.Length, args.Message.Length);
 
                 for (int i = 0; i < data.Length; i++)
                 {
-                    Assert.AreEqual(data[i], args.Bytes[i]);
+                    Assert.AreEqual(data[i], args.Message.ReadByte());
                 }
 
                 Assert.AreEqual(sendOption, args.SendOption);
@@ -72,11 +72,11 @@ namespace Hazel.UnitTests
                 {
                     Trace.WriteLine("Data was received correctly.");
 
-                    Assert.AreEqual(data.Length, innerArgs.Bytes.Length);
+                    Assert.AreEqual(data.Length, innerArgs.Message.Length);
 
                     for (int i = 0; i < data.Length; i++)
                     {
-                        Assert.AreEqual(data[i], innerArgs.Bytes[i]);
+                        Assert.AreEqual(data[i], innerArgs.Message.ReadByte());
                     }
 
                     Assert.AreEqual(sendOption, innerArgs.SendOption);

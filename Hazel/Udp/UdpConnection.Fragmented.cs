@@ -165,7 +165,15 @@ namespace Hazel.Udp
                 ptr += fragment.data.Length - fragment.offset;
             }
 
-            InvokeDataReceived(completeData, SendOption.FragmentedReliable, 0);
+            var reader = MessageReader.GetRaw(completeData, 0, completeData.Length);
+            try
+            {
+                InvokeDataReceived(reader, SendOption.FragmentedReliable, 0);
+            }
+            finally
+            {
+                reader.Recycle();
+            }
         }
 
         /// <summary>

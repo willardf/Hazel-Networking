@@ -153,14 +153,9 @@ namespace Hazel.Udp
             UdpServerConnection connection;
             lock (connections)
             {
-                aware = connections.ContainsKey(remoteEndPoint);
-
                 //If we're aware of this connection use the one already
-                if (aware)
-                    connection = connections[remoteEndPoint];
-                
                 //If this is a new client then connect with them!
-                else
+                if (!(aware = connections.TryGetValue(remoteEndPoint, out connection)))
                 {
                     //Check for malformed connection attempts
                     if (buffer[0] != (byte)UdpSendOption.Hello)
@@ -177,9 +172,15 @@ namespace Hazel.Udp
             //If it's a new connection invoke the NewConnection event.
             if (!aware)
             {
-                byte[] dataBuffer = new byte[buffer.Length - 3];
-                Buffer.BlockCopy(buffer, 3, dataBuffer, 0, buffer.Length - 3);
-                InvokeNewConnection(dataBuffer, connection);
+                var reader = MessageReader.GetRaw(buffer, 4, buffer.Length - 4);
+                try
+                {
+                    InvokeNewConnection(reader, connection);
+                }
+                finally
+                {
+                    reader.Recycle();
+                }
             }
         }
 

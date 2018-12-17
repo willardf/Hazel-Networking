@@ -35,7 +35,7 @@ namespace Hazel
         /// <summary>
         ///     The data received from the client in the handshake.
         /// </summary>
-        public byte[] HandshakeData { get; private set; }
+        public MessageReader HandshakeData { get; private set; }
 
         /// <summary>
         ///     The <see cref="Connection"/> to the new client.
@@ -53,11 +53,11 @@ namespace Hazel
         /// <summary>
         ///     Sets the members of the arguments.
         /// </summary>
-        /// <param name="bytes">The bytes that were received in the handshake.</param>
+        /// <param name="msg">The bytes that were received in the handshake.</param>
         /// <param name="connection">The new connection</param>
-        internal void Set(byte[] bytes, Connection connection)
+        internal void Set(MessageReader msg, Connection connection)
         {
-            this.HandshakeData = bytes;
+            this.HandshakeData = msg;
             this.Connection = connection;
         }
 

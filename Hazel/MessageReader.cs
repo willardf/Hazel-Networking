@@ -29,14 +29,13 @@ namespace Hazel
 
         private int readHead;
         
-        public static MessageReader Get(MessageReader srcMsg)
+        public static MessageReader GetRaw(byte[] bytes, int offset, int length)
         {
             var output = ReaderPool.GetObject();
-            output.Buffer = srcMsg.Buffer;
-            output.Offset = srcMsg.Offset;
-            output.Position = srcMsg.Position;
-            output.Length = srcMsg.Length;
-            output.Tag = srcMsg.Tag;
+            output.Buffer = bytes;
+            output.Offset = offset;
+            output.Position = 0;
+            output.Length = length;
             return output;
         }
 

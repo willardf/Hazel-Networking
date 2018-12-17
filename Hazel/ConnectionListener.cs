@@ -68,17 +68,17 @@ namespace Hazel
         /// <summary>
         ///     Invokes the NewConnection event with the supplied connection.
         /// </summary>
-        /// <param name="bytes">The user sent bytes that were received as part of the handshake.</param>
+        /// <param name="msg">The user sent bytes that were received as part of the handshake.</param>
         /// <param name="connection">The connection to pass in the arguments.</param>
         /// <remarks>
         ///     Implementers should call this to invoke the <see cref="NewConnection"/> event before data is received so that
         ///     subscribers do not miss any data that may have been sent immediately after connecting.
         /// </remarks>
-        protected void InvokeNewConnection(byte[] bytes, Connection connection)
+        protected void InvokeNewConnection(MessageReader msg, Connection connection)
         {
             //Get new args
             NewConnectionEventArgs args = NewConnectionEventArgs.GetObject();
-            args.Set(bytes, connection);
+            args.Set(msg, connection);
 
             //Make a copy to avoid race condition between null check and invocation
             EventHandler<NewConnectionEventArgs> handler = NewConnection;
