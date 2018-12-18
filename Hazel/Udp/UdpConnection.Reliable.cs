@@ -79,12 +79,12 @@ namespace Hazel.Udp
         /// <summary>
         ///     Class to hold packet data
         /// </summary>
-        class Packet : IRecyclable, IDisposable
+        public class Packet : IRecyclable, IDisposable
         {
             /// <summary>
             ///     Object pool for this event.
             /// </summary>
-            static readonly ObjectPool<Packet> objectPool = new ObjectPool<Packet>(() => new Packet());
+            public static readonly ObjectPool<Packet> PacketPool = new ObjectPool<Packet>(() => new Packet());
 
             /// <summary>
             ///     Returns an instance of this object from the pool.
@@ -92,7 +92,7 @@ namespace Hazel.Udp
             /// <returns></returns>
             internal static Packet GetObject()
             {
-                return objectPool.GetObject();
+                return PacketPool.GetObject();
             }
 
             public ushort Id;
@@ -143,7 +143,7 @@ namespace Hazel.Udp
                     }
                 }
 
-                objectPool.PutObject(this);
+                PacketPool.PutObject(this);
             }
 
             /// <summary>
@@ -223,7 +223,7 @@ namespace Hazel.Udp
                             if (p.Id != id) return;
 
                             // Backoff retry frequency to avoid congestion
-                            p.LastTimeout = (int)Math.Min(p.LastTimeout * 1.5f, this.disconnectTimeout / 2f);
+                            p.LastTimeout = (int)Math.Min(p.LastTimeout * 1.25f, 2000);
                             p.Timer.Change(p.LastTimeout, Timeout.Infinite);
                         }
 
@@ -240,7 +240,7 @@ namespace Hazel.Udp
 
                         Trace.WriteLine("Resend.");
                     },
-                    resendTimeout > 0 ? resendTimeout : (int)Math.Max(100, Math.Min(AveragePingMs * 4, 1500)),
+                    resendTimeout > 0 ? resendTimeout : (int)Math.Max(500, Math.Min(AveragePingMs * 4, 2000)),
                     ackCallback
                 );
             }
@@ -422,7 +422,7 @@ namespace Hazel.Udp
 
                 lock (PingLock)
                 {
-                    this.AveragePingMs = Math.Max(10, this.AveragePingMs * .7f + rt * .3f);
+                    this.AveragePingMs = Math.Max(50, this.AveragePingMs * .7f + rt * .3f);
                 }
             }
 

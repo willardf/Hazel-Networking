@@ -23,7 +23,9 @@ namespace Hazel.Udp
         ///     The socket listening for connections.
         /// </summary>
         Socket listener;
-        
+
+        private Action<string> Logger;
+
         /// <summary>
         ///     The connections we currently hold
         /// </summary>
@@ -37,10 +39,10 @@ namespace Hazel.Udp
         /// <param name="port">The port to listen on.</param>
         /// <param name="mode">The <see cref="IPMode"/> to listen with.</param>
         [Obsolete("Temporary constructor in beta only, use NetworkEndPoint constructor instead.")]
-        public UdpConnectionListener(IPAddress IPAddress, int port, IPMode mode = IPMode.IPv4)
+        public UdpConnectionListener(IPAddress IPAddress, int port, Action<string> logger, IPMode mode = IPMode.IPv4)
             : this (new NetworkEndPoint(IPAddress, port, mode))
         {
-
+            this.Logger = logger;
         }
 
         /// <summary>
@@ -163,22 +165,23 @@ namespace Hazel.Udp
                 message.Recycle();
                 return;
             }
-            
+
             //Begin receiving again
             StartListeningForData();
 
-            bool aware;
-            bool isHello = message.Buffer[0] == (byte)UdpSendOption.Hello
-                && message.Length >= MinConnectionLength;
+            bool aware = true;
+            bool hasHelloByte = message.Buffer[0] == (byte)UdpSendOption.Hello;
+            bool isHello = hasHelloByte && message.Length >= MinConnectionLength;
 
             //If we're aware of this connection use the one already
             //If this is a new client then connect with them!
             UdpServerConnection connection;
-            if (!(aware = this.allConnections.TryGetValue(remoteEndPoint, out connection)))
+            if (!this.allConnections.TryGetValue(remoteEndPoint, out connection))
             {
                 lock (this.allConnections)
                 {
-                    if (!(aware = this.allConnections.TryGetValue(remoteEndPoint, out connection)))
+                    aware = this.allConnections.TryGetValue(remoteEndPoint, out connection);
+                    if (!aware)
                     {
                         //Check for malformed connection attempts
                         if (!isHello)
@@ -189,24 +192,39 @@ namespace Hazel.Udp
                         }
 
                         connection = new UdpServerConnection(this, remoteEndPoint, this.IPMode);
-                        this.allConnections.TryAdd(remoteEndPoint, connection);
+                        if (!this.allConnections.TryAdd(remoteEndPoint, connection))
+                        {
+                            throw new Exception();
+                        }
                     }
                 }
             }
 
-            //Inform the connection of the buffer (new connections need to send an ack back to client)
-            connection.HandleReceive(message, bytesReceived);
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            try
+            {
+                //Inform the connection of the buffer (new connections need to send an ack back to client)
+                connection.HandleReceive(message, bytesReceived);
+            }
+            finally
+            {
+                var el = stopwatch.ElapsedMilliseconds;
+                if (el > 5)
+                {
+                    this.Logger?.Invoke($"Long Packet {el}ms = {string.Join(" ", message.Buffer.Take(bytesReceived))}");
+                }
+            }
 
             //If it's a new connection invoke the NewConnection event.
             if (!aware)
             {
                 // Skip header and hello byte;
-                message.Offset = 4; 
+                message.Offset = 4;
                 message.Length = bytesReceived - 4;
                 message.Position = 0;
                 InvokeNewConnection(message, connection);
             }
-            else if (isHello)
+            else if (isHello || (!isHello && hasHelloByte))
             {
                 message.Recycle();
             }
@@ -287,7 +305,10 @@ namespace Hazel.Udp
         /// <param name="endPoint">The endpoint of the virtual connection.</param>
         internal void RemoveConnectionTo(EndPoint endPoint)
         {
-            this.allConnections.TryRemove(endPoint, out var conn);
+            lock (this.allConnections)
+            {
+                this.allConnections.TryRemove(endPoint, out var conn);
+            }
         }
 
         /// <inheritdoc />

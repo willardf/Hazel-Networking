@@ -15,6 +15,7 @@ namespace Hazel
     {
         private int numberCreated;
         public int NumberCreated { get { return numberCreated; } }
+        public int NumberInUse { get { return this.inuse.Count; } }
 
         public int Size { get { return this.pool.Count; } }
 
