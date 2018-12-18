@@ -240,7 +240,7 @@ namespace Hazel.Udp
 
                         Trace.WriteLine("Resend.");
                     },
-                    resendTimeout > 0 ? resendTimeout : (int)Math.Max(40, Math.Min(AveragePingMs * 4, 750)),
+                    resendTimeout > 0 ? resendTimeout : (int)Math.Max(100, Math.Min(AveragePingMs * 4, 1500)),
                     ackCallback
                 );
             }

@@ -17,6 +17,8 @@ namespace Hazel.Udp
     {
         public const int BufferSize = ushort.MaxValue / 4;
 
+        public int MinConnectionLength = 0;
+
         /// <summary>
         ///     The socket listening for connections.
         /// </summary>
@@ -26,7 +28,7 @@ namespace Hazel.Udp
         ///     The connections we currently hold
         /// </summary>
         ConcurrentDictionary<EndPoint, UdpServerConnection> allConnections = new ConcurrentDictionary<EndPoint, UdpServerConnection>();
-
+        
         public int ConnectionCount { get { return this.allConnections.Count; } }
         /// <summary>
         ///     Creates a new UdpConnectionListener for the given <see cref="IPAddress"/>, port and <see cref="IPMode"/>.
@@ -165,23 +167,30 @@ namespace Hazel.Udp
             //Begin receiving again
             StartListeningForData();
 
-            bool aware = true;
-            bool isHello = message.Buffer[0] == (byte)UdpSendOption.Hello;
+            bool aware;
+            bool isHello = message.Buffer[0] == (byte)UdpSendOption.Hello
+                && message.Length >= MinConnectionLength;
 
             //If we're aware of this connection use the one already
             //If this is a new client then connect with them!
-            UdpServerConnection connection = this.allConnections.GetOrAdd(
-                remoteEndPoint, 
-                key => { aware = false; return new UdpServerConnection(this, key, IPMode); });
-
-            if (!aware)
+            UdpServerConnection connection;
+            if (!(aware = this.allConnections.TryGetValue(remoteEndPoint, out connection)))
             {
-                //Check for malformed connection attempts
-                if (!isHello)
+                lock (this.allConnections)
                 {
-                    Interlocked.Decrement(ref ActiveCallbacks);
-                    message.Recycle();
-                    return;
+                    if (!(aware = this.allConnections.TryGetValue(remoteEndPoint, out connection)))
+                    {
+                        //Check for malformed connection attempts
+                        if (!isHello)
+                        {
+                            Interlocked.Decrement(ref ActiveCallbacks);
+                            message.Recycle();
+                            return;
+                        }
+
+                        connection = new UdpServerConnection(this, remoteEndPoint, this.IPMode);
+                        this.allConnections.TryAdd(remoteEndPoint, connection);
+                    }
                 }
             }
 
