@@ -8,10 +8,10 @@ using System.Text;
 namespace Hazel
 {
     /// <summary>
-    ///     Abstract base class for a <see cref="ConnectionListener"/> for network based connections.
+    ///     Abstract base class for a <see cref="List"/> for network based connections.
     /// </summary>
     /// <threadsafety static="true" instance="true"/>
-    public abstract class NetworkConnectionListener : ConnectionListener
+    public abstract class NetworkConnectionListener : List
     {
         /// <summary>
         ///     The local end point the listener is listening for new clients on.

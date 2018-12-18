@@ -144,37 +144,43 @@ namespace Hazel.Udp
         ///     Handles the receiving of data.
         /// </summary>
         /// <param name="message">The buffer containing the bytes received.</param>
-        protected internal void HandleReceive(MessageReader message)
+        protected internal void HandleReceive(MessageReader message, int bytesReceived)
         {
             InvokeDataReceivedRaw(message.Buffer);
-                        
+
+            ushort id;
             switch (message.Buffer[0])
             {
                 //Handle reliable receives
                 case (byte)SendOption.Reliable:
-                    ReliableMessageReceive(message);
+                    ReliableMessageReceive(message, bytesReceived);
                     break;
 
                 //Handle acknowledgments
                 case (byte)UdpSendOption.Acknowledgement:
                     AcknowledgementMessageReceive(message.Buffer);
+                    message.Recycle();
                     break;
 
                 //We need to acknowledge hello and ping messages but dont want to invoke any events!
                 case (byte)UdpSendOption.Ping:
+                    ProcessReliableReceive(message.Buffer, 1, out id);
+                    Statistics.LogHelloReceive(message.Length);
+                    message.Recycle();
+                    break;
                 case (byte)UdpSendOption.Hello:
-                    ushort id;
                     ProcessReliableReceive(message.Buffer, 1, out id);
                     Statistics.LogHelloReceive(message.Length);
                     break;
 
                 case (byte)UdpSendOption.Disconnect:
-                    HandleDisconnect(new HazelException("The remote sent a disconnect request"));                    
+                    HandleDisconnect(new HazelException("The remote sent a disconnect request"));
+                    message.Recycle();
                     break;
                     
                 //Treat everything else as unreliable
                 default:
-                    InvokeDataReceived(SendOption.None, message, 1, 0);
+                    InvokeDataReceived(SendOption.None, message, 1, bytesReceived, 0);
                     Statistics.LogUnreliableReceive(message.Length - 1, message.Length);
                     break;
             }
@@ -219,10 +225,10 @@ namespace Hazel.Udp
         /// <param name="sendOption">The send option the message was received with.</param>
         /// <param name="buffer">The buffer received.</param>
         /// <param name="dataOffset">The offset of data in the buffer.</param>
-        void InvokeDataReceived(SendOption sendOption, MessageReader buffer, int dataOffset, ushort reliableId)
+        void InvokeDataReceived(SendOption sendOption, MessageReader buffer, int dataOffset, int bytesReceived, ushort reliableId)
         {
             buffer.Offset = dataOffset;
-            buffer.Length = buffer.Length - dataOffset;
+            buffer.Length = bytesReceived - dataOffset;
             buffer.Position = 0;
 
             InvokeDataReceived(buffer, sendOption, reliableId);

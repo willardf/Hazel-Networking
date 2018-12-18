@@ -16,7 +16,7 @@ namespace Hazel.UnitTests
         /// </summary>
         /// <param name="listener">The listener to test.</param>
         /// <param name="connection">The connection to test.</param>
-        internal static void RunServerToClientTest(ConnectionListener listener, Connection connection, int dataSize, SendOption sendOption)
+        internal static void RunServerToClientTest(NetworkConnectionListener listener, Connection connection, int dataSize, SendOption sendOption)
         {
             //Setup meta stuff 
             byte[] data = BuildData(dataSize);
@@ -66,7 +66,7 @@ namespace Hazel.UnitTests
         /// </summary>
         /// <param name="listener">The listener to test.</param>
         /// <param name="connection">The connection to test.</param>
-        internal static void RunClientToServerTest(ConnectionListener listener, Connection connection, int dataSize, SendOption sendOption)
+        internal static void RunClientToServerTest(NetworkConnectionListener listener, Connection connection, int dataSize, SendOption sendOption)
         {
             //Setup meta stuff 
             byte[] data = BuildData(dataSize);
@@ -116,7 +116,7 @@ namespace Hazel.UnitTests
         /// </summary>
         /// <param name="listener">The listener to test.</param>
         /// <param name="connection">The connection to test.</param>
-        internal static void RunServerDisconnectTest(ConnectionListener listener, Connection connection)
+        internal static void RunServerDisconnectTest(NetworkConnectionListener listener, Connection connection)
         {
             ManualResetEvent mutex = new ManualResetEvent(false);
 
@@ -142,7 +142,7 @@ namespace Hazel.UnitTests
         /// </summary>
         /// <param name="listener">The listener to test.</param>
         /// <param name="connection">The connection to test.</param>
-        internal static void RunClientDisconnectTest(ConnectionListener listener, Connection connection)
+        internal static void RunClientDisconnectTest(NetworkConnectionListener listener, Connection connection)
         {
             ManualResetEvent mutex = new ManualResetEvent(false);
             ManualResetEvent mutex2 = new ManualResetEvent(false);

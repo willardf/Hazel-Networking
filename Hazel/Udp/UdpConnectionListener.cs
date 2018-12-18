@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -14,6 +15,8 @@ namespace Hazel.Udp
     /// <inheritdoc />
     public class UdpConnectionListener : NetworkConnectionListener
     {
+        public const int BufferSize = ushort.MaxValue / 4;
+
         /// <summary>
         ///     The socket listening for connections.
         /// </summary>
@@ -22,8 +25,9 @@ namespace Hazel.Udp
         /// <summary>
         ///     The connections we currently hold
         /// </summary>
-        Dictionary<EndPoint, UdpServerConnection> connections = new Dictionary<EndPoint, UdpServerConnection>();
+        ConcurrentDictionary<EndPoint, UdpServerConnection> allConnections = new ConcurrentDictionary<EndPoint, UdpServerConnection>();
 
+        public int ConnectionCount { get { return this.allConnections.Count; } }
         /// <summary>
         ///     Creates a new UdpConnectionListener for the given <see cref="IPAddress"/>, port and <see cref="IPMode"/>.
         /// </summary>
@@ -84,12 +88,14 @@ namespace Hazel.Udp
         void StartListeningForData()
         {
             EndPoint remoteEP = EndPoint;
-            
+
+            MessageReader message = null;
             try
             {
-                var message = MessageReader.GetSized(ushort.MaxValue);
+                message = MessageReader.GetSized(BufferSize);
+
                 listener.BeginReceiveFrom(message.Buffer, 0, message.Buffer.Length, SocketFlags.None, ref remoteEP, ReadCallback, message);
-                Interlocked.Increment(ref ActiveThreads);
+                Interlocked.Increment(ref ActiveListeners);
             }
             catch (ObjectDisposedException)
             {
@@ -99,6 +105,7 @@ namespace Hazel.Udp
             {
                 //Client no longer reachable, pretend it didn't happen
                 //TODO possibly able to disconnect client, see other TODO
+                message?.Recycle();
                 StartListeningForData();
                 return;
             }
@@ -109,17 +116,27 @@ namespace Hazel.Udp
         /// </summary>
         /// <param name="result">The asyncronous operation's result.</param>
 
-        private int ActiveThreads;
+        public int ActiveListeners;
+        public int ActiveCallbacks;
         void ReadCallback(IAsyncResult result)
         {
+            var message = (MessageReader)result.AsyncState;
+            Interlocked.Increment(ref ActiveCallbacks);
+
             int bytesReceived;
             EndPoint remoteEndPoint = new IPEndPoint(IPMode == IPMode.IPv4 ? IPAddress.Any : IPAddress.IPv6Any, 0);
 
             //End the receive operation
             try
             {
-                Interlocked.Decrement(ref ActiveThreads);
+                Interlocked.Decrement(ref ActiveListeners);
                 bytesReceived = listener.EndReceiveFrom(result, ref remoteEndPoint);
+                message.Offset = 0;
+                message.Length = bytesReceived;
+            }
+            catch (NullReferenceException)
+            {
+                return;
             }
             catch (ObjectDisposedException)
             {
@@ -128,44 +145,48 @@ namespace Hazel.Udp
             }
             catch (SocketException)
             {
-                //Client no longer reachable, pretend it didn't happen
-                //TODO should this not inform the connection this client is lost???
+                // Client no longer reachable, pretend it didn't happen
+                // TODO should this not inform the connection this client is lost???
 
-                //This thread suggests the IP is not passed out from WinSoc so maybe not possible
-                //http://stackoverflow.com/questions/2576926/python-socket-error-on-udp-data-receive-10054
+                // This thread suggests the IP is not passed out from WinSoc so maybe not possible
+                // http://stackoverflow.com/questions/2576926/python-socket-error-on-udp-data-receive-10054
+                message.Recycle();
                 StartListeningForData();
                 return;
             }
 
-            //Exit if no bytes read, we've closed.
+            // Exit if no bytes read, we've closed.
             if (bytesReceived == 0)
+            {
+                message.Recycle();
                 return;
+            }
             
             //Begin receiving again
             StartListeningForData();
 
-            var message = (MessageReader)result.AsyncState;
-            message.Length = bytesReceived;
+            bool aware = true;
+            bool isHello = message.Buffer[0] == (byte)UdpSendOption.Hello;
 
-            bool aware;
-            UdpServerConnection connection;
-            lock (connections)
+            //If we're aware of this connection use the one already
+            //If this is a new client then connect with them!
+            UdpServerConnection connection = this.allConnections.GetOrAdd(
+                remoteEndPoint, 
+                key => { aware = false; return new UdpServerConnection(this, key, IPMode); });
+
+            if (!aware)
             {
-                //If we're aware of this connection use the one already
-                //If this is a new client then connect with them!
-                if (!(aware = connections.TryGetValue(remoteEndPoint, out connection)))
+                //Check for malformed connection attempts
+                if (!isHello)
                 {
-                    //Check for malformed connection attempts
-                    if (message.Buffer[0] != (byte)UdpSendOption.Hello)
-                        return;
-
-                    connection = new UdpServerConnection(this, remoteEndPoint, IPMode);
-                    connections.Add(remoteEndPoint, connection);
+                    Interlocked.Decrement(ref ActiveCallbacks);
+                    message.Recycle();
+                    return;
                 }
             }
 
             //Inform the connection of the buffer (new connections need to send an ack back to client)
-            connection.HandleReceive(message);
+            connection.HandleReceive(message, bytesReceived);
 
             //If it's a new connection invoke the NewConnection event.
             if (!aware)
@@ -176,6 +197,12 @@ namespace Hazel.Udp
                 message.Position = 0;
                 InvokeNewConnection(message, connection);
             }
+            else if (isHello)
+            {
+                message.Recycle();
+            }
+
+            Interlocked.Decrement(ref ActiveCallbacks);
         }
 
         /// <summary>
@@ -197,7 +224,11 @@ namespace Hazel.Udp
                     endPoint,
                     delegate (IAsyncResult result)
                     {
-                        listener.EndSendTo(result);
+                        try
+                        {
+                            listener.EndSendTo(result);
+                        }
+                        catch { }
                     },
                     null
                 );
@@ -247,31 +278,20 @@ namespace Hazel.Udp
         /// <param name="endPoint">The endpoint of the virtual connection.</param>
         internal void RemoveConnectionTo(EndPoint endPoint)
         {
-            lock (connections)
-                connections.Remove(endPoint);
+            this.allConnections.TryRemove(endPoint, out var conn);
         }
 
         /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
-            lock (connections)
+            var keys = this.allConnections.Keys.ToArray();
+            foreach (var k in keys)
             {
-                var connects = this.connections.ToArray();
-                foreach (var kvp in connects)
+                UdpServerConnection conn;
+                if (this.allConnections.TryGetValue(k, out conn))
                 {
-                    if (kvp.Value.State == ConnectionState.Connected)
-                    {
-                        try
-                        {
-                            kvp.Value.SendDisconnect();
-                        }
-                        catch { }
-                    }
-
-                    kvp.Value.Dispose();
+                    conn.Dispose();
                 }
-
-                connections.Clear();
             }
 
             if (listener != null)

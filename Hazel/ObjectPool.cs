@@ -23,6 +23,8 @@ namespace Hazel
         /// </summary>
         ConcurrentBag<T> pool = new ConcurrentBag<T>();
 
+        private ConcurrentDictionary<T, bool> inuse = new ConcurrentDictionary<T, bool>();
+
         /// <summary>
         ///     The generator for creating new objects.
         /// </summary>
@@ -44,11 +46,18 @@ namespace Hazel
         internal T GetObject()
         {
             T item;
-            if (pool.TryTake(out item))
-                return item;
+            if (!pool.TryTake(out item))
+            {
+                Interlocked.Increment(ref numberCreated);
+                item = objectFactory.Invoke();
+            }
 
-            Interlocked.Increment(ref numberCreated);
-            return objectFactory.Invoke();
+            if (!inuse.TryAdd(item, true))
+            {
+                throw new Exception("Duplicate pull");
+            }
+
+            return item;
         }
 
         /// <summary>
@@ -57,7 +66,14 @@ namespace Hazel
         /// <param name="item">The item to return.</param>
         internal void PutObject(T item)
         {
-            pool.Add(item);
+            if (inuse.TryRemove(item, out bool b))
+            {
+                pool.Add(item);
+            }
+            else
+            {
+                throw new Exception("Duplicate add");
+            }
         }
     }
 }

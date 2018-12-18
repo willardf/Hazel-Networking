@@ -16,20 +16,15 @@ namespace Hazel
     ///     <include file="DocInclude/common.xml" path="docs/item[@name='Recyclable']/*" />
     /// </remarks>
     /// <threadsafety static="true" instance="true"/>
-    public class DataReceivedEventArgs : EventArgs, IRecyclable
+    public class DataReceivedEventArgs : EventArgs
     {
-        /// <summary>
-        ///     Object pool for this event.
-        /// </summary>
-        static readonly ObjectPool<DataReceivedEventArgs> objectPool = new ObjectPool<DataReceivedEventArgs>(() => new DataReceivedEventArgs());
-
         /// <summary>
         ///     Returns an instance of this object from the pool.
         /// </summary>
         /// <returns>A new or recycled DataEventArgs object.</returns>
         internal static DataReceivedEventArgs GetObject()
         {
-            return objectPool.GetObject();
+            return new DataReceivedEventArgs();
         }
 
         /// <summary>
@@ -62,12 +57,6 @@ namespace Hazel
             this.Message = msg;
             this.SendOption = sendOption;
             this.ReliableId = reliableId;
-        }
-
-        /// <inheritdoc />
-        public void Recycle()
-        {
-            objectPool.PutObject(this);
         }
     }
 }

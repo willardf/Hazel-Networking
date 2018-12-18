@@ -16,20 +16,15 @@ namespace Hazel
     ///     <include file="DocInclude/common.xml" path="docs/item[@name='Recyclable']/*" />
     /// </remarks>
     /// <threadsafety static="true" instance="true"/>
-    public class DisconnectedEventArgs : EventArgs, IRecyclable
+    public class DisconnectedEventArgs : EventArgs
     {
-        /// <summary>
-        ///     Object pool for this event.
-        /// </summary>
-        static readonly ObjectPool<DisconnectedEventArgs> objectPool = new ObjectPool<DisconnectedEventArgs>(() => new DisconnectedEventArgs());
-
         /// <summary>
         ///     Returns an instance of this object from the pool.
         /// </summary>
         /// <returns>A new or recycled DisconnectedEventArgs object.</returns>
         internal static DisconnectedEventArgs GetObject()
         {
-            return objectPool.GetObject();
+            return new DisconnectedEventArgs();
         }
 
         /// <summary>
@@ -58,12 +53,6 @@ namespace Hazel
         internal void Set(Exception e)
         {
             this.Exception = e;
-        }
-
-        /// <inheritdoc />
-        public void Recycle()
-        {
-            objectPool.PutObject(this);
         }
     }
 }

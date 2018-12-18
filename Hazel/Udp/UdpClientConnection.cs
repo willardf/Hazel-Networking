@@ -286,7 +286,7 @@ namespace Hazel.Udp
             }
 
             MessageReader msg = MessageReader.GetRaw(bytes, 0, bytesReceived);
-            HandleReceive(msg);
+            HandleReceive(msg, bytesReceived);
         }
 
         /// <inheritdoc />

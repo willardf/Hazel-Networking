@@ -6,30 +6,25 @@ using System.Text;
 namespace Hazel
 {
     /// <summary>
-    ///     Event arguments for the <see cref="ConnectionListener.NewConnection"/> event.
+    ///     Event arguments for the <see cref="List.NewConnection"/> event.
     /// </summary>
     /// <remarks>
     ///     <para>
     ///         This contains the new connection for the client that connection and is passed to subscribers of the
-    ///         <see cref="ConnectionListener.NewConnection"/> event.
+    ///         <see cref="List.NewConnection"/> event.
     ///     </para>
     ///     <include file="DocInclude/common.xml" path="docs/item[@name='Recyclable']/*" />
     /// </remarks>
     /// <threadsafety static="true" instance="true"/>
-    public class NewConnectionEventArgs : EventArgs, IRecyclable
+    public class NewConnectionEventArgs : EventArgs
     {
-        /// <summary>
-        ///     Object pool for this event.
-        /// </summary>
-        static readonly ObjectPool<NewConnectionEventArgs> objectPool = new ObjectPool<NewConnectionEventArgs>(() => new NewConnectionEventArgs());
-
         /// <summary>
         ///     Returns an instance of this object from the pool.
         /// </summary>
         /// <returns>A new or recycled NewConnectionEventArgs object.</returns>
         internal static NewConnectionEventArgs GetObject()
         {
-            return objectPool.GetObject();
+            return new NewConnectionEventArgs();
         }
 
         /// <summary>
@@ -59,12 +54,6 @@ namespace Hazel
         {
             this.HandshakeData = msg;
             this.Connection = connection;
-        }
-
-        /// <inheritdoc />
-        public void Recycle()
-        {
-            objectPool.PutObject(this);
         }
     }
 }

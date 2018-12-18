@@ -24,7 +24,7 @@ namespace Hazel
     ///     </para>
     /// </remarks>
     /// <threadsafety static="true" instance="true"/>
-    public abstract class ConnectionListener : IDisposable
+    public abstract class List : IDisposable
     {
         /// <summary>
         ///     Invoked when a new client connects.

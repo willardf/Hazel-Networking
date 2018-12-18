@@ -1,12 +1,18 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 
 namespace Hazel
 {
-    ///
     public class MessageReader : IRecyclable
     {
+        public static int Readers = 0;
+        public int ReaderId = 0;
+
         public static readonly ObjectPool<MessageReader> ReaderPool = new ObjectPool<MessageReader>(() => new MessageReader());
 
         public byte[] Buffer;
@@ -21,13 +27,21 @@ namespace Hazel
             set
             {
                 this._position = value;
-                this.readHead = this._position + Offset;
+                this.readHead = value + Offset;
             }
         }
-
+        
         private int _position;
-
         private int readHead;
+
+        public MessageReader()
+        {
+            this.ReaderId = Interlocked.Increment(ref Readers);
+        }
+        public override string ToString()
+        {
+            return $"{ReaderId}: BL:{Buffer.Length}   O:{Offset}   L:{Length}";
+        }
 
         public static MessageReader GetSized(int minSize)
         {
@@ -37,9 +51,6 @@ namespace Hazel
                 output.Buffer = new byte[minSize];
             }
 
-            output.Offset = 0;
-            output.Position = 0;
-            output.Length = minSize;
             output.Tag = byte.MaxValue;
             return output;
         }
@@ -47,6 +58,7 @@ namespace Hazel
         public static MessageReader GetRaw(byte[] bytes, int offset, int length)
         {
             var output = ReaderPool.GetObject();
+
             output.Buffer = bytes;
             output.Offset = offset;
             output.Position = 0;
@@ -58,6 +70,7 @@ namespace Hazel
         public static MessageReader Get(byte[] buffer)
         {
             var output = ReaderPool.GetObject();
+
             output.Buffer = buffer;
             output.Offset = 0;
             output.Position = 0;
@@ -67,14 +80,33 @@ namespace Hazel
             return output;
         }
 
+        public static MessageReader Get(MessageReader source)
+        {
+            var output = GetSized(source.Buffer.Length);
+            System.Buffer.BlockCopy(source.Buffer, 0, output.Buffer, 0, source.Buffer.Length);
+
+            output.Offset = source.Offset;
+
+            output._position = source._position;
+            output.readHead = source.readHead;
+
+            output.Length = source.Length;
+            output.Tag = source.Tag;
+
+            return output;
+        }
+
         public static MessageReader Get(byte[] buffer, int offset)
         {
+            // Ensure there is at least a header
+            if (offset + 3 > buffer.Length) return null;
+
             var output = ReaderPool.GetObject();
+
             output.Buffer = buffer;
             output.Offset = offset;
             output.Position = 0;
 
-            if (output.readHead + 3 > output.Buffer.Length) return null;
             output.Length = output.ReadUInt16();
             output.Tag = output.ReadByte();
 
@@ -87,8 +119,20 @@ namespace Hazel
         ///
         public MessageReader ReadMessage()
         {
-            var output = MessageReader.Get(this.Buffer, this.readHead);
-            if (output == null) return null;
+            // Ensure there is at least a header
+            if (this.readHead + 3 > this.Buffer.Length) return null;
+
+            var output = new MessageReader();
+
+            output.Buffer = this.Buffer;
+            output.Offset = this.readHead;
+            output.Position = 0;
+
+            output.Length = output.ReadUInt16();
+            output.Tag = output.ReadByte();
+
+            output.Offset += 3;
+            output.Position = 0;
 
             this.Position += output.Length + 3;
             return output;
@@ -97,7 +141,6 @@ namespace Hazel
         ///
         public void Recycle()
         {
-            this.Position = this.Length = 0;
             ReaderPool.PutObject(this);
         }
 
