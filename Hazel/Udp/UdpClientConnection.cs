@@ -21,11 +21,6 @@ namespace Hazel.Udp
         Socket socket;
 
         /// <summary>
-        ///     Object for locking the state.
-        /// </summary>
-        Object stateLock = new Object();
-
-        /// <summary>
         ///     The buffer to store incomming data in.
         /// </summary>
         byte[] dataBuffer = new byte[ushort.MaxValue];
@@ -73,11 +68,8 @@ namespace Hazel.Udp
         { 
             InvokeDataSentRaw(bytes, length);
 
-            lock (stateLock)
-            {
-                if (State != ConnectionState.Connected && State != ConnectionState.Connecting)
-                    throw new InvalidOperationException("Could not send data as this Connection is not connected and is not connecting. Did you disconnect?");
-            }
+            if (State != ConnectionState.Connected && State != ConnectionState.Connecting)
+                throw new InvalidOperationException("Could not send data as this Connection is not connected and is not connecting. Did you disconnect?");
 
             try
             {
@@ -123,41 +115,7 @@ namespace Hazel.Udp
                 HandleDisconnect(he);
             }
         }
-
-        /// <inheritdoc />
-        protected override void WriteBytesToConnectionSync(byte[] bytes, int length)
-        {
-            InvokeDataSentRaw(bytes, length);
-
-            lock (stateLock)
-            {
-                if (State != ConnectionState.Connected && State != ConnectionState.Connecting)
-                    throw new InvalidOperationException("Could not send data as this Connection is not connected and is not connecting. Did you disconnect?");
-            }
-
-            try
-            {
-                socket.SendTo(
-                    bytes,
-                    0,
-                    length,
-                    SocketFlags.None,
-                    RemoteEndPoint
-                );
-            }
-            catch (ObjectDisposedException)
-            {
-                //User probably called Disconnect in between this method starting and here so report the issue
-                throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
-            }
-            catch (SocketException e)
-            {
-                HazelException he = new HazelException("Could not send data as a SocketException occured.", e);
-                HandleDisconnect(he);
-                throw he;
-            }
-        }
-
+        
         /// <inheritdoc />
         public override void Connect(byte[] bytes = null, int timeout = 5000)
         {
@@ -177,13 +135,10 @@ namespace Hazel.Udp
         /// <inheritdoc />
         public override void ConnectAsync(byte[] bytes = null, int timeout = 5000)
         {
-            lock (stateLock)
-            {
                 if (State != ConnectionState.NotConnected)
                     throw new InvalidOperationException("Cannot connect as the Connection is already connected.");
 
-                State = ConnectionState.Connecting;
-            }
+            State = ConnectionState.Connecting;
 
             //Begin listening
             try
@@ -207,8 +162,7 @@ namespace Hazel.Udp
             {
                 //If the socket's been disposed then we can just end there but make sure we're in NotConnected state.
                 //If we end up here I'm really lost...
-                lock (stateLock)
-                    State = ConnectionState.NotConnected;
+                State = ConnectionState.NotConnected;
                 return;
             }
             catch (SocketException e)
@@ -219,7 +173,7 @@ namespace Hazel.Udp
 
             //Write bytes to the server to tell it hi (and to punch a hole in our NAT, if present)
             //When acknowledged set the state to connected
-            SendHello(bytes, () => { lock (stateLock) State = ConnectionState.Connected; });
+            SendHello(bytes, () => { State = ConnectionState.Connected; });
         }
 
         /// <summary>
@@ -292,29 +246,18 @@ namespace Hazel.Udp
         /// <inheritdoc />
         protected override void HandleDisconnect(HazelException e = null)
         {
-            bool invoke = false;
-
-            lock (stateLock)
+            if (State == ConnectionState.Connected)
             {
-                //Only invoke the disconnected event if we're not already disconnecting
-                if (State == ConnectionState.Connected)
-                {
-                    State = ConnectionState.Disconnecting;
-                    invoke = true;
-                }
-            }
+                State = ConnectionState.Disconnecting;
 
-            //Invoke event outide lock if need be
-            if (invoke)
-            {
                 try
                 {
                     InvokeDisconnected(e);
                 }
                 catch { }
-
-                Dispose();
             }
+
+            Dispose();
         }
 
         /// <inheritdoc />
@@ -323,16 +266,15 @@ namespace Hazel.Udp
             if (disposing)
             {
                 //Send disconnect message if we're not already disconnecting
-                bool connected;
-                lock (stateLock)
-                    connected = State == ConnectionState.Connected;
-
-                if (connected)
-                    SendDisconnect();
-
-                //Dispose of the socket
-                lock (stateLock)
+                if (State == ConnectionState.Connected)
+                {
                     State = ConnectionState.NotConnected;
+                    try
+                    {
+                        SendDisconnect();
+                    }
+                    catch { }
+                }
             }
 
             if (socket != null)

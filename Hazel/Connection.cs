@@ -48,7 +48,7 @@ namespace Hazel
         /// <example>
         ///     <code language="C#" source="DocInclude/TcpClientExample.cs"/>
         /// </example>
-        public event EventHandler<DataReceivedEventArgs> DataReceived;
+        public Action<DataReceivedEventArgs> DataReceived;
 
         public int TestLagMs = -1;
 
@@ -123,20 +123,20 @@ namespace Hazel
         {
             get
             {
-                return state;
+                return this.state;
             }
             
             protected set
             {
                 state = value;
-
                 if (state == ConnectionState.Connected)
                     connectWaitLock.Set();
                 else
                     connectWaitLock.Reset();
             }
         }
-        volatile ConnectionState state;
+
+        protected ConnectionState state;
 
         /// <summary>
         ///     Reset event that is triggered when the connection is marked Connected.
@@ -246,12 +246,12 @@ namespace Hazel
         protected void InvokeDataReceived(MessageReader msg, SendOption sendOption, ushort reliableId)
         {
             //Make a copy to avoid race condition between null check and invocation
-            EventHandler<DataReceivedEventArgs> handler = DataReceived;
+            Action<DataReceivedEventArgs> handler = DataReceived;
             if (handler != null)
             {
                 DataReceivedEventArgs args = DataReceivedEventArgs.GetObject();
                 args.Set(msg, sendOption, reliableId);
-                handler.Invoke(this, args);
+                handler.Invoke(args);
             }
             else
             {

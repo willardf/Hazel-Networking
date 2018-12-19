@@ -46,7 +46,7 @@ namespace Hazel
         /// <example>
         ///     <code language="C#" source="DocInclude/TcpListenerExample.cs"/>
         /// </example>
-        public event EventHandler<NewConnectionEventArgs> NewConnection;
+        public Action<NewConnectionEventArgs> NewConnection;
 
         /// <summary>
         ///     Makes this connection listener begin listening for connections.
@@ -77,12 +77,12 @@ namespace Hazel
         protected void InvokeNewConnection(MessageReader msg, Connection connection)
         {
             //Make a copy to avoid race condition between null check and invocation
-            EventHandler<NewConnectionEventArgs> handler = NewConnection;
+            Action<NewConnectionEventArgs> handler = NewConnection;
             if (handler != null)
             {
                 NewConnectionEventArgs args = NewConnectionEventArgs.GetObject();
                 args.Set(msg, connection);
-                handler(this, args);
+                handler(args);
             }
             else
             {

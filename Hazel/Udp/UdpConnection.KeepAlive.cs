@@ -62,7 +62,7 @@ namespace Hazel.Udp
                     {
                         try
                         {
-                            ReliableSend((byte)UdpSendOption.Hello); // TODO: Change to ping after server can handle it, before clients update
+                            ReliableSend((byte)UdpSendOption.Ping);
                             Trace.WriteLine("Keepalive packet sent.");
                         }
                         catch

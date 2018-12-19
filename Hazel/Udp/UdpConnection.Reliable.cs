@@ -149,16 +149,8 @@ namespace Hazel.Udp
                 PacketPool.PutObject(this);
             }
         }
-
-        private Timer reliableTimer;
-        private int activePackets;
-
-        private void InitializeReliableTimer()
-        {
-            reliableTimer = new Timer(ManageReliablePackets, null, 100, 100);
-        }
-
-        private void ManageReliablePackets(object state)
+                
+        internal void ManageReliablePackets(object state)
         {
             if (this.reliableDataPacketsSent.Count > 0)
             {
@@ -195,11 +187,12 @@ namespace Hazel.Udp
             //Create packet object
             Packet packet = Packet.GetObject();
 
-            do
+            id = (ushort)Interlocked.Increment(ref lastIDAllocated);
+
+            if (!reliableDataPacketsSent.TryAdd(id, packet))
             {
-                id = (ushort)Interlocked.Increment(ref lastIDAllocated);
+                throw new Exception("That shouldn't be possible");
             }
-            while (!reliableDataPacketsSent.TryAdd(id, packet));
 
             int timeout = resendTimeout > 0 ? resendTimeout : (int)Math.Max(50, Math.Min(AveragePingMs * 2, 1000));
 
@@ -222,7 +215,6 @@ namespace Hazel.Udp
                     {
                         if (reliableDataPacketsSent.TryRemove(p.Id, out self))
                         {
-                            Interlocked.Decrement(ref this.activePackets);
                             HandleDisconnect(new HazelException($"Reliable packet {self.Id} was not ack'd after {self.Retransmissions} resends"));
 
                             self.Recycle();
@@ -421,7 +413,6 @@ namespace Hazel.Udp
             Packet packet;
             if (reliableDataPacketsSent.TryRemove(id, out packet))
             {
-                Interlocked.Decrement(ref this.activePackets);
                 float rt = packet.Stopwatch.ElapsedMilliseconds;
 
                 packet.AckCallback?.Invoke();
@@ -461,8 +452,6 @@ namespace Hazel.Udp
 
         void DisposeReliablePackets()
         {
-            this.reliableTimer.Dispose();
-
             foreach (var kvp in reliableDataPacketsSent)
             {
                 Packet pkt;

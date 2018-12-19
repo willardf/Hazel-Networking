@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -29,6 +30,8 @@ namespace Hazel.Udp
 
         private Action<string> Logger;
 
+        Timer reliablePacketTimer;
+
         /// <summary>
         ///     The connections we currently hold
         /// </summary>
@@ -56,11 +59,28 @@ namespace Hazel.Udp
                 this.listener = new Socket(AddressFamily.InterNetworkV6, SocketType.Dgram, ProtocolType.Udp);
                 this.listener.SetSocketOption(SocketOptionLevel.IPv6, (SocketOptionName)27, false);
             }
+
+            reliablePacketTimer = new Timer(ManageReliablePackets, null, 100, Timeout.Infinite);
         }
 
         ~UdpConnectionListener()
         {
             this.Dispose(false);
+        }
+
+        public float AveragePacketsTime = 1;
+        Stopwatch stopwatch = new Stopwatch();
+        private void ManageReliablePackets(object state)
+        {
+            stopwatch.Restart();
+            foreach (var kvp in this.allConnections)
+            {
+                kvp.Value.ManageReliablePackets(state);
+            }
+
+            this.AveragePacketsTime = this.AveragePacketsTime * .7f + stopwatch.ElapsedMilliseconds * .3f;
+
+            this.reliablePacketTimer.Change(100, Timeout.Infinite);
         }
 
         /// <inheritdoc />
@@ -111,7 +131,7 @@ namespace Hazel.Udp
         ///     Called when data has been received by the listener.
         /// </summary>
         /// <param name="result">The asyncronous operation's result.</param>
-
+        
         public int ActiveListeners;
         public int ActiveCallbacks;
         void ReadCallback(IAsyncResult result)
@@ -149,6 +169,13 @@ namespace Hazel.Udp
                 // This thread suggests the IP is not passed out from WinSoc so maybe not possible
                 // http://stackoverflow.com/questions/2576926/python-socket-error-on-udp-data-receive-10054
                 message.Recycle();
+
+                UdpServerConnection dead;
+                if (this.allConnections.TryRemove(remoteEndPoint, out dead))
+                {
+                    dead.Dispose();
+                }
+
                 StartListeningForData();
                 return;
             }
@@ -309,14 +336,9 @@ namespace Hazel.Udp
         /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
-            var keys = this.allConnections.Keys.ToArray();
-            foreach (var k in keys)
+            foreach (var kvp in this.allConnections)
             {
-                UdpServerConnection conn;
-                if (this.allConnections.TryGetValue(k, out conn))
-                {
-                    conn.Dispose();
-                }
+                kvp.Value.Dispose();
             }
 
             if (listener != null)
@@ -325,6 +347,8 @@ namespace Hazel.Udp
                 this.listener.Dispose();
                 this.listener = null;
             }
+
+            this.reliablePacketTimer.Dispose();
 
             base.Dispose(disposing);
         }

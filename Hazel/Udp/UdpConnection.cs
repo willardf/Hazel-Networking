@@ -21,7 +21,6 @@ namespace Hazel.Udp
         protected UdpConnection()
         {
             InitializeKeepAliveTimer();
-            InitializeReliableTimer();
         }
 
         /// <summary>
@@ -29,13 +28,7 @@ namespace Hazel.Udp
         /// </summary>
         /// <param name="bytes">The bytes to write.</param>
         protected abstract void WriteBytesToConnection(byte[] bytes, int length);
-
-        /// <summary>
-        ///     Writes the given bytes to the connection synchronously.
-        /// </summary>
-        /// <param name="bytes">The bytes to write.</param>
-        protected abstract void WriteBytesToConnectionSync(byte[] bytes, int length);
-
+        
         /// <inheritdoc/>
         public override void Send(MessageWriter msg)
         {
@@ -267,7 +260,7 @@ namespace Hazel.Udp
         /// </summary>
         public override void SendDisconnect()
         {
-            WriteBytesToConnectionSync(new byte[] { (byte)UdpSendOption.Disconnect }, 1);
+            WriteBytesToConnection(new byte[] { (byte)UdpSendOption.Disconnect }, 1);
         }
 
         /// <inheritdoc/>

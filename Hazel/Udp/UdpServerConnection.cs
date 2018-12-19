@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Text;
-
+using System.Threading;
 
 namespace Hazel.Udp
 {
@@ -59,20 +59,6 @@ namespace Hazel.Udp
         }
 
         /// <inheritdoc />
-        protected override void WriteBytesToConnectionSync(byte[] bytes, int length)
-        {
-            InvokeDataSentRaw(bytes, length);
-
-            lock (stateLock)
-            {
-                if (State != ConnectionState.Connected)
-                    throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
-            }
-
-            Listener.SendDataSync(bytes, length, RemoteEndPoint);
-        }
-
-        /// <inheritdoc />
         /// <remarks>
         ///     This will always throw a HazelException.
         /// </remarks>
@@ -124,19 +110,19 @@ namespace Hazel.Udp
             //Here we just need to inform the listener we no longer need data.
             if (disposing)
             {
-                //Send disconnect message if we're not already disconnecting
-                bool connected;
+                // Send disconnect message if we're not already disconnecting
+                if (this.state == ConnectionState.Connected)
+                {
+                    try
+                    {
+                        SendDisconnect();
+                    }
+                    catch { }
+                    this.state = ConnectionState.Disconnecting;
+                }
 
-                lock (stateLock)
-                    connected = State == ConnectionState.Connected;
-
-                if (connected)
-                    SendDisconnect();
-                
                 Listener.RemoveConnectionTo(RemoteEndPoint);
 
-                lock (stateLock)
-                    State = ConnectionState.NotConnected;
             }
 
             base.Dispose(disposing);
