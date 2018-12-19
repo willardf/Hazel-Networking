@@ -21,6 +21,7 @@ namespace Hazel.Udp
         protected UdpConnection()
         {
             InitializeKeepAliveTimer();
+            InitializeReliableTimer();
         }
 
         /// <summary>

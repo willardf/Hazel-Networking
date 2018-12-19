@@ -15,6 +15,9 @@ namespace Hazel.Udp
     /// <inheritdoc />
     public class UdpConnectionListener : NetworkConnectionListener
     {
+        public long BytesReceived;
+        public long BytesSent;
+
         public const int BufferSize = ushort.MaxValue / 4;
 
         public int MinConnectionLength = 0;
@@ -32,25 +35,14 @@ namespace Hazel.Udp
         ConcurrentDictionary<EndPoint, UdpServerConnection> allConnections = new ConcurrentDictionary<EndPoint, UdpServerConnection>();
         
         public int ConnectionCount { get { return this.allConnections.Count; } }
-        /// <summary>
-        ///     Creates a new UdpConnectionListener for the given <see cref="IPAddress"/>, port and <see cref="IPMode"/>.
-        /// </summary>
-        /// <param name="IPAddress">The IPAddress to listen on.</param>
-        /// <param name="port">The port to listen on.</param>
-        /// <param name="mode">The <see cref="IPMode"/> to listen with.</param>
-        [Obsolete("Temporary constructor in beta only, use NetworkEndPoint constructor instead.")]
-        public UdpConnectionListener(IPAddress IPAddress, int port, Action<string> logger, IPMode mode = IPMode.IPv4)
-            : this (new NetworkEndPoint(IPAddress, port, mode))
-        {
-            this.Logger = logger;
-        }
 
         /// <summary>
         ///     Creates a new UdpConnectionListener for the given <see cref="IPAddress"/>, port and <see cref="IPMode"/>.
         /// </summary>
         /// <param name="endPoint">The endpoint to listen on.</param>
-        public UdpConnectionListener(NetworkEndPoint endPoint)
+        public UdpConnectionListener(NetworkEndPoint endPoint, Action<string> logger = null)
         {
+            this.Logger = logger;
             this.EndPoint = endPoint.EndPoint;
             this.IPMode = endPoint.IPMode;
 
@@ -135,6 +127,8 @@ namespace Hazel.Udp
             {
                 Interlocked.Decrement(ref ActiveListeners);
                 bytesReceived = listener.EndReceiveFrom(result, ref remoteEndPoint);
+                Interlocked.Add(ref BytesReceived, bytesReceived);
+
                 message.Offset = 0;
                 message.Length = bytesReceived;
             }
@@ -240,6 +234,7 @@ namespace Hazel.Udp
         internal void SendData(byte[] bytes, int length, EndPoint endPoint)
         {
             if (length > bytes.Length) return;
+            Interlocked.Add(ref BytesSent, length);
 
             try
             {
