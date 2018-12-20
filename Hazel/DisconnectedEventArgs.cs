@@ -36,7 +36,7 @@ namespace Hazel
         ///     that caused it or a <see cref="HazelException"/> with the details of the exception, if the disconnection 
         ///     wasn't caused by an error then this will contain null.
         /// </remarks>
-        public Exception Exception { get; private set; }
+        public string Reason { get; private set; }
 
         /// <summary>
         ///     Private constructor for object pool.
@@ -50,9 +50,9 @@ namespace Hazel
         ///     Sets the given exception for the arguments.
         /// </summary>
         /// <param name="e">The exception if the cause.</param>
-        internal void Set(Exception e)
+        internal void Set(string reason)
         {
-            this.Exception = e;
+            this.Reason = reason;
         }
     }
 }

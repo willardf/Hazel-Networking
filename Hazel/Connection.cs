@@ -268,7 +268,7 @@ namespace Hazel
         ///     by the end point or because an error occured. If an error occured the error should be passed in in order to 
         ///     pass to the subscribers, otherwise null can be passed in.
         /// </remarks>
-        protected void InvokeDisconnected(Exception e = null)
+        protected void InvokeDisconnected(string e)
         {
             //Make a copy to avoid race condition between null check and invocation
             EventHandler<DisconnectedEventArgs> handler = Disconnected;

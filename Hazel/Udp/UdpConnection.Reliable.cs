@@ -47,7 +47,7 @@ namespace Hazel.Udp
         ///     The packet id that was received last.
         /// </summary>
         volatile ushort reliableReceiveLast = 0;
-
+        
         /// <summary>
         ///     Has the connection received anything yet
         /// </summary>
@@ -102,7 +102,7 @@ namespace Hazel.Udp
             public int LastTimeout;
             public volatile bool Acknowledged;
 
-            private Action<Packet> ResendAction;
+            private Func<Packet, int> ResendAction;
             public Action AckCallback;
 
             public volatile int Retransmissions;
@@ -112,7 +112,7 @@ namespace Hazel.Udp
             {
             }
             
-            internal void Set(ushort id, byte[] data, Action<Packet> resendAction, int timeout, Action ackCallback)
+            internal void Set(ushort id, byte[] data, Func<Packet, int> resendAction, int timeout, Action ackCallback)
             {
                 this.Id = id;
                 this.Data = data;
@@ -127,16 +127,19 @@ namespace Hazel.Udp
                 Stopwatch.Restart();
             }
 
-            public void Resend()
+            // Packets resent
+            public int Resend()
             {
                 var evt = this.ResendAction;
                 if (!this.Acknowledged)
                 {
                     if (evt != null)
                     {
-                        evt(this);
+                        return evt(this);
                     }
                 }
+
+                return 0;
             }
 
             /// <summary>
@@ -150,8 +153,9 @@ namespace Hazel.Udp
             }
         }
                 
-        internal void ManageReliablePackets(object state)
+        internal int ManageReliablePackets(object state)
         {
+            int output = 0;
             if (this.reliableDataPacketsSent.Count > 0)
             {
                 double minTimeout = int.MaxValue;
@@ -163,7 +167,7 @@ namespace Hazel.Udp
                     {
                         try
                         {
-                            pkt.Resend();
+                            output += pkt.Resend();
                         }
                         catch { }
                     }
@@ -171,6 +175,8 @@ namespace Hazel.Udp
                     minTimeout = Math.Min(pkt.LastTimeout, minTimeout);
                 }
             }
+
+            return output;
         }
 
         /// <summary>
@@ -206,7 +212,7 @@ namespace Hazel.Udp
                 (Packet p) =>
                 {
                     // Callback for a previous packet
-                    if (p.Acknowledged) return;
+                    if (p.Acknowledged) return 0;
 
                     p.LastSend = DateTime.Now;
 
@@ -215,12 +221,12 @@ namespace Hazel.Udp
                     {
                         if (reliableDataPacketsSent.TryRemove(p.Id, out self))
                         {
-                            HandleDisconnect(new HazelException($"Reliable packet {self.Id} was not ack'd after {self.Retransmissions} resends"));
+                            HandleDisconnect($"Reliable packet {self.Id} was not ack'd after {self.Retransmissions} resends");
 
                             self.Recycle();
                         }
 
-                        return;
+                        return 0;
                     }
 
                     // Backoff retry frequency to avoid congestion
@@ -230,14 +236,15 @@ namespace Hazel.Udp
                     {
                         WriteBytesToConnection(p.Data, sendLength);
                         p.Retransmissions++;
+                        return 1;
                     }
-                    catch (InvalidOperationException e)
+                    catch (InvalidOperationException)
                     {
                         //No longer connected
-                        HandleDisconnect(new HazelException("Could not resend data as connection is no longer connected", e));
+                        HandleDisconnect("Could not resend data as connection is no longer connected");
                     }
 
-                    Trace.WriteLine("Resend.");
+                    return 0;
                 },
                 timeout,
                 ackCallback

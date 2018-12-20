@@ -69,13 +69,15 @@ namespace Hazel.Udp
         }
 
         public float AveragePacketsTime = 1;
+        public int PacketsResent = 0;
+
         Stopwatch stopwatch = new Stopwatch();
         private void ManageReliablePackets(object state)
         {
             stopwatch.Restart();
             foreach (var kvp in this.allConnections)
             {
-                kvp.Value.ManageReliablePackets(state);
+                PacketsResent += kvp.Value.ManageReliablePackets(state);
             }
 
             this.AveragePacketsTime = this.AveragePacketsTime * .7f + stopwatch.ElapsedMilliseconds * .3f;

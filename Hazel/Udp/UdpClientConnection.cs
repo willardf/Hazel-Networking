@@ -88,11 +88,11 @@ namespace Hazel.Udp
                         }
                         catch (ObjectDisposedException e)
                         {
-                            HandleDisconnect(new HazelException("Could not send as the socket was disposed of.", e));
+                            HandleDisconnect("Could not send as the socket was disposed of.");
                         }
                         catch (SocketException e)
                         {
-                            HandleDisconnect(new HazelException("Could not send data as a SocketException occured.", e));
+                            HandleDisconnect("Could not send data as a SocketException occured.");
                         }
                     },
                     null
@@ -105,14 +105,8 @@ namespace Hazel.Udp
             }
             catch (SocketException e)
             {
-                HazelException he = new HazelException("Could not send data as a SocketException occured.", e);
-                HandleDisconnect(he);
-                throw he;
-            }
-            catch (ArgumentOutOfRangeException e)
-            {
-                HazelException he = new HazelException("Something wonk with the buffer: " + bytes.Length, e);
-                HandleDisconnect(he);
+                HandleDisconnect("Could not send data as a SocketException occured.");
+                throw e;
             }
         }
         
@@ -204,14 +198,14 @@ namespace Hazel.Udp
             }
             catch (SocketException e)
             {
-                HandleDisconnect(new HazelException("A socket exception occured while reading data.", e));
+                HandleDisconnect("A socket exception occured while reading data.");
                 return;
             }
 
             //Exit if no bytes read, we've failed.
             if (bytesReceived == 0)
             {
-                HandleDisconnect(new HazelException("Recieved 0 bytes"));
+                HandleDisconnect("Recieved 0 bytes");
                 return;
             }
 
@@ -226,7 +220,7 @@ namespace Hazel.Udp
             }
             catch (SocketException e)
             {
-                HandleDisconnect(new HazelException("A Socket exception occured while initiating a receive operation.", e));
+                HandleDisconnect("A Socket exception occured while initiating a receive operation.");
             }
             catch (ObjectDisposedException)
             {
@@ -244,7 +238,7 @@ namespace Hazel.Udp
         }
 
         /// <inheritdoc />
-        protected override void HandleDisconnect(HazelException e = null)
+        protected override void HandleDisconnect(string e)
         {
             if (State == ConnectionState.Connected)
             {

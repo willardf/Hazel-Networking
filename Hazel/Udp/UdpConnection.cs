@@ -168,7 +168,7 @@ namespace Hazel.Udp
                     break;
 
                 case (byte)UdpSendOption.Disconnect:
-                    HandleDisconnect(new HazelException("The remote sent a disconnect request"));
+                    HandleDisconnect("The remote sent a disconnect request");
                     message.Recycle();
                     break;
                     
@@ -253,7 +253,7 @@ namespace Hazel.Udp
         ///     Called when the socket has been disconnected at the remote host.
         /// </summary>
         /// <param name="e">The exception if one was the cause.</param>
-        protected abstract void HandleDisconnect(HazelException e = null);
+        protected abstract void HandleDisconnect(string reason);
 
         /// <summary>
         ///     Sends a disconnect message to the end point.

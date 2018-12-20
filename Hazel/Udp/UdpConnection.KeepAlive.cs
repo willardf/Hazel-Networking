@@ -40,6 +40,8 @@ namespace Hazel.Udp
         }
         int keepAliveInterval = 10000;
 
+        public int KeepAlivesSent;
+
         /// <summary>
         ///     The timer creating keepalive pulses.
         /// </summary>
@@ -63,7 +65,7 @@ namespace Hazel.Udp
                         try
                         {
                             ReliableSend((byte)UdpSendOption.Ping);
-                            Trace.WriteLine("Keepalive packet sent.");
+                            Interlocked.Increment(ref KeepAlivesSent);
                         }
                         catch
                         {

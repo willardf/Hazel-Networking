@@ -77,7 +77,7 @@ namespace Hazel.Udp
         }
 
         /// <inheritdoc />
-        protected override void HandleDisconnect(HazelException e = null)
+        protected override void HandleDisconnect(string reason)
         {
             bool invoke = false;
 
@@ -96,7 +96,7 @@ namespace Hazel.Udp
             {
                 try
                 {
-                    InvokeDisconnected(e);
+                    InvokeDisconnected(reason);
                 }
                 catch { }
 
