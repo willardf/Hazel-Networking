@@ -25,6 +25,8 @@ namespace Hazel.Udp
         /// </summary>
         byte[] dataBuffer = new byte[ushort.MaxValue];
 
+        Timer reliablePacketTimer;
+
         /// <summary>
         ///     Creates a new UdpClientConnection.
         /// </summary>
@@ -46,6 +48,8 @@ namespace Hazel.Udp
                 socket = new Socket(AddressFamily.InterNetworkV6, SocketType.Dgram, ProtocolType.Udp);
                 socket.SetSocketOption(SocketOptionLevel.IPv6, (SocketOptionName)27, false);    //TODO these lines shouldn't be needed anymore
             }
+
+            reliablePacketTimer = new Timer((s) => ManageReliablePackets(s), null, 50, Timeout.Infinite);
         }
 
         ~UdpClientConnection()
@@ -60,12 +64,14 @@ namespace Hazel.Udp
             {
                 ThreadPool.QueueUserWorkItem(a => { Thread.Sleep(this.TestLagMs); WriteBytesToConnectionReal(bytes, length); });
             }
-
-            WriteBytesToConnectionReal(bytes, length);
+            else
+            {
+                WriteBytesToConnectionReal(bytes, length);
+            }
         }
 
         private void WriteBytesToConnectionReal(byte[] bytes, int length)
-        { 
+        {
             InvokeDataSentRaw(bytes, length);
 
             if (State != ConnectionState.Connected && State != ConnectionState.Connecting)
@@ -83,14 +89,13 @@ namespace Hazel.Udp
                     {
                         try
                         {
-                            lock (socket)
-                                socket.EndSendTo(result);
+                            socket.EndSendTo(result);
                         }
-                        catch (ObjectDisposedException e)
+                        catch (ObjectDisposedException)
                         {
                             HandleDisconnect("Could not send as the socket was disposed of.");
                         }
-                        catch (SocketException e)
+                        catch (SocketException)
                         {
                             HandleDisconnect("Could not send data as a SocketException occured.");
                         }
@@ -103,13 +108,13 @@ namespace Hazel.Udp
                 //User probably called Disconnect in between this method starting and here so report the issue
                 throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
             }
-            catch (SocketException e)
+            catch (SocketException)
             {
                 HandleDisconnect("Could not send data as a SocketException occured.");
-                throw e;
+                throw;
             }
         }
-        
+
         /// <inheritdoc />
         public override void Connect(byte[] bytes = null, int timeout = 5000)
         {
@@ -129,8 +134,8 @@ namespace Hazel.Udp
         /// <inheritdoc />
         public override void ConnectAsync(byte[] bytes = null, int timeout = 5000)
         {
-                if (State != ConnectionState.NotConnected)
-                    throw new InvalidOperationException("Cannot connect as the Connection is already connected.");
+            if (State != ConnectionState.NotConnected)
+                throw new InvalidOperationException("Cannot connect as the Connection is already connected.");
 
             State = ConnectionState.Connecting;
 
@@ -277,6 +282,8 @@ namespace Hazel.Udp
                 socket.Dispose();
                 socket = null;
             }
+
+            this.reliablePacketTimer.Dispose();
 
             base.Dispose(disposing);
         }

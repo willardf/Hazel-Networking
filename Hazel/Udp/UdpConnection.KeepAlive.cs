@@ -38,7 +38,7 @@ namespace Hazel.Udp
                 ResetKeepAliveTimer();
             }
         }
-        int keepAliveInterval = 10000;
+        int keepAliveInterval = 3000;
 
         public int KeepAlivesSent;
 

@@ -27,9 +27,7 @@ namespace Hazel.Udp
         ///     The socket listening for connections.
         /// </summary>
         Socket listener;
-
-        private Action<string> Logger;
-
+        
         Timer reliablePacketTimer;
 
         /// <summary>
@@ -43,9 +41,8 @@ namespace Hazel.Udp
         ///     Creates a new UdpConnectionListener for the given <see cref="IPAddress"/>, port and <see cref="IPMode"/>.
         /// </summary>
         /// <param name="endPoint">The endpoint to listen on.</param>
-        public UdpConnectionListener(NetworkEndPoint endPoint, Action<string> logger = null)
+        public UdpConnectionListener(NetworkEndPoint endPoint)
         {
-            this.Logger = logger;
             this.EndPoint = endPoint.EndPoint;
             this.IPMode = endPoint.IPMode;
 
@@ -70,6 +67,8 @@ namespace Hazel.Udp
 
         public float AveragePacketsTime = 1;
         public int PacketsResent = 0;
+        public int KeepAlives = 0;
+        public int DuplicateRecieves = 0;
 
         Stopwatch stopwatch = new Stopwatch();
         private void ManageReliablePackets(object state)
@@ -77,7 +76,10 @@ namespace Hazel.Udp
             stopwatch.Restart();
             foreach (var kvp in this.allConnections)
             {
-                PacketsResent += kvp.Value.ManageReliablePackets(state);
+                var sock = kvp.Value;
+                PacketsResent += sock.ManageReliablePackets(state);
+                KeepAlives += Interlocked.Exchange(ref sock.KeepAlivesSent, 0);
+                DuplicateRecieves += Interlocked.Exchange(ref sock.DuplicateRecieves, 0);
             }
 
             this.AveragePacketsTime = this.AveragePacketsTime * .7f + stopwatch.ElapsedMilliseconds * .3f;
@@ -128,7 +130,7 @@ namespace Hazel.Udp
                 return;
             }
         }
-
+        
         /// <summary>
         ///     Called when data has been received by the listener.
         /// </summary>
@@ -223,20 +225,8 @@ namespace Hazel.Udp
                 }
             }
 
-            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            try
-            {
-                //Inform the connection of the buffer (new connections need to send an ack back to client)
-                connection.HandleReceive(message, bytesReceived);
-            }
-            finally
-            {
-                var el = stopwatch.ElapsedMilliseconds;
-                if (el > 5)
-                {
-                    this.Logger?.Invoke($"Long Packet {el}ms = {string.Join(" ", message.Buffer.Take(bytesReceived))}");
-                }
-            }
+            //Inform the connection of the buffer (new connections need to send an ack back to client)
+            connection.HandleReceive(message, bytesReceived);
 
             //If it's a new connection invoke the NewConnection event.
             if (!aware)
@@ -329,10 +319,7 @@ namespace Hazel.Udp
         /// <param name="endPoint">The endpoint of the virtual connection.</param>
         internal void RemoveConnectionTo(EndPoint endPoint)
         {
-            lock (this.allConnections)
-            {
-                this.allConnections.TryRemove(endPoint, out var conn);
-            }
+            this.allConnections.TryRemove(endPoint, out var conn);
         }
 
         /// <inheritdoc />

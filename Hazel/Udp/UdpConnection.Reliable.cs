@@ -47,7 +47,9 @@ namespace Hazel.Udp
         ///     The packet id that was received last.
         /// </summary>
         volatile ushort reliableReceiveLast = 0;
-        
+
+        public int DuplicateRecieves;
+
         /// <summary>
         ///     Has the connection received anything yet
         /// </summary>
@@ -215,6 +217,7 @@ namespace Hazel.Udp
                     if (p.Acknowledged) return 0;
 
                     p.LastSend = DateTime.Now;
+                    p.LastTimeout = (int)Math.Min(p.LastTimeout * 1.5f, 3000);
 
                     Packet self;
                     if (p.Stopwatch.ElapsedMilliseconds > this.disconnectTimeout)
@@ -229,8 +232,6 @@ namespace Hazel.Udp
                         return 0;
                     }
 
-                    // Backoff retry frequency to avoid congestion
-                    p.LastTimeout = (int)Math.Min(p.LastTimeout * 1.25f, 1000);
 
                     try
                     {
@@ -319,6 +320,7 @@ namespace Hazel.Udp
             }
             else
             {
+                Interlocked.Increment(ref this.DuplicateRecieves);
                 message.Recycle();
             }
 
