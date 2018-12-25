@@ -93,11 +93,11 @@ namespace Hazel.Udp
                         }
                         catch (ObjectDisposedException)
                         {
-                            HandleDisconnect("Could not send as the socket was disposed of.");
+                            Disconnect("Could not send as the socket was disposed of.");
                         }
                         catch (SocketException)
                         {
-                            HandleDisconnect("Could not send data as a SocketException occured.");
+                            Disconnect("Could not send data as a SocketException occured.");
                         }
                     },
                     null
@@ -110,7 +110,35 @@ namespace Hazel.Udp
             }
             catch (SocketException)
             {
-                HandleDisconnect("Could not send data as a SocketException occured.");
+                Disconnect("Could not send data as a SocketException occured.");
+                throw;
+            }
+        }
+
+        protected override void WriteBytesToConnectionSync(byte[] bytes, int length)
+        {
+            InvokeDataSentRaw(bytes, length);
+
+            if (State != ConnectionState.Connected && State != ConnectionState.Connecting)
+                throw new InvalidOperationException("Could not send data as this Connection is not connected and is not connecting. Did you disconnect?");
+
+            try
+            {
+                socket.SendTo(
+                    bytes,
+                    0,
+                    length,
+                    SocketFlags.None,
+                    RemoteEndPoint);
+            }
+            catch (ObjectDisposedException)
+            {
+                //User probably called Disconnect in between this method starting and here so report the issue
+                throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
+            }
+            catch (SocketException)
+            {
+                Disconnect("Could not send data as a SocketException occured.");
                 throw;
             }
         }
@@ -203,14 +231,14 @@ namespace Hazel.Udp
             }
             catch (SocketException e)
             {
-                HandleDisconnect("A socket exception occured while reading data.");
+                Disconnect("Socket exception while reading data: " + e.Message);
                 return;
             }
 
             //Exit if no bytes read, we've failed.
             if (bytesReceived == 0)
             {
-                HandleDisconnect("Recieved 0 bytes");
+                Disconnect("Received 0 bytes");
                 return;
             }
 
@@ -225,7 +253,7 @@ namespace Hazel.Udp
             }
             catch (SocketException e)
             {
-                HandleDisconnect("A Socket exception occured while initiating a receive operation.");
+                Disconnect("Socket exception during receive: " + e.Message);
             }
             catch (ObjectDisposedException)
             {
@@ -243,44 +271,23 @@ namespace Hazel.Udp
         }
 
         /// <inheritdoc />
-        protected override void HandleDisconnect(string e)
-        {
-            if (State == ConnectionState.Connected)
-            {
-                State = ConnectionState.Disconnecting;
-
-                try
-                {
-                    InvokeDisconnected(e);
-                }
-                catch { }
-            }
-
-            Dispose();
-        }
-
-        /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
             if (disposing)
             {
-                //Send disconnect message if we're not already disconnecting
-                if (State == ConnectionState.Connected)
+                if (this.state == ConnectionState.Connected
+                    || this.state == ConnectionState.Disconnecting)
                 {
-                    State = ConnectionState.NotConnected;
-                    try
-                    {
-                        SendDisconnect();
-                    }
-                    catch { }
+                    SendDisconnect();
+                    this.state = ConnectionState.NotConnected;
                 }
             }
 
-            if (socket != null)
+            if (this.socket != null)
             {
-                socket.Close();
-                socket.Dispose();
-                socket = null;
+                this.socket.Close();
+                this.socket.Dispose();
+                this.socket = null;
             }
 
             this.reliablePacketTimer.Dispose();

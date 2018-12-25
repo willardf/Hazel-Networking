@@ -28,7 +28,13 @@ namespace Hazel.Udp
         /// </summary>
         /// <param name="bytes">The bytes to write.</param>
         protected abstract void WriteBytesToConnection(byte[] bytes, int length);
-        
+
+        /// <summary>
+        ///     Writes the given bytes to the connection synchronously.
+        /// </summary>
+        /// <param name="bytes">The bytes to write.</param>
+        protected abstract void WriteBytesToConnectionSync(byte[] bytes, int length);
+
         /// <inheritdoc/>
         public override void Send(MessageWriter msg)
         {
@@ -168,7 +174,7 @@ namespace Hazel.Udp
                     break;
 
                 case (byte)UdpSendOption.Disconnect:
-                    HandleDisconnect("The remote sent a disconnect request");
+                    Disconnect("The remote sent a disconnect request");
                     message.Recycle();
                     break;
                     
@@ -253,14 +259,40 @@ namespace Hazel.Udp
         ///     Called when the socket has been disconnected at the remote host.
         /// </summary>
         /// <param name="e">The exception if one was the cause.</param>
-        protected abstract void HandleDisconnect(string reason);
+        public override void Disconnect(string reason)
+        {
+            bool invoke = false;
+            lock (this)
+            {
+                if (this.state == ConnectionState.Connected)
+                {
+                    this.state = ConnectionState.Disconnecting;
+                    invoke = true;
+                }
+            }
+
+            if (invoke)
+            {
+                try
+                {
+                    InvokeDisconnected(reason);
+                }
+                catch { }
+            }
+
+            this.Dispose();
+        }
 
         /// <summary>
         ///     Sends a disconnect message to the end point.
         /// </summary>
-        public override void SendDisconnect()
+        protected override void SendDisconnect()
         {
-            WriteBytesToConnection(new byte[] { (byte)UdpSendOption.Disconnect }, 1);
+            try
+            {
+                WriteBytesToConnectionSync(new byte[] { (byte)UdpSendOption.Disconnect }, 1);
+            }
+            catch { }
         }
 
         /// <inheritdoc/>

@@ -25,7 +25,7 @@ namespace Hazel.Udp
         /// <summary>
         ///     Lock object for the writing to the state of the connection.
         /// </summary>
-        Object stateLock = new Object();
+        private ReaderWriterLockSlim stateLock = new ReaderWriterLockSlim();
 
         /// <summary>
         ///     Creates a UdpConnection for the virtual connection to the endpoint.
@@ -49,13 +49,20 @@ namespace Hazel.Udp
         {
             InvokeDataSentRaw(bytes, length);
 
-            lock (stateLock)
-            {
-                if (State != ConnectionState.Connected)
-                    throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
-            }
+            if (State != ConnectionState.Connected)
+                throw new InvalidOperationException("Could not send data: Not connected.");
 
             Listener.SendData(bytes, length, RemoteEndPoint);
+        }
+
+        /// <inheritdoc />
+        protected override void WriteBytesToConnectionSync(byte[] bytes, int length)
+        {
+            InvokeDataSentRaw(bytes, length);
+
+            // No throw: As an internal interface, I want to try sending bytes whenever the I feel like it.
+
+            Listener.SendDataSync(bytes, length, RemoteEndPoint);
         }
 
         /// <inheritdoc />
@@ -75,54 +82,19 @@ namespace Hazel.Udp
         {
             throw new HazelException("Cannot manually connect a UdpServerConnection, did you mean to use UdpClientConnection?");
         }
-
-        /// <inheritdoc />
-        protected override void HandleDisconnect(string reason)
-        {
-            bool invoke = false;
-
-            lock (stateLock)
-            {
-                //Only invoke the disconnected event if we're not already disconnecting
-                if (State == ConnectionState.Connected)
-                {
-                    State = ConnectionState.Disconnecting;
-                    invoke = true;
-                }
-            }
-
-            //Invoke event outide lock if need be
-            if (invoke)
-            {
-                try
-                {
-                    InvokeDisconnected(reason);
-                }
-                catch { }
-
-                Dispose();
-            }
-        }
-
-        /// <inheritdoc />
+        
         protected override void Dispose(bool disposing)
         {
-            //Here we just need to inform the listener we no longer need data.
+            Listener.RemoveConnectionTo(RemoteEndPoint);
+
             if (disposing)
             {
-                // Send disconnect message if we're not already disconnecting
-                if (this.state == ConnectionState.Connected)
+                if (this.state == ConnectionState.Connected
+                    || this.state == ConnectionState.Disconnecting)
                 {
-                    try
-                    {
-                        SendDisconnect();
-                    }
-                    catch { }
-                    this.state = ConnectionState.Disconnecting;
+                    SendDisconnect();
+                    this.state = ConnectionState.NotConnected;
                 }
-
-                Listener.RemoveConnectionTo(RemoteEndPoint);
-
             }
 
             base.Dispose(disposing);

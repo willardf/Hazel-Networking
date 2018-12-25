@@ -51,7 +51,7 @@ namespace Hazel
         public Action<DataReceivedEventArgs> DataReceived;
 
         public int TestLagMs = -1;
-
+        
         public event Action<byte[], int> DataSentRaw;
         protected void InvokeDataSentRaw(byte[] data, int length)
         {
@@ -106,7 +106,7 @@ namespace Hazel
         ///         Connections go round 4 states in their lifetime: they start as <see cref="ConnectionState.NotConnected"/> to 
         ///         indicate they have no endpoint, calling <see cref="Connect"/> takes them into 
         ///         <see cref="ConnectionState.Connecting"/>, once they have received confirmation they are connected they enter
-        ///         <see cref="ConnectionState.Connected"/> and finally calling <see cref="Close"/> sets them to 
+        ///         <see cref="ConnectionState.Connected"/> and finally calling <see cref="Dispose"/> sets them to 
         ///         <see cref="ConnectionState.Disconnecting"/> and then the sequence repeats back to
         ///         <see cref="ConnectionState.NotConnected"/> once disconnection is complete.
         ///     </para>
@@ -128,8 +128,8 @@ namespace Hazel
             
             protected set
             {
-                state = value;
-                if (state == ConnectionState.Connected)
+                this.state = value;
+                if (this.state == ConnectionState.Connected)
                     connectWaitLock.Set();
                 else
                     connectWaitLock.Reset();
@@ -152,9 +152,8 @@ namespace Hazel
         /// </remarks>
         protected Connection()
         {
-            Statistics = new ConnectionStatistics();
-
-            State = ConnectionState.NotConnected;
+            this.Statistics = new ConnectionStatistics();
+            this.State = ConnectionState.NotConnected;
         }
 
         /// <summary>
@@ -231,7 +230,7 @@ namespace Hazel
         /// <summary>
         ///     Sends a disconnect message to the end point.
         /// </summary>
-        public abstract void SendDisconnect();
+        protected abstract void SendDisconnect();
 
         /// <summary>
         ///     Invokes the DataReceived event.
@@ -295,24 +294,11 @@ namespace Hazel
         }
 
         /// <summary>
-        ///     Closes this connection safely.
+        /// For times when you want to force the disconnect handler to fire as well as close it.
+        /// If you only want to close it, just use Dispose.
         /// </summary>
-        /// <remarks>
-        ///     <para>
-        ///         Informs the end point of the connection that we are disconnecting from them and disposes of this 
-        ///         connection.
-        ///     </para>
-        ///     <para>
-        ///         This calls <see cref="Dispose()"/> and therefore sets <see cref="State"/> straight to 
-        ///         <see cref="ConnectionState.NotConnected"/>. Once you call Close you will not be able to send any more
-        ///         data using this connection and no more data will be received.
-        ///     </para> 
-        /// </remarks>
-        public virtual void Close()
-        {
-            Dispose();
-        }
-
+        public abstract void Disconnect(string reason);
+        
         /// <summary>
         ///     Disposes of this NetworkConnection.
         /// </summary>

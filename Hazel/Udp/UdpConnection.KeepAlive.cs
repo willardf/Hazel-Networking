@@ -48,36 +48,28 @@ namespace Hazel.Udp
         Timer keepAliveTimer;
 
         /// <summary>
-        ///     Lock for keep alive timer.
-        /// </summary>
-        Object keepAliveTimerLock = new Object();
-        
-        /// <summary>
         ///     Starts the keepalive timer.
         /// </summary>
         void InitializeKeepAliveTimer()
         {
-            lock (keepAliveTimerLock)
-            {
-                keepAliveTimer = new Timer(
-                    (o) =>
+            keepAliveTimer = new Timer(
+                (o) =>
+                {
+                    try
                     {
-                        try
-                        {
-                            ReliableSend((byte)UdpSendOption.Ping);
-                            Interlocked.Increment(ref KeepAlivesSent);
-                        }
-                        catch
-                        {
-                            Trace.WriteLine("Keepalive packet failed to send.");
-                            DisposeKeepAliveTimer();
-                        }
-                    },
-                    null,
-                    keepAliveInterval,
-                    keepAliveInterval
-                );
-            }
+                        ReliableSend((byte)UdpSendOption.Ping);
+                        Interlocked.Increment(ref KeepAlivesSent);
+                    }
+                    catch
+                    {
+                        Trace.WriteLine("Keepalive packet failed to send.");
+                        DisposeKeepAliveTimer();
+                    }
+                },
+                null,
+                keepAliveInterval,
+                keepAliveInterval
+            );
         }
 
         /// <summary>
@@ -85,10 +77,11 @@ namespace Hazel.Udp
         /// </summary>
         void ResetKeepAliveTimer()
         {
-            lock (keepAliveTimerLock)
+            try
             {
                 keepAliveTimer.Change(keepAliveInterval, keepAliveInterval);
             }
+            catch { }
         }
 
         /// <summary>
@@ -96,13 +89,11 @@ namespace Hazel.Udp
         /// </summary>
         void DisposeKeepAliveTimer()
         {
-            lock (keepAliveTimerLock)
+            var timer = this.keepAliveTimer;
+            if (timer != null)
             {
-                if (keepAliveTimer != null)
-                {
-                    keepAliveTimer.Dispose();
-                    keepAliveTimer = null;
-                }
+                this.keepAliveTimer = null;
+                timer.Dispose();
             }
         }
     }

@@ -26,8 +26,10 @@ namespace Hazel.Udp
         /// <summary>
         ///     The socket listening for connections.
         /// </summary>
-        Socket listener;
-        
+        Socket socket;
+
+        private Action<string> Logger;
+
         Timer reliablePacketTimer;
 
         /// <summary>
@@ -41,20 +43,21 @@ namespace Hazel.Udp
         ///     Creates a new UdpConnectionListener for the given <see cref="IPAddress"/>, port and <see cref="IPMode"/>.
         /// </summary>
         /// <param name="endPoint">The endpoint to listen on.</param>
-        public UdpConnectionListener(NetworkEndPoint endPoint)
+        public UdpConnectionListener(NetworkEndPoint endPoint, Action<string> logger = null)
         {
+            this.Logger = logger;
             this.EndPoint = endPoint.EndPoint;
             this.IPMode = endPoint.IPMode;
 
             if (endPoint.IPMode == IPMode.IPv4)
-                this.listener = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+                this.socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             else
             {
                 if (!Socket.OSSupportsIPv6)
                     throw new HazelException("IPV6 not supported!");
 
-                this.listener = new Socket(AddressFamily.InterNetworkV6, SocketType.Dgram, ProtocolType.Udp);
-                this.listener.SetSocketOption(SocketOptionLevel.IPv6, (SocketOptionName)27, false);
+                this.socket = new Socket(AddressFamily.InterNetworkV6, SocketType.Dgram, ProtocolType.Udp);
+                this.socket.SetSocketOption(SocketOptionLevel.IPv6, (SocketOptionName)27, false);
             }
 
             reliablePacketTimer = new Timer(ManageReliablePackets, null, 100, Timeout.Infinite);
@@ -77,7 +80,7 @@ namespace Hazel.Udp
             foreach (var kvp in this.allConnections)
             {
                 var sock = kvp.Value;
-                PacketsResent += sock.ManageReliablePackets(state);
+                Interlocked.Add(ref PacketsResent, sock.ManageReliablePackets(state));
                 KeepAlives += Interlocked.Exchange(ref sock.KeepAlivesSent, 0);
                 DuplicateRecieves += Interlocked.Exchange(ref sock.DuplicateRecieves, 0);
             }
@@ -92,7 +95,7 @@ namespace Hazel.Udp
         {
             try
             {
-                listener.Bind(EndPoint);
+                socket.Bind(EndPoint);
             }
             catch (SocketException e)
             {
@@ -114,7 +117,7 @@ namespace Hazel.Udp
             {
                 message = MessageReader.GetSized(BufferSize);
 
-                listener.BeginReceiveFrom(message.Buffer, 0, message.Buffer.Length, SocketFlags.None, ref remoteEP, ReadCallback, message);
+                socket.BeginReceiveFrom(message.Buffer, 0, message.Buffer.Length, SocketFlags.None, ref remoteEP, ReadCallback, message);
                 Interlocked.Increment(ref ActiveListeners);
             }
             catch (ObjectDisposedException)
@@ -138,112 +141,132 @@ namespace Hazel.Udp
         
         public int ActiveListeners;
         public int ActiveCallbacks;
+
         void ReadCallback(IAsyncResult result)
         {
-            var message = (MessageReader)result.AsyncState;
             Interlocked.Increment(ref ActiveCallbacks);
+            Interlocked.Decrement(ref ActiveListeners);
 
-            int bytesReceived;
-            EndPoint remoteEndPoint = new IPEndPoint(IPMode == IPMode.IPv4 ? IPAddress.Any : IPAddress.IPv6Any, 0);
-
-            //End the receive operation
             try
             {
-                Interlocked.Decrement(ref ActiveListeners);
-                bytesReceived = listener.EndReceiveFrom(result, ref remoteEndPoint);
-                Interlocked.Add(ref BytesReceived, bytesReceived);
+                var message = (MessageReader)result.AsyncState;
+                int bytesReceived;
+                EndPoint remoteEndPoint = new IPEndPoint(IPMode == IPMode.IPv4 ? IPAddress.Any : IPAddress.IPv6Any, 0);
 
-                message.Offset = 0;
-                message.Length = bytesReceived;
-            }
-            catch (NullReferenceException)
-            {
-                return;
-            }
-            catch (ObjectDisposedException)
-            {
-                //If the socket's been disposed then we can just end there.
-                return;
-            }
-            catch (SocketException)
-            {
-                // Client no longer reachable, pretend it didn't happen
-                // TODO should this not inform the connection this client is lost???
-
-                // This thread suggests the IP is not passed out from WinSoc so maybe not possible
-                // http://stackoverflow.com/questions/2576926/python-socket-error-on-udp-data-receive-10054
-                message.Recycle();
-
-                UdpServerConnection dead;
-                if (this.allConnections.TryRemove(remoteEndPoint, out dead))
+                //End the receive operation
+                try
                 {
-                    dead.Dispose();
+                    bytesReceived = socket.EndReceiveFrom(result, ref remoteEndPoint);
+                    Interlocked.Add(ref BytesReceived, bytesReceived);
+
+                    message.Offset = 0;
+                    message.Length = bytesReceived;
+                }
+                catch (NullReferenceException)
+                {
+                    return;
+                }
+                catch (ObjectDisposedException)
+                {
+                    //If the socket's been disposed then we can just end there.
+                    return;
+                }
+                catch (SocketException)
+                {
+                    // Client no longer reachable, pretend it didn't happen
+                    // TODO should this not inform the connection this client is lost???
+
+                    // This thread suggests the IP is not passed out from WinSoc so maybe not possible
+                    // http://stackoverflow.com/questions/2576926/python-socket-error-on-udp-data-receive-10054
+                    message.Recycle();
+
+                    UdpServerConnection dead;
+                    if (this.allConnections.TryRemove(remoteEndPoint, out dead))
+                    {
+                        dead.Dispose();
+                    }
+
+                    StartListeningForData();
+                    return;
                 }
 
-                StartListeningForData();
-                return;
-            }
-
-            // Exit if no bytes read, we've closed.
-            if (bytesReceived == 0)
-            {
-                message.Recycle();
-                return;
-            }
-
-            //Begin receiving again
-            StartListeningForData();
-
-            bool aware = true;
-            bool hasHelloByte = message.Buffer[0] == (byte)UdpSendOption.Hello;
-            bool isHello = hasHelloByte && message.Length >= MinConnectionLength;
-
-            //If we're aware of this connection use the one already
-            //If this is a new client then connect with them!
-            UdpServerConnection connection;
-            if (!this.allConnections.TryGetValue(remoteEndPoint, out connection))
-            {
-                lock (this.allConnections)
+                // Exit if no bytes read, we've closed.
+                if (bytesReceived == 0)
                 {
-                    aware = this.allConnections.TryGetValue(remoteEndPoint, out connection);
-                    if (!aware)
-                    {
-                        //Check for malformed connection attempts
-                        if (!isHello)
-                        {
-                            Interlocked.Decrement(ref ActiveCallbacks);
-                            message.Recycle();
-                            return;
-                        }
+                    message.Recycle();
+                    return;
+                }
 
-                        connection = new UdpServerConnection(this, remoteEndPoint, this.IPMode);
-                        if (!this.allConnections.TryAdd(remoteEndPoint, connection))
+                //Begin receiving again
+                StartListeningForData();
+
+                bool aware = true;
+                bool hasHelloByte = message.Buffer[0] == (byte)UdpSendOption.Hello;
+                bool isHello = hasHelloByte && message.Length >= MinConnectionLength;
+
+                //If we're aware of this connection use the one already
+                //If this is a new client then connect with them!
+                UdpServerConnection connection;
+                if (!this.allConnections.TryGetValue(remoteEndPoint, out connection))
+                {
+                    //Check for malformed connection attempts
+                    if (!isHello)
+                    {
+                        message.Recycle();
+                        return;
+                    }
+
+                    lock (this.allConnections)
+                    {
+                        aware = this.allConnections.TryGetValue(remoteEndPoint, out connection);
+                        if (!aware)
                         {
-                            throw new Exception();
+                            connection = new UdpServerConnection(this, remoteEndPoint, this.IPMode);
+                            if (!this.allConnections.TryAdd(remoteEndPoint, connection))
+                            {
+                                throw new Exception();
+                            }
                         }
                     }
                 }
+
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                try
+                {
+                    //Inform the connection of the buffer (new connections need to send an ack back to client)
+                    connection.HandleReceive(message, bytesReceived);
+                }
+                finally
+                {
+                    var el = stopwatch.ElapsedMilliseconds;
+                    if (el > 5)
+                    {
+                        this.Logger?.Invoke($"Long Packet {el}ms = {string.Join(" ", message.Buffer.Take(bytesReceived))}");
+                    }
+                }
+
+                //If it's a new connection invoke the NewConnection event.
+                if (!aware)
+                {
+                    // Skip header and hello byte;
+                    message.Offset = 4;
+                    message.Length = bytesReceived - 4;
+                    message.Position = 0;
+                    InvokeNewConnection(message, connection);
+                }
+                else if (isHello || (!isHello && hasHelloByte))
+                {
+                    message.Recycle();
+                }
             }
-
-            //Inform the connection of the buffer (new connections need to send an ack back to client)
-            connection.HandleReceive(message, bytesReceived);
-
-            //If it's a new connection invoke the NewConnection event.
-            if (!aware)
+            finally
             {
-                // Skip header and hello byte;
-                message.Offset = 4;
-                message.Length = bytesReceived - 4;
-                message.Position = 0;
-                InvokeNewConnection(message, connection);
+                Interlocked.Decrement(ref ActiveCallbacks);
             }
-            else if (isHello || (!isHello && hasHelloByte))
-            {
-                message.Recycle();
-            }
-
-            Interlocked.Decrement(ref ActiveCallbacks);
         }
+
+        public int TestDropRate = -1;
+        private int dropCounter = 0;
 
         /// <summary>
         ///     Sends data from the listener socket.
@@ -255,9 +278,17 @@ namespace Hazel.Udp
             if (length > bytes.Length) return;
             Interlocked.Add(ref BytesSent, length);
 
+            if (TestDropRate > 0)
+            {
+                if (Interlocked.Increment(ref dropCounter) % TestDropRate == 0)
+                {
+                    return;
+                }
+            }
+
             try
             {
-                listener.BeginSendTo(
+                socket.BeginSendTo(
                     bytes,
                     0,
                     length,
@@ -267,7 +298,7 @@ namespace Hazel.Udp
                     {
                         try
                         {
-                            listener.EndSendTo(result);
+                            socket.EndSendTo(result);
                         }
                         catch { }
                     },
@@ -294,7 +325,7 @@ namespace Hazel.Udp
         {
             try
             {
-                listener.SendTo(
+                socket.SendTo(
                     bytes,
                     0,
                     length,
@@ -330,11 +361,11 @@ namespace Hazel.Udp
                 kvp.Value.Dispose();
             }
 
-            if (listener != null)
+            if (this.socket != null)
             {
-                listener.Close();
-                this.listener.Dispose();
-                this.listener = null;
+                this.socket.Close();
+                this.socket.Dispose();
+                this.socket = null;
             }
 
             this.reliablePacketTimer.Dispose();

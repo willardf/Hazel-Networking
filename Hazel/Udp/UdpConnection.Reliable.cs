@@ -28,6 +28,10 @@ namespace Hazel.Udp
         public int ResendTimeout { get { return resendTimeout; } set { resendTimeout = value; } }
         private volatile int resendTimeout = 0;
 
+        public volatile int ResendLimit = 0;
+
+        public volatile float ResendPingMultiplier = 3;
+
         /// <summary>
         ///     Holds the last ID allocated.
         /// </summary>
@@ -75,8 +79,7 @@ namespace Hazel.Udp
         ///     connection will be marked as disconnected and the <see cref="Connection.Disconnected">Disconnected</see> event
         ///     will be invoked.
         /// </remarks>
-        public int DisconnectTimeout { get { return disconnectTimeout; } set { disconnectTimeout = value; } }
-        private volatile int disconnectTimeout = 2500;
+        public volatile int DisconnectTimeout = 2500;
 
         /// <summary>
         ///     Class to hold packet data
@@ -98,13 +101,13 @@ namespace Hazel.Udp
             }
 
             public ushort Id;
-            public byte[] Data;
+            private byte[] Data;
+            private UdpConnection Connection;
+            private int Length;
 
-            public DateTime LastSend;
-            public int LastTimeout;
+            public volatile int NextTimeout;
             public volatile bool Acknowledged;
 
-            private Func<Packet, int> ResendAction;
             public Action AckCallback;
 
             public volatile int Retransmissions;
@@ -114,30 +117,65 @@ namespace Hazel.Udp
             {
             }
             
-            internal void Set(ushort id, byte[] data, Func<Packet, int> resendAction, int timeout, Action ackCallback)
+            internal void Set(ushort id, UdpConnection connection, byte[] data, int length, int timeout, Action ackCallback)
             {
                 this.Id = id;
                 this.Data = data;
+                this.Connection = connection;
+                this.Length = length;
 
                 this.Acknowledged = false;
-                this.LastSend = DateTime.Now;
-                this.LastTimeout = timeout;
-                this.ResendAction = resendAction;
-                AckCallback = ackCallback;
-                Retransmissions = 0;
+                this.NextTimeout = timeout;
+                this.AckCallback = ackCallback;
+                this.Retransmissions = 0;
 
-                Stopwatch.Restart();
+                this.Stopwatch.Restart();
             }
 
             // Packets resent
             public int Resend()
             {
-                var evt = this.ResendAction;
-                if (!this.Acknowledged)
+                var connection = this.Connection;
+                if (!this.Acknowledged && connection != null)
                 {
-                    if (evt != null)
+                    long lifetime = this.Stopwatch.ElapsedMilliseconds;
+                    if (lifetime >= connection.DisconnectTimeout)
                     {
-                        return evt(this);
+                        if (connection.reliableDataPacketsSent.TryRemove(this.Id, out Packet self))
+                        {
+                            connection.Disconnect($"Reliable packet {self.Id} was not ack'd after {lifetime}ms");
+
+                            self.Recycle();
+                        }
+
+                        return 0;
+                    }
+
+                    if (lifetime >= this.NextTimeout)
+                    {
+                        if (++this.Retransmissions > connection.ResendLimit)
+                        {
+                            if (connection.reliableDataPacketsSent.TryRemove(this.Id, out Packet self))
+                            {
+                                connection.Disconnect($"Reliable packet {self.Id} was not ack'd after {self.Retransmissions} resends");
+
+                                self.Recycle();
+                            }
+
+                            return 0;
+                        }
+
+                        this.NextTimeout = (int)Math.Min(this.NextTimeout * 3f, connection.DisconnectTimeout);
+                        try
+                        {
+                            connection.WriteBytesToConnection(this.Data, this.Length);
+                            return 1;
+                        }
+                        catch (InvalidOperationException)
+                        {
+                            //No longer connected
+                            connection.Disconnect("Could not resend data as connection is no longer connected");
+                        }
                     }
                 }
 
@@ -150,6 +188,7 @@ namespace Hazel.Udp
             public void Recycle()
             {
                 this.Acknowledged = true;
+                this.Connection = null;
 
                 PacketPool.PutObject(this);
             }
@@ -164,17 +203,14 @@ namespace Hazel.Udp
                 foreach (var kvp in this.reliableDataPacketsSent)
                 {
                     Packet pkt = kvp.Value;
-                    double timeSinceLast = (DateTime.Now - pkt.LastSend).TotalMilliseconds;
-                    if (timeSinceLast >= pkt.LastTimeout)
-                    {
+                    
                         try
                         {
                             output += pkt.Resend();
                         }
                         catch { }
-                    }
 
-                    minTimeout = Math.Min(pkt.LastTimeout, minTimeout);
+                    minTimeout = Math.Min(pkt.NextTimeout, minTimeout);
                 }
             }
 
@@ -197,59 +233,22 @@ namespace Hazel.Udp
 
             id = (ushort)Interlocked.Increment(ref lastIDAllocated);
 
-            if (!reliableDataPacketsSent.TryAdd(id, packet))
-            {
-                throw new Exception("That shouldn't be possible");
-            }
-
-            int timeout = resendTimeout > 0 ? resendTimeout : (int)Math.Max(50, Math.Min(AveragePingMs * 2, 1000));
-
-            //Write ID
             buffer[offset] = (byte)((id >> 8) & 0xFF);
             buffer[offset + 1] = (byte)id;
 
             packet.Set(
                 id,
+                this,
                 buffer,
-                (Packet p) =>
-                {
-                    // Callback for a previous packet
-                    if (p.Acknowledged) return 0;
-
-                    p.LastSend = DateTime.Now;
-                    p.LastTimeout = (int)Math.Min(p.LastTimeout * 1.5f, 3000);
-
-                    Packet self;
-                    if (p.Stopwatch.ElapsedMilliseconds > this.disconnectTimeout)
-                    {
-                        if (reliableDataPacketsSent.TryRemove(p.Id, out self))
-                        {
-                            HandleDisconnect($"Reliable packet {self.Id} was not ack'd after {self.Retransmissions} resends");
-
-                            self.Recycle();
-                        }
-
-                        return 0;
-                    }
-
-
-                    try
-                    {
-                        WriteBytesToConnection(p.Data, sendLength);
-                        p.Retransmissions++;
-                        return 1;
-                    }
-                    catch (InvalidOperationException)
-                    {
-                        //No longer connected
-                        HandleDisconnect("Could not resend data as connection is no longer connected");
-                    }
-
-                    return 0;
-                },
-                timeout,
+                sendLength,
+                resendTimeout > 0 ? resendTimeout : (int)Math.Max(300, Math.Min(AveragePingMs * this.ResendPingMultiplier, 2000)),
                 ackCallback
             );
+
+            if (!reliableDataPacketsSent.TryAdd(id, packet))
+            {
+                throw new Exception("That shouldn't be possible");
+            }
         }
 
         /// <summary>
