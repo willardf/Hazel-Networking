@@ -6,12 +6,12 @@ using System.Text;
 namespace Hazel
 {
     /// <summary>
-    ///     Event arguments for the <see cref="List.NewConnection"/> event.
+    ///     Event arguments for the <see cref="ConnectionListener.NewConnection"/> event.
     /// </summary>
     /// <remarks>
     ///     <para>
     ///         This contains the new connection for the client that connection and is passed to subscribers of the
-    ///         <see cref="List.NewConnection"/> event.
+    ///         <see cref="ConnectionListener.NewConnection"/> event.
     ///     </para>
     ///     <include file="DocInclude/common.xml" path="docs/item[@name='Recyclable']/*" />
     /// </remarks>
