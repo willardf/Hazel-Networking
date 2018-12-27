@@ -10,9 +10,6 @@ namespace Hazel
 {
     public class MessageReader : IRecyclable
     {
-        public static int Readers = 0;
-        public int ReaderId = 0;
-
         public static readonly ObjectPool<MessageReader> ReaderPool = new ObjectPool<MessageReader>(() => new MessageReader());
 
         public byte[] Buffer;
@@ -33,16 +30,7 @@ namespace Hazel
         
         private int _position;
         private int readHead;
-
-        public MessageReader()
-        {
-            this.ReaderId = Interlocked.Increment(ref Readers);
-        }
-        public override string ToString()
-        {
-            return $"{ReaderId}: BL:{Buffer.Length}   O:{Offset}   L:{Length}";
-        }
-
+        
         public static MessageReader GetSized(int minSize)
         {
             var output = ReaderPool.GetObject();

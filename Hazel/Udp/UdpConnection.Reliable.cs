@@ -35,7 +35,7 @@ namespace Hazel.Udp
         /// <summary>
         ///     Holds the last ID allocated.
         /// </summary>
-        volatile int lastIDAllocated = ushort.MaxValue + 1;
+        private int lastIDAllocated = ushort.MaxValue + 1;
 
         /// <summary>
         ///     The packets of data that have been transmitted reliably and not acknowledged.
@@ -51,9 +51,7 @@ namespace Hazel.Udp
         ///     The packet id that was received last.
         /// </summary>
         volatile ushort reliableReceiveLast = 0;
-
-        public int DuplicateRecieves;
-
+        
         /// <summary>
         ///     Has the connection received anything yet
         /// </summary>
@@ -68,7 +66,7 @@ namespace Hazel.Udp
         ///     This returns the average ping for a one-way trip as calculated from the reliable packets that have been sent 
         ///     and acknowledged by the endpoint.
         /// </remarks>
-        public volatile float AveragePingMs = 500;
+        public float AveragePingMs = 500;
 
         /// <summary>
         ///     The maximum times a message should be resent before marking the endpoint as disconnected.
@@ -105,12 +103,12 @@ namespace Hazel.Udp
             private UdpConnection Connection;
             private int Length;
 
-            public volatile int NextTimeout;
+            public int NextTimeout;
             public volatile bool Acknowledged;
 
             public Action AckCallback;
 
-            public volatile int Retransmissions;
+            public int Retransmissions;
             public Stopwatch Stopwatch = new Stopwatch();
             
             Packet()
@@ -143,7 +141,7 @@ namespace Hazel.Udp
                     {
                         if (connection.reliableDataPacketsSent.TryRemove(this.Id, out Packet self))
                         {
-                            connection.Disconnect($"Reliable packet {self.Id} was not ack'd after {lifetime}ms");
+                            connection.Disconnect($"Reliable packet {self.Id} was not ack'd after {lifetime}ms ({self.Retransmissions} resends)");
 
                             self.Recycle();
                         }
@@ -157,7 +155,7 @@ namespace Hazel.Udp
                         {
                             if (connection.reliableDataPacketsSent.TryRemove(this.Id, out Packet self))
                             {
-                                connection.Disconnect($"Reliable packet {self.Id} was not ack'd after {self.Retransmissions} resends");
+                                connection.Disconnect($"Reliable packet {self.Id} was not ack'd after {self.Retransmissions} resends ({lifetime}ms)");
 
                                 self.Recycle();
                             }
@@ -173,7 +171,6 @@ namespace Hazel.Udp
                         }
                         catch (InvalidOperationException)
                         {
-                            //No longer connected
                             connection.Disconnect("Could not resend data as connection is no longer connected");
                         }
                     }
@@ -319,7 +316,6 @@ namespace Hazel.Udp
             }
             else
             {
-                Interlocked.Increment(ref this.DuplicateRecieves);
                 message.Recycle();
             }
 
