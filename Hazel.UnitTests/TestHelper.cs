@@ -23,7 +23,7 @@ namespace Hazel.UnitTests
             ManualResetEvent mutex = new ManualResetEvent(false);
 
             //Setup listener
-            listener.NewConnection += delegate(object sender, NewConnectionEventArgs ncArgs)
+            listener.NewConnection += delegate(NewConnectionEventArgs ncArgs)
             {
                 ncArgs.Connection.SendBytes(data, sendOption);
             };
@@ -32,7 +32,7 @@ namespace Hazel.UnitTests
 
             DataReceivedEventArgs args = null;
             //Setup conneciton
-            connection.DataReceived += delegate(object sender, DataReceivedEventArgs a)
+            connection.DataReceived += delegate(DataReceivedEventArgs a)
             {
                 Trace.WriteLine("Data was received correctly.");
 
@@ -75,9 +75,9 @@ namespace Hazel.UnitTests
 
             //Setup listener
             DataReceivedEventArgs result = null;
-            listener.NewConnection += delegate(object sender, NewConnectionEventArgs args)
+            listener.NewConnection += delegate(NewConnectionEventArgs args)
             {
-                args.Connection.DataReceived += delegate(object innerSender, DataReceivedEventArgs innerArgs)
+                args.Connection.DataReceived += delegate(DataReceivedEventArgs innerArgs)
                 {
                     Trace.WriteLine("Data was received correctly.");
 
@@ -125,9 +125,9 @@ namespace Hazel.UnitTests
                 mutex.Set();
             };
 
-            listener.NewConnection += delegate(object sender, NewConnectionEventArgs args)
+            listener.NewConnection += delegate(NewConnectionEventArgs args)
             {
-                args.Connection.Close();
+                args.Connection.Disconnect("Testing");
             };
 
             listener.Start();
@@ -147,7 +147,7 @@ namespace Hazel.UnitTests
             ManualResetEvent mutex = new ManualResetEvent(false);
             ManualResetEvent mutex2 = new ManualResetEvent(false);
 
-            listener.NewConnection += delegate(object sender, NewConnectionEventArgs args)
+            listener.NewConnection += delegate(NewConnectionEventArgs args)
             {
                 args.Connection.Disconnected += delegate(object sender2, DisconnectedEventArgs args2)
                 {
@@ -163,7 +163,7 @@ namespace Hazel.UnitTests
 
             mutex.WaitOne();
 
-            connection.Close();
+            connection.Disconnect("Testing");
 
             mutex2.WaitOne();
         }

@@ -46,7 +46,7 @@ namespace Hazel.UnitTests
                 listener.Start();
 
                 MessageReader output = null;
-                listener.NewConnection += delegate (object sender, NewConnectionEventArgs e)
+                listener.NewConnection += delegate (NewConnectionEventArgs e)
                 {
                     output = e.HandshakeData;
                 };
@@ -69,9 +69,9 @@ namespace Hazel.UnitTests
             using (UdpConnection connection = new UdpClientConnection(new NetworkEndPoint(IPAddress.Loopback, 4296, IPMode.IPv4)))
             {
                 MessageReader output = null;
-                listener.NewConnection += delegate (object sender, NewConnectionEventArgs e)
+                listener.NewConnection += delegate (NewConnectionEventArgs e)
                 {
-                    e.Connection.DataReceived += delegate (object s, DataReceivedEventArgs evt)
+                    e.Connection.DataReceived += delegate (DataReceivedEventArgs evt)
                     {
                         output = evt.Message;
                     };
@@ -103,9 +103,9 @@ namespace Hazel.UnitTests
             using (UdpConnection connection = new UdpClientConnection(new NetworkEndPoint(IPAddress.Loopback, 4296, IPMode.IPv4)))
             {
                 listener.Start();
-                listener.NewConnection += delegate (object sender, NewConnectionEventArgs e)
+                listener.NewConnection += delegate (NewConnectionEventArgs e)
                 {
-                    e.Connection.DataReceived += delegate (object s, DataReceivedEventArgs evt)
+                    e.Connection.DataReceived += delegate (DataReceivedEventArgs evt)
                     {
                         Assert.IsTrue(Enumerable.SequenceEqual(evt.Message.Buffer, new byte[] { 3, 4 }));
                     };
@@ -141,7 +141,7 @@ namespace Hazel.UnitTests
             {
                 listener2.Start();
 
-                listener2.NewConnection += (sender, evt) =>
+                listener2.NewConnection += (evt) =>
                 {
                     Console.WriteLine("v6 connection: " + ((NetworkConnection)evt.Connection).GetIP4Address());
                 };
@@ -264,7 +264,7 @@ namespace Hazel.UnitTests
             using (UdpConnectionListener listener = new UdpConnectionListener(new NetworkEndPoint(IPAddress.Any, 4296)))
             using (UdpConnection connection = new UdpClientConnection(new NetworkEndPoint(IPAddress.Loopback, 4296)))
             {
-                listener.NewConnection += delegate(object sender, NewConnectionEventArgs args)
+                listener.NewConnection += delegate(NewConnectionEventArgs args)
                 {
                     ((UdpConnection)args.Connection).KeepAliveInterval = 100;
 

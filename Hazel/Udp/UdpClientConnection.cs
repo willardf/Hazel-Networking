@@ -278,7 +278,7 @@ namespace Hazel.Udp
                 if (this.state == ConnectionState.Connected
                     || this.state == ConnectionState.Disconnecting)
                 {
-                    SendDisconnect();
+                    // SendDisconnect();
                     this.state = ConnectionState.NotConnected;
                 }
             }

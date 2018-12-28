@@ -10,19 +10,18 @@ namespace Hazel.UnitTests
     [TestClass]
     public class UnitTest1
     {
-        // [TestMethod]
+        [TestMethod]
         public void StressTest()
         {
+            var ep = new NetworkEndPoint(IPAddress.Loopback, 22023);
             Parallel.For(0, 10000,
-                new ParallelOptions { MaxDegreeOfParallelism = 16 },
-                (i) =>
-            {
-                var ep = new NetworkEndPoint(IPAddress.Loopback, 22023);
-                using (var connection = new UdpClientConnection(ep))
-                {
-                    connection.Connect();
-                    Thread.Sleep(100);
-                }
+                new ParallelOptions { MaxDegreeOfParallelism = 64 },
+                (i) => {
+                    
+                var connection = new UdpClientConnection(ep);
+                connection.KeepAliveInterval = 50;
+
+                connection.Connect(new byte[5]);
             });
         }
     }
