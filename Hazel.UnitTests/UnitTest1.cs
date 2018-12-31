@@ -13,7 +13,7 @@ namespace Hazel.UnitTests
         [TestMethod]
         public void StressTest()
         {
-            var ep = new NetworkEndPoint(IPAddress.Loopback, 22023);
+            var ep = new IPEndPoint(IPAddress.Loopback, 22023);
             Parallel.For(0, 10000,
                 new ParallelOptions { MaxDegreeOfParallelism = 64 },
                 (i) => {

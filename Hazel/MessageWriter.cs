@@ -11,7 +11,7 @@ namespace Hazel
         public static int BufferSize = 64000;
         public static readonly ObjectPool<MessageWriter> WriterPool = new ObjectPool<MessageWriter>(() => new MessageWriter(BufferSize));
 
-        internal byte[] Buffer;
+        public byte[] Buffer;
         public int Length;
         public int Position;
 

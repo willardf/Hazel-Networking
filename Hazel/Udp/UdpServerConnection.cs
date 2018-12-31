@@ -33,12 +33,12 @@ namespace Hazel.Udp
         /// <param name="listener">The listener that created this connection.</param>
         /// <param name="endPoint">The endpoint that we are connected to.</param>
         /// <param name="IPMode">The IPMode we are connected using.</param>
-        internal UdpServerConnection(UdpConnectionListener listener, EndPoint endPoint, IPMode IPMode)
+        internal UdpServerConnection(UdpConnectionListener listener, IPEndPoint endPoint, IPMode IPMode)
             : base()
         {
             this.Listener = listener;
             this.RemoteEndPoint = endPoint;
-            this.EndPoint = new NetworkEndPoint(endPoint);
+            this.EndPoint = endPoint;
             this.IPMode = IPMode;
 
             State = ConnectionState.Connected;

@@ -88,7 +88,9 @@ namespace Hazel
         ///     <see cref="ConnectionEndPoint"/> which can then be cast to an appropriate end point depending on the 
         ///     connection type.
         /// </remarks>
-        public ConnectionEndPoint EndPoint { get; protected set; }
+        public IPEndPoint EndPoint { get; protected set; }
+
+        public IPMode IPMode { get; protected set; }
 
         /// <summary>
         ///     The traffic statistics about this Connection.

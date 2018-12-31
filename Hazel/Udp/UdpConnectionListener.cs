@@ -40,13 +40,13 @@ namespace Hazel.Udp
         ///     Creates a new UdpConnectionListener for the given <see cref="IPAddress"/>, port and <see cref="IPMode"/>.
         /// </summary>
         /// <param name="endPoint">The endpoint to listen on.</param>
-        public UdpConnectionListener(NetworkEndPoint endPoint, Action<string> logger = null)
+        public UdpConnectionListener(IPEndPoint endPoint, IPMode ipMode = IPMode.IPv4, Action<string> logger = null)
         {
             this.Logger = logger;
-            this.EndPoint = endPoint.EndPoint;
-            this.IPMode = endPoint.IPMode;
+            this.EndPoint = endPoint;
+            this.IPMode = ipMode;
 
-            if (endPoint.IPMode == IPMode.IPv4)
+            if (this.IPMode == IPMode.IPv4)
                 this.socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             else
             {
@@ -202,7 +202,7 @@ namespace Hazel.Udp
                     aware = this.allConnections.TryGetValue(remoteEndPoint, out connection);
                     if (!aware)
                     {
-                        connection = new UdpServerConnection(this, remoteEndPoint, this.IPMode);
+                        connection = new UdpServerConnection(this, (IPEndPoint)remoteEndPoint, this.IPMode);
                         if (!this.allConnections.TryAdd(remoteEndPoint, connection))
                         {
                             throw new Exception();

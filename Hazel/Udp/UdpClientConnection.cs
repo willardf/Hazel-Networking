@@ -31,14 +31,14 @@ namespace Hazel.Udp
         ///     Creates a new UdpClientConnection.
         /// </summary>
         /// <param name="remoteEndPoint">A <see cref="NetworkEndPoint"/> to connect to.</param>
-        public UdpClientConnection(NetworkEndPoint remoteEndPoint)
+        public UdpClientConnection(IPEndPoint remoteEndPoint, IPMode ipMode = IPMode.IPv4)
             : base()
         {
             this.EndPoint = remoteEndPoint;
-            this.RemoteEndPoint = remoteEndPoint.EndPoint;
-            this.IPMode = remoteEndPoint.IPMode;
+            this.RemoteEndPoint = remoteEndPoint;
+            this.IPMode = ipMode;
 
-            if (remoteEndPoint.IPMode == IPMode.IPv4)
+            if (this.IPMode == IPMode.IPv4)
                 socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             else
             {
