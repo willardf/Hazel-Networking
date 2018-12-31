@@ -70,9 +70,13 @@ namespace Hazel.Udp
             }
         }
 
+
+        public event Action<byte[], int> DataSentRaw;
+        public event Action<byte[]> DataReceivedRaw;
+
         private void WriteBytesToConnectionReal(byte[] bytes, int length)
         {
-            InvokeDataSentRaw(bytes, length);
+            DataSentRaw?.Invoke(bytes, length);
 
             if (State != ConnectionState.Connected && State != ConnectionState.Connecting)
                 throw new InvalidOperationException("Could not send data as this Connection is not connected and is not connecting. Did you disconnect?");
@@ -117,7 +121,7 @@ namespace Hazel.Udp
 
         protected override void WriteBytesToConnectionSync(byte[] bytes, int length)
         {
-            InvokeDataSentRaw(bytes, length);
+            DataSentRaw?.Invoke(bytes, length);
 
             if (State != ConnectionState.Connected && State != ConnectionState.Connecting)
                 throw new InvalidOperationException("Could not send data as this Connection is not connected and is not connecting. Did you disconnect?");
@@ -266,8 +270,21 @@ namespace Hazel.Udp
                 Thread.Sleep(this.TestLagMs);
             }
 
+            DataReceivedRaw?.Invoke(bytes);
             MessageReader msg = MessageReader.GetRaw(bytes, 0, bytesReceived);
             HandleReceive(msg, bytesReceived);
+        }
+
+        /// <summary>
+        ///     Sends a disconnect message to the end point.
+        /// </summary>
+        protected override void SendDisconnect()
+        {
+            try
+            {
+                WriteBytesToConnectionSync(DisconnectBytes, 1);
+            }
+            catch { }
         }
 
         /// <inheritdoc />

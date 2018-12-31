@@ -15,6 +15,8 @@ namespace Hazel.Udp
     /// <inheritdoc />
     public abstract partial class UdpConnection : NetworkConnection
     {
+        protected static readonly byte[] DisconnectBytes = new byte[] { (byte)UdpSendOption.Disconnect };
+
         /// <summary>
         ///     Creates a new UdpConnection and initializes the keep alive timer.
         /// </summary>
@@ -146,8 +148,6 @@ namespace Hazel.Udp
         /// <param name="message">The buffer containing the bytes received.</param>
         protected internal void HandleReceive(MessageReader message, int bytesReceived)
         {
-            InvokeDataReceivedRaw(message.Buffer);
-
             ushort id;
             switch (message.Buffer[0])
             {
@@ -174,7 +174,7 @@ namespace Hazel.Udp
                     break;
 
                 case (byte)UdpSendOption.Disconnect:
-                    Disconnect("The remote sent a disconnect request");
+                    Disconnect("The remote sent a disconnect request", true);
                     message.Recycle();
                     break;
                     
@@ -261,12 +261,17 @@ namespace Hazel.Udp
         /// <param name="e">The exception if one was the cause.</param>
         public override void Disconnect(string reason)
         {
+            this.Disconnect(reason, false);
+        }
+
+        protected void Disconnect(string reason, bool skipSendDisconnect)
+        {
             bool invoke = false;
             lock (this)
             {
                 if (this.state == ConnectionState.Connected)
                 {
-                    this.state = ConnectionState.Disconnecting;
+                    this.state = skipSendDisconnect ? ConnectionState.NotConnected : ConnectionState.Disconnecting;
                     invoke = true;
                 }
             }
@@ -282,19 +287,7 @@ namespace Hazel.Udp
 
             this.Dispose();
         }
-
-        /// <summary>
-        ///     Sends a disconnect message to the end point.
-        /// </summary>
-        protected override void SendDisconnect()
-        {
-            try
-            {
-                WriteBytesToConnectionSync(new byte[] { (byte)UdpSendOption.Disconnect }, 1);
-            }
-            catch { }
-        }
-
+        
         /// <inheritdoc/>
         protected override void Dispose(bool disposing)
         {

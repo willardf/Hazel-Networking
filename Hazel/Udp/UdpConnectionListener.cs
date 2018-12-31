@@ -134,10 +134,12 @@ namespace Hazel.Udp
         /// <param name="result">The asyncronous operation's result.</param>
         
         public int ActiveListeners;
+        public int PacketsReceived;
 
         void ReadCallback(IAsyncResult result)
         {
             Interlocked.Decrement(ref ActiveListeners);
+            Interlocked.Increment(ref PacketsReceived);
 
             var message = (MessageReader)result.AsyncState;
             int bytesReceived;
@@ -170,11 +172,12 @@ namespace Hazel.Udp
                 return;
             }
 
-            // Exit if no bytes read, we've closed.
+            // I'm a little concerned about a infinite loop here, but it seems like it's possible 
+            // to get 0 bytes read on UDP without the socket being shut down.
             if (bytesReceived == 0)
             {
                 message.Recycle();
-                this.Logger?.Invoke("Stopped due to receiving 0 bytes");
+                StartListeningForData();
                 return;
             }
 

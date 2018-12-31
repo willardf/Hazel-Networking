@@ -52,18 +52,6 @@ namespace Hazel
 
         public int TestLagMs = -1;
         
-        public event Action<byte[], int> DataSentRaw;
-        protected void InvokeDataSentRaw(byte[] data, int length)
-        {
-            this.DataSentRaw?.Invoke(data, length);
-        }
-
-        public event Action<byte[]> DataReceivedRaw;
-        protected void InvokeDataReceivedRaw(byte[] data)
-        {
-            this.DataReceivedRaw?.Invoke(data);
-        }
-
         /// <summary>
         ///     Called when the end point disconnects or an error occurs.
         /// </summary>
@@ -319,8 +307,6 @@ namespace Hazel
             if (disposing)
             {
                 this.DataReceived = null;
-                this.DataReceivedRaw = null;
-                this.DataSentRaw = null;
                 this.Disconnected = null;
             }
         }

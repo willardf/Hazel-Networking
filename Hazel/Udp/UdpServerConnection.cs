@@ -47,8 +47,6 @@ namespace Hazel.Udp
         /// <inheritdoc />
         protected override void WriteBytesToConnection(byte[] bytes, int length)
         {
-            InvokeDataSentRaw(bytes, length);
-
             if (State != ConnectionState.Connected)
                 throw new InvalidOperationException("Could not send data: Not connected.");
 
@@ -58,8 +56,6 @@ namespace Hazel.Udp
         /// <inheritdoc />
         protected override void WriteBytesToConnectionSync(byte[] bytes, int length)
         {
-            InvokeDataSentRaw(bytes, length);
-
             // No throw: As an internal interface, I want to try sending bytes whenever the I feel like it.
 
             Listener.SendDataSync(bytes, length, RemoteEndPoint);
@@ -82,7 +78,20 @@ namespace Hazel.Udp
         {
             throw new HazelException("Cannot manually connect a UdpServerConnection, did you mean to use UdpClientConnection?");
         }
-        
+
+
+        /// <summary>
+        ///     Sends a disconnect message to the end point.
+        /// </summary>
+        protected override void SendDisconnect()
+        {
+            try
+            {
+                WriteBytesToConnection(DisconnectBytes, 1);
+            }
+            catch { }
+        }
+
         protected override void Dispose(bool disposing)
         {
             Listener.RemoveConnectionTo(RemoteEndPoint);
@@ -97,6 +106,7 @@ namespace Hazel.Udp
                 }
             }
 
+            
             base.Dispose(disposing);
         }
     }
