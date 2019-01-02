@@ -200,12 +200,12 @@ namespace Hazel.Udp
                 foreach (var kvp in this.reliableDataPacketsSent)
                 {
                     Packet pkt = kvp.Value;
-                    
-                        try
-                        {
-                            output += pkt.Resend();
-                        }
-                        catch { }
+
+                    try
+                    {
+                        output += pkt.Resend();
+                    }
+                    catch { }
 
                     minTimeout = Math.Min(pkt.NextTimeout, minTimeout);
                 }
@@ -239,8 +239,7 @@ namespace Hazel.Udp
                 buffer,
                 sendLength,
                 resendTimeout > 0 ? resendTimeout : (int)Math.Max(300, Math.Min(AveragePingMs * this.ResendPingMultiplier, 2000)),
-                ackCallback
-            );
+                ackCallback);
 
             if (!reliableDataPacketsSent.TryAdd(id, packet))
             {

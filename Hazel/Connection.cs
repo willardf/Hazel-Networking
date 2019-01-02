@@ -113,20 +113,20 @@ namespace Hazel
         {
             get
             {
-                return this.state;
+                return this._state;
             }
             
             protected set
             {
-                this.state = value;
-                if (this.state == ConnectionState.Connected)
+                this._state = value;
+                if (this._state == ConnectionState.Connected)
                     connectWaitLock.Set();
                 else
                     connectWaitLock.Reset();
             }
         }
 
-        protected ConnectionState state;
+        protected ConnectionState _state;
 
         /// <summary>
         ///     Reset event that is triggered when the connection is marked Connected.

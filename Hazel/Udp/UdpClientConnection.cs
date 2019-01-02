@@ -78,9 +78,6 @@ namespace Hazel.Udp
         {
             DataSentRaw?.Invoke(bytes, length);
 
-            if (State != ConnectionState.Connected && State != ConnectionState.Connecting)
-                throw new InvalidOperationException("Could not send data as this Connection is not connected and is not connecting. Did you disconnect?");
-
             try
             {
                 socket.BeginSendTo(
@@ -123,9 +120,6 @@ namespace Hazel.Udp
         {
             DataSentRaw?.Invoke(bytes, length);
 
-            if (State != ConnectionState.Connected && State != ConnectionState.Connecting)
-                throw new InvalidOperationException("Could not send data as this Connection is not connected and is not connecting. Did you disconnect?");
-
             try
             {
                 socket.SendTo(
@@ -166,10 +160,7 @@ namespace Hazel.Udp
         /// <inheritdoc />
         public override void ConnectAsync(byte[] bytes = null, int timeout = 5000)
         {
-            if (State != ConnectionState.NotConnected)
-                throw new InvalidOperationException("Cannot connect as the Connection is already connected.");
-
-            State = ConnectionState.Connecting;
+            this.State = ConnectionState.Connecting;
 
             //Begin listening
             try
@@ -292,11 +283,11 @@ namespace Hazel.Udp
         {
             if (disposing)
             {
-                if (this.state == ConnectionState.Connected
-                    || this.state == ConnectionState.Disconnecting)
+                if (this._state == ConnectionState.Connected
+                    || this._state == ConnectionState.Disconnecting)
                 {
-                    // SendDisconnect();
-                    this.state = ConnectionState.NotConnected;
+                    SendDisconnect();
+                    this._state = ConnectionState.NotConnected;
                 }
             }
 

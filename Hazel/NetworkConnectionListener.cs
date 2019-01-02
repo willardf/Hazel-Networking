@@ -16,7 +16,7 @@ namespace Hazel
         /// <summary>
         ///     The local end point the listener is listening for new clients on.
         /// </summary>
-        public EndPoint EndPoint { get; protected set; }
+        public IPEndPoint EndPoint { get; protected set; }
 
         /// <summary>
         ///     The <see cref="IPMode">IPMode</see> the listener is listening for new clients on.

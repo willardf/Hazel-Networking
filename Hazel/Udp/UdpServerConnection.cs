@@ -21,12 +21,7 @@ namespace Hazel.Udp
         ///     created this connection and is hence the listener this conenction sends and receives via.
         /// </remarks>
         public UdpConnectionListener Listener { get; private set; }
-
-        /// <summary>
-        ///     Lock object for the writing to the state of the connection.
-        /// </summary>
-        private ReaderWriterLockSlim stateLock = new ReaderWriterLockSlim();
-
+        
         /// <summary>
         ///     Creates a UdpConnection for the virtual connection to the endpoint.
         /// </summary>
@@ -47,9 +42,6 @@ namespace Hazel.Udp
         /// <inheritdoc />
         protected override void WriteBytesToConnection(byte[] bytes, int length)
         {
-            if (State != ConnectionState.Connected)
-                throw new InvalidOperationException("Could not send data: Not connected.");
-
             Listener.SendData(bytes, length, RemoteEndPoint);
         }
 
@@ -98,11 +90,11 @@ namespace Hazel.Udp
 
             if (disposing)
             {
-                if (this.state == ConnectionState.Connected
-                    || this.state == ConnectionState.Disconnecting)
+                if (this._state == ConnectionState.Connected
+                    || this._state == ConnectionState.Disconnecting)
                 {
                     SendDisconnect();
-                    this.state = ConnectionState.NotConnected;
+                    this._state = ConnectionState.NotConnected;
                 }
             }
 

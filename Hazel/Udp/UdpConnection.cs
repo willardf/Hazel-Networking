@@ -41,7 +41,7 @@ namespace Hazel.Udp
         public override void Send(MessageWriter msg)
         {
             //Early check
-            if (State != ConnectionState.Connected)
+            if (this._state != ConnectionState.Connected)
                 throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
 
             byte[] buffer = new byte[msg.Length];
@@ -75,10 +75,6 @@ namespace Hazel.Udp
         /// </remarks>
         public override void SendBytes(byte[] bytes, SendOption sendOption = SendOption.None)
         {
-            //Early check
-            if (State != ConnectionState.Connected)
-                throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
-
             //Add header information and send
             HandleSend(bytes, (byte)sendOption);
         }
@@ -100,10 +96,6 @@ namespace Hazel.Udp
         /// </remarks>
         public override void SendBytes(byte[] bytes, int offset, int length, SendOption sendOption = SendOption.None)
         {
-            //Early check
-            if (State != ConnectionState.Connected)
-                throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
-
             switch (sendOption)
             {
                 //Handle reliable header and hellos
@@ -269,9 +261,9 @@ namespace Hazel.Udp
             bool invoke = false;
             lock (this)
             {
-                if (this.state == ConnectionState.Connected)
+                if (this._state == ConnectionState.Connected)
                 {
-                    this.state = skipSendDisconnect ? ConnectionState.NotConnected : ConnectionState.Disconnecting;
+                    this._state = skipSendDisconnect ? ConnectionState.NotConnected : ConnectionState.Disconnecting;
                     invoke = true;
                 }
             }

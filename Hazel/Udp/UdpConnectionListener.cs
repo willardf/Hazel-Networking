@@ -57,6 +57,9 @@ namespace Hazel.Udp
                 this.socket.SetSocketOption(SocketOptionLevel.IPv6, (SocketOptionName)27, false);
             }
 
+            socket.ReceiveBufferSize = 4194304;
+            socket.SendBufferSize = 1048576;
+            
             reliablePacketTimer = new Timer(ManageReliablePackets, null, 100, Timeout.Infinite);
         }
 
@@ -100,7 +103,7 @@ namespace Hazel.Udp
         /// <summary>
         ///     Instructs the listener to begin listening.
         /// </summary>
-        public void StartListeningForData()
+        private void StartListeningForData()
         {
             EndPoint remoteEP = EndPoint;
 
@@ -214,21 +217,9 @@ namespace Hazel.Udp
                 }
             }
 
-            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            try
-            {
-                //Inform the connection of the buffer (new connections need to send an ack back to client)
-                connection.HandleReceive(message, bytesReceived);
-            }
-            finally
-            {
-                var el = stopwatch.ElapsedMilliseconds;
-                if (el > 5)
-                {
-                    this.Logger?.Invoke($"Long Packet {el}ms = {string.Join(" ", message.Buffer.Take(bytesReceived))}");
-                }
-            }
-
+            //Inform the connection of the buffer (new connections need to send an ack back to client)
+            connection.HandleReceive(message, bytesReceived);
+            
             //If it's a new connection invoke the NewConnection event.
             if (!aware)
             {
