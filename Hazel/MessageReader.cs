@@ -165,6 +165,16 @@ namespace Hazel
             return output;
         }
 
+        public uint ReadUInt32()
+        {
+            uint output = this.FastByte()
+                | (uint)this.FastByte() << 8
+                | (uint)this.FastByte() << 16
+                | (uint)this.FastByte() << 24;
+
+            return output;
+        }
+
         public int ReadInt32()
         {
             int output = this.FastByte()

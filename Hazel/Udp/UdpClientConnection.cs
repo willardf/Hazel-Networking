@@ -43,7 +43,7 @@ namespace Hazel.Udp
             else
             {
                 if (!Socket.OSSupportsIPv6)
-                    throw new HazelException("IPV6 not supported!");
+                    throw new InvalidOperationException("IPV6 not supported!");
 
                 socket = new Socket(AddressFamily.InterNetworkV6, SocketType.Dgram, ProtocolType.Udp);
                 socket.SetSocketOption(SocketOptionLevel.IPv6, (SocketOptionName)27, false);    //TODO these lines shouldn't be needed anymore

@@ -311,7 +311,7 @@ namespace Hazel.Udp
             ushort id;
             if (ProcessReliableReceive(message.Buffer, 1, out id))
             {
-                InvokeDataReceived(SendOption.Reliable, message, 3, bytesReceived, id);
+                InvokeDataReceived(SendOption.Reliable, message, 3, bytesReceived);
             }
             else
             {

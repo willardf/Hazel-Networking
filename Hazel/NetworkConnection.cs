@@ -39,5 +39,38 @@ namespace Hazel
                 return BitConverter.ToInt64(bytes, bytes.Length - 8);
             }
         }
+
+        /// <summary>
+        ///     Called when the socket has been disconnected at the remote host.
+        /// </summary>
+        /// <param name="e">The exception if one was the cause.</param>
+        public override void Disconnect(string reason)
+        {
+            this.Disconnect(reason, false);
+        }
+
+        protected void Disconnect(string reason, bool skipSendDisconnect)
+        {
+            bool invoke = false;
+            lock (this)
+            {
+                if (this._state == ConnectionState.Connected)
+                {
+                    this._state = skipSendDisconnect ? ConnectionState.NotConnected : ConnectionState.Disconnecting;
+                    invoke = true;
+                }
+            }
+
+            if (invoke)
+            {
+                try
+                {
+                    InvokeDisconnected(reason);
+                }
+                catch { }
+            }
+
+            this.Dispose();
+        }
     }
 }

@@ -55,7 +55,12 @@ namespace Hazel
                             System.Buffer.BlockCopy(this.Buffer, 1, output, 0, this.Length - 1);
                             return output;
                         }
-
+                    case SendOption.Tcp:
+                        {
+                            byte[] output = new byte[this.Length - 4];
+                            System.Buffer.BlockCopy(this.Buffer, 4, output, 0, this.Length - 4);
+                            return output;
+                        }
                 }
             }
 
@@ -120,6 +125,9 @@ namespace Hazel
                 case SendOption.Reliable:
                     this.Length = this.Position = 3;
                     break;
+                case SendOption.Tcp:
+                    this.Length = this.Position = 4;
+                    break;
             }
         }
 
@@ -180,6 +188,15 @@ namespace Hazel
         {
             this.Buffer[this.Position++] = (byte)value;
             this.Buffer[this.Position++] = (byte)(value >> 8);
+            if (this.Position > this.Length) this.Length = this.Position;
+        }
+
+        public void Write(uint value)
+        {
+            this.Buffer[this.Position++] = (byte)value;
+            this.Buffer[this.Position++] = (byte)(value >> 8);
+            this.Buffer[this.Position++] = (byte)(value >> 16);
+            this.Buffer[this.Position++] = (byte)(value >> 24);
             if (this.Position > this.Length) this.Length = this.Position;
         }
 

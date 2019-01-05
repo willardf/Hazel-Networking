@@ -48,7 +48,7 @@ namespace Hazel
         /// <example>
         ///     <code language="C#" source="DocInclude/TcpClientExample.cs"/>
         /// </example>
-        public Action<DataReceivedEventArgs> DataReceived;
+        public event Action<DataReceivedEventArgs> DataReceived;
 
         public int TestLagMs = -1;
         
@@ -174,24 +174,7 @@ namespace Hazel
         ///     </para>
         /// </remarks>
         public abstract void SendBytes(byte[] bytes, SendOption sendOption = SendOption.None);
-
-        /// <summary>
-        ///     Sends a number of bytes to the end point of the connection using the specified <see cref="SendOption"/>.
-        /// </summary>
-        /// <param name="bytes">The bytes of the message to send.</param>
-        /// <param name="offset"></param>
-        /// <param name="length"></param>
-        /// <param name="sendOption">The option specifying how the message should be sent.</param>
-        /// <remarks>
-        ///     <include file="DocInclude/common.xml" path="docs/item[@name='Connection_SendBytes_General']/*" />
-        ///     <para>
-        ///         The sendOptions parameter is only a request to use those options and the actual method used to send the
-        ///         data is up to the implementation. There are circumstances where this parameter may be ignored but in 
-        ///         general any implementer should aim to always follow the user's request.
-        ///     </para>
-        /// </remarks>
-        public abstract void SendBytes(byte[] bytes, int offset, int length, SendOption sendOption = SendOption.None);
-
+        
         /// <summary>
         ///     Connects the connection to a server and begins listening.
         /// </summary>
@@ -232,15 +215,13 @@ namespace Hazel
         ///     received. The bytes and the send option that the message was sent with should be passed in to give to the
         ///     subscribers.
         /// </remarks>
-        protected void InvokeDataReceived(MessageReader msg, SendOption sendOption, ushort reliableId)
+        protected void InvokeDataReceived(MessageReader msg, SendOption sendOption)
         {
             //Make a copy to avoid race condition between null check and invocation
             Action<DataReceivedEventArgs> handler = DataReceived;
             if (handler != null)
             {
-                DataReceivedEventArgs args = DataReceivedEventArgs.GetObject();
-                args.Set(msg, sendOption, reliableId);
-                handler.Invoke(args);
+                handler(new DataReceivedEventArgs(msg, sendOption));
             }
             else
             {

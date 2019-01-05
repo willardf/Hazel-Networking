@@ -78,38 +78,7 @@ namespace Hazel.Udp
             //Add header information and send
             HandleSend(bytes, (byte)sendOption);
         }
-
-        /// <summary>
-        ///     Sends a number of bytes to the end point of the connection using the specified <see cref="SendOption"/>.
-        /// </summary>
-        /// <param name="bytes">The bytes of the message to send.</param>
-        /// <param name="offset"></param>
-        /// <param name="length"></param>
-        /// <param name="sendOption">The option specifying how the message should be sent.</param>
-        /// <remarks>
-        ///     <include file="DocInclude/common.xml" path="docs/item[@name='Connection_SendBytes_General']/*" />
-        ///     <para>
-        ///         The sendOptions parameter is only a request to use those options and the actual method used to send the
-        ///         data is up to the implementation. There are circumstances where this parameter may be ignored but in 
-        ///         general any implementer should aim to always follow the user's request.
-        ///     </para>
-        /// </remarks>
-        public override void SendBytes(byte[] bytes, int offset, int length, SendOption sendOption = SendOption.None)
-        {
-            switch (sendOption)
-            {
-                //Handle reliable header and hellos
-                case SendOption.Reliable:
-                    ReliableSend((byte)sendOption, bytes, offset, length);
-                    break;
-                    
-                //Treat all else as unreliable
-                default:
-                    UnreliableSend((byte)sendOption, bytes, offset, length);
-                    break;
-            }
-        }
-
+        
         /// <summary>
         ///     Handles the reliable/fragmented sending from this connection.
         /// </summary>
@@ -172,7 +141,7 @@ namespace Hazel.Udp
                     
                 //Treat everything else as unreliable
                 default:
-                    InvokeDataReceived(SendOption.None, message, 1, bytesReceived, 0);
+                    InvokeDataReceived(SendOption.None, message, 1, bytesReceived);
                     Statistics.LogUnreliableReceive(message.Length - 1, message.Length);
                     break;
             }
@@ -217,13 +186,13 @@ namespace Hazel.Udp
         /// <param name="sendOption">The send option the message was received with.</param>
         /// <param name="buffer">The buffer received.</param>
         /// <param name="dataOffset">The offset of data in the buffer.</param>
-        void InvokeDataReceived(SendOption sendOption, MessageReader buffer, int dataOffset, int bytesReceived, ushort reliableId)
+        void InvokeDataReceived(SendOption sendOption, MessageReader buffer, int dataOffset, int bytesReceived)
         {
             buffer.Offset = dataOffset;
             buffer.Length = bytesReceived - dataOffset;
             buffer.Position = 0;
 
-            InvokeDataReceived(buffer, sendOption, reliableId);
+            InvokeDataReceived(buffer, sendOption);
         }
 
         /// <summary>
@@ -246,40 +215,7 @@ namespace Hazel.Udp
 
             HandleSend(actualBytes, (byte)UdpSendOption.Hello, acknowledgeCallback);
         }
-
-        /// <summary>
-        ///     Called when the socket has been disconnected at the remote host.
-        /// </summary>
-        /// <param name="e">The exception if one was the cause.</param>
-        public override void Disconnect(string reason)
-        {
-            this.Disconnect(reason, false);
-        }
-
-        protected void Disconnect(string reason, bool skipSendDisconnect)
-        {
-            bool invoke = false;
-            lock (this)
-            {
-                if (this._state == ConnectionState.Connected)
-                {
-                    this._state = skipSendDisconnect ? ConnectionState.NotConnected : ConnectionState.Disconnecting;
-                    invoke = true;
-                }
-            }
-
-            if (invoke)
-            {
-                try
-                {
-                    InvokeDisconnected(reason);
-                }
-                catch { }
-            }
-
-            this.Dispose();
-        }
-        
+                
         /// <inheritdoc/>
         protected override void Dispose(bool disposing)
         {
