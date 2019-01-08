@@ -191,7 +191,7 @@ namespace Hazel.Udp
             }
         }
                 
-        internal int ManageReliablePackets(object state)
+        internal int ManageReliablePackets()
         {
             int output = 0;
             if (this.reliableDataPacketsSent.Count > 0)

@@ -10,7 +10,7 @@ namespace Hazel.UnitTests
     [TestClass]
     public class UnitTest1
     {
-        [TestMethod]
+        // [TestMethod]
         public void StressTest()
         {
             var ep = new IPEndPoint(IPAddress.Loopback, 22023);

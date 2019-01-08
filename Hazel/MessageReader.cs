@@ -39,6 +39,7 @@ namespace Hazel
                 output.Buffer = new byte[minSize];
             }
 
+            output.Offset = 0;
             output.Tag = byte.MaxValue;
             return output;
         }

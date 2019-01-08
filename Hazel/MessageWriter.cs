@@ -126,7 +126,6 @@ namespace Hazel
                     this.Length = this.Position = 3;
                     break;
                 case SendOption.Tcp:
-                    this.Length = this.Position = 4;
                     break;
             }
         }

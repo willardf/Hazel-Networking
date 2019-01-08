@@ -95,27 +95,7 @@ namespace Hazel.UnitTests
                 }
             }
         }
-
-        [TestMethod]
-        public void UdpUnreliableDataSubsetSendTest()
-        {
-            using (UdpConnectionListener listener = new UdpConnectionListener(new IPEndPoint(IPAddress.Any, 4296)))
-            using (UdpConnection connection = new UdpClientConnection(new IPEndPoint(IPAddress.Loopback, 4296)))
-            {
-                listener.Start();
-                listener.NewConnection += delegate (NewConnectionEventArgs e)
-                {
-                    e.Connection.DataReceived += delegate (DataReceivedEventArgs evt)
-                    {
-                        Assert.IsTrue(Enumerable.SequenceEqual(evt.Message.Buffer, new byte[] { 3, 4 }));
-                    };
-                };
-
-                connection.Connect();
-                connection.SendBytes(new byte[] { 1, 2, 3, 4, 5, 6 }, 2, 2, SendOption.None);
-            }
-        }
-
+        
         /// <summary>
         ///     Tests IPv4 connectivity.
         /// </summary>

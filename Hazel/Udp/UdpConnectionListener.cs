@@ -77,7 +77,7 @@ namespace Hazel.Udp
             foreach (var kvp in this.allConnections)
             {
                 var sock = kvp.Value;
-                sock.ManageReliablePackets(state);
+                sock.ManageReliablePackets();
             }
 
             this.AveragePacketsTime = this.AveragePacketsTime * .7f + stopwatch.ElapsedMilliseconds * .3f;

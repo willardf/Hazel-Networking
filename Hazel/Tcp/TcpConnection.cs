@@ -25,7 +25,7 @@ namespace Hazel.Tcp
         internal TcpConnection(Socket socket)
         {
             //Check it's a TCP socket
-            if (socket.ProtocolType != System.Net.Sockets.ProtocolType.Tcp)
+            if (socket.ProtocolType != ProtocolType.Tcp)
                 throw new ArgumentException("A TcpConnection requires a TCP socket.");
 
             this.EndPoint = (IPEndPoint)socket.RemoteEndPoint;
@@ -43,9 +43,6 @@ namespace Hazel.Tcp
         /// <param name="remoteEndPoint">A <see cref="NetworkEndPoint"/> to connect to.</param>
         public TcpConnection(IPEndPoint remoteEndPoint, IPMode ipMode = IPMode.IPv4)
         {
-            if (State != ConnectionState.NotConnected)
-                throw new InvalidOperationException("Cannot connect as the Connection is already connected.");
-
             this.EndPoint = remoteEndPoint;
             this.RemoteEndPoint = remoteEndPoint;
             this.IPMode = ipMode;
@@ -212,25 +209,68 @@ namespace Hazel.Tcp
                 throw new HazelException("Not connected");
 
             var msg = MessageReader.GetSized(ushort.MaxValue);
-            socket.BeginReceive(msg.Buffer, 0, 4, SocketFlags.None, o => HeaderReadCallback(callback, o), msg);
+            try
+            {
+                socket.BeginReceive(msg.Buffer, 0, 4, SocketFlags.None, o => HeaderReadCallback(callback, o), msg);
+            }
+            catch (SocketException s)
+            {
+                Disconnect("SocketException while reading header: " + s.Message);
+            }
         }
 
         private void HeaderReadCallback(Action<MessageReader> callback, IAsyncResult result)
         {
-            int bytesRead = socket.EndReceive(result);
-            var msg = (MessageReader)result.AsyncState;
+            int bytesRead;
+            try
+            {
+                bytesRead = socket.EndReceive(result);
+                if (bytesRead == 0)
+                {
+                    Disconnect("Received 0 bytes");
+                    return;
+                }
 
-            Statistics.LogFragmentedReceive(0, bytesRead);
+                Statistics.LogFragmentedReceive(0, bytesRead);
+            }
+            catch (SocketException s)
+            {
+                Disconnect("SocketException while reading header: " + s.Message);
+                return;
+            }
 
             // TODO: Could possibly fragment here...
+            var msg = (MessageReader)result.AsyncState;
             msg.Length = GetLengthFromBytes(msg.Buffer);
 
-            socket.BeginReceive(msg.Buffer, 0, msg.Length, SocketFlags.None, o => BodyReadCallback(callback, o), msg);
+            try
+            {
+                socket.BeginReceive(msg.Buffer, 0, msg.Length, SocketFlags.None, o => BodyReadCallback(callback, o), msg);
+            }
+            catch (SocketException s)
+            {
+                Disconnect("SocketException while reading body: " + s.Message);
+            }
         }
 
         private void BodyReadCallback(Action<MessageReader> callback, IAsyncResult result)
         {
-            int bytesRead = socket.EndReceive(result);
+            int bytesRead;
+            try
+            {
+                bytesRead = socket.EndReceive(result);
+                if (bytesRead == 0)
+                {
+                    Disconnect("Received 0 bytes");
+                    return;
+                }
+            }
+            catch (SocketException s)
+            {
+                Disconnect("SocketException while reading body: " + s.Message);
+                return;
+            }
+
             var msg = (MessageReader)result.AsyncState;
             msg.Position += bytesRead;
 
@@ -238,7 +278,14 @@ namespace Hazel.Tcp
 
             if (msg.Position < bytesRead)
             {
-                socket.BeginReceive(msg.Buffer, msg.Position, msg.Length - msg.Position, SocketFlags.None, o => BodyReadCallback(callback, o), msg);
+                try
+                {
+                    socket.BeginReceive(msg.Buffer, msg.Position, msg.Length - msg.Position, SocketFlags.None, o => BodyReadCallback(callback, o), msg);
+                }
+                catch (SocketException s)
+                {
+                    Disconnect("SocketException while reading body: " + s.Message);
+                }
             }
             else
             {

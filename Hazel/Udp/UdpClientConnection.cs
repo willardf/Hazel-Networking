@@ -49,12 +49,18 @@ namespace Hazel.Udp
                 socket.SetSocketOption(SocketOptionLevel.IPv6, (SocketOptionName)27, false);    //TODO these lines shouldn't be needed anymore
             }
 
-            reliablePacketTimer = new Timer((s) => ManageReliablePackets(s), null, 50, Timeout.Infinite);
+            reliablePacketTimer = new Timer(ManageReliablePacketsInternal, null, 100, Timeout.Infinite);
         }
-
+        
         ~UdpClientConnection()
         {
             this.Dispose(false);
+        }
+
+        private void ManageReliablePacketsInternal(object state)
+        {
+            base.ManageReliablePackets();
+            reliablePacketTimer.Change(100, Timeout.Infinite);
         }
 
         /// <inheritdoc />
