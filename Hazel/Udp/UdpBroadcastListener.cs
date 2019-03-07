@@ -97,7 +97,7 @@ namespace Hazel.Udp
             }
 
             IPEndPoint ipEnd = (IPEndPoint)endpt;
-            string data = ASCIIEncoding.ASCII.GetString(buffer, 2, numBytes - 2);
+            string data = UTF8Encoding.UTF8.GetString(buffer, 2, numBytes - 2);
             int dataHash = data.GetHashCode();
 
             lock (packets)
@@ -139,7 +139,21 @@ namespace Hazel.Udp
         {
             if (this.socket != null)
             {
-                this.socket.Close();
+                try
+                {
+                    this.socket.Shutdown(SocketShutdown.Both);
+                }
+                catch { }
+                try
+                {
+                    this.socket.Close();
+                }
+                catch { }
+                try
+                {
+                    this.socket.Dispose();
+                }
+                catch { }
                 this.socket = null;
             }
         }

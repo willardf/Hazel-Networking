@@ -51,6 +51,8 @@ namespace Hazel
         public event Action<DataReceivedEventArgs> DataReceived;
 
         public int TestLagMs = -1;
+        public int TestDropRate = 0;
+        protected int testDropCount = 0;
         
         /// <summary>
         ///     Called when the end point disconnects or an error occurs.

@@ -67,21 +67,15 @@ namespace Hazel.Udp
         {
             this.Dispose(false);
         }
-
-        public float AveragePacketsTime = 1;
-
-        Stopwatch stopwatch = new Stopwatch();
+        
         private void ManageReliablePackets(object state)
         {
-            stopwatch.Restart();
             foreach (var kvp in this.allConnections)
             {
                 var sock = kvp.Value;
                 sock.ManageReliablePackets();
             }
-
-            this.AveragePacketsTime = this.AveragePacketsTime * .7f + stopwatch.ElapsedMilliseconds * .3f;
-
+            
             this.reliablePacketTimer.Change(100, Timeout.Infinite);
         }
 
@@ -336,6 +330,11 @@ namespace Hazel.Udp
 
             if (this.socket != null)
             {
+                try
+                {
+                    this.socket.Shutdown(SocketShutdown.Both);
+                }
+                catch { }
                 this.socket.Close();
                 this.socket.Dispose();
                 this.socket = null;

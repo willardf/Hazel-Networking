@@ -28,12 +28,12 @@ namespace Hazel.Udp
         ///
         public void SetData(string data)
         {
-            int len = ASCIIEncoding.ASCII.GetByteCount(data);
+            int len = UTF8Encoding.UTF8.GetByteCount(data);
             this.data = new byte[len + 2];
             this.data[0] = 4;
             this.data[1] = 2;
 
-            ASCIIEncoding.ASCII.GetBytes(data, 0, data.Length, this.data, 2);
+            UTF8Encoding.UTF8.GetBytes(data, 0, data.Length, this.data, 2);
         }
 
         ///
@@ -52,7 +52,21 @@ namespace Hazel.Udp
         {
             if (this.socket != null)
             {
-                this.socket.Close();
+                try
+                {
+                    this.socket.Shutdown(SocketShutdown.Both);
+                }
+                catch { }
+                try
+                {
+                    this.socket.Close();
+                }
+                catch { }
+                try
+                {
+                    this.socket.Dispose();
+                }
+                catch { }
                 this.socket = null;
             }
         }

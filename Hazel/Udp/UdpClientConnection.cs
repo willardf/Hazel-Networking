@@ -18,14 +18,14 @@ namespace Hazel.Udp
         /// <summary>
         ///     The socket we're connected via.
         /// </summary>
-        Socket socket;
+        private Socket socket;
 
         /// <summary>
         ///     The buffer to store incomming data in.
         /// </summary>
-        byte[] dataBuffer = new byte[ushort.MaxValue];
+        private byte[] dataBuffer = new byte[ushort.MaxValue];
 
-        Timer reliablePacketTimer;
+        private Timer reliablePacketTimer;
 
         /// <summary>
         ///     Creates a new UdpClientConnection.
@@ -75,7 +75,6 @@ namespace Hazel.Udp
                 WriteBytesToConnectionReal(bytes, length);
             }
         }
-
 
         public event Action<byte[], int> DataSentRaw;
         public event Action<byte[]> DataReceivedRaw;
@@ -265,6 +264,14 @@ namespace Hazel.Udp
             if (this.TestLagMs > 0)
             {
                 Thread.Sleep(this.TestLagMs);
+            }
+
+            if (this.TestDropRate > 0)
+            {
+                if ((this.testDropCount++ % this.TestDropRate) == 0)
+                {
+                    return;
+                }
             }
 
             DataReceivedRaw?.Invoke(bytes);

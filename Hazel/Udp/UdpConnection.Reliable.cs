@@ -25,11 +25,17 @@ namespace Hazel.Udp
         ///         resulting in a more dynamic resend that responds to endpoints on slower or faster connections.
         ///     </para>
         /// </remarks>
-        public int ResendTimeout { get { return resendTimeout; } set { resendTimeout = value; } }
-        private volatile int resendTimeout = 0;
+        public volatile int ResendTimeout = 0;
 
+        /// <summary>
+        /// Max number of times to resend. 0 == no limit
+        /// </summary>
         public volatile int ResendLimit = 0;
 
+        /// <summary>
+        /// A compounding multiplier to back off resend timeout.
+        /// Applied to ping before first timeout when ResendTimeout == 0.
+        /// </summary>
         public volatile float ResendPingMultiplier = 3;
 
         /// <summary>
@@ -40,24 +46,24 @@ namespace Hazel.Udp
         /// <summary>
         ///     The packets of data that have been transmitted reliably and not acknowledged.
         /// </summary>
-        ConcurrentDictionary<ushort, Packet> reliableDataPacketsSent = new ConcurrentDictionary<ushort, Packet>();
+        internal ConcurrentDictionary<ushort, Packet> reliableDataPacketsSent = new ConcurrentDictionary<ushort, Packet>();
 
         /// <summary>
         ///     The last packets that were received.
         /// </summary>
-        HashSet<ushort> reliableDataPacketsMissing = new HashSet<ushort>();
+        private HashSet<ushort> reliableDataPacketsMissing = new HashSet<ushort>();
 
         /// <summary>
         ///     The packet id that was received last.
         /// </summary>
-        volatile ushort reliableReceiveLast = 0;
-        
+        private volatile ushort reliableReceiveLast = 0;
+
         /// <summary>
         ///     Has the connection received anything yet
         /// </summary>
-        volatile bool hasReceivedSomething = false;
+        private volatile bool hasReceivedSomething = false;
 
-        object PingLock = new object();
+        private object PingLock = new object();
 
         /// <summary>
         ///     Returns the average ping to this endpoint.
@@ -77,7 +83,7 @@ namespace Hazel.Udp
         ///     connection will be marked as disconnected and the <see cref="Connection.Disconnected">Disconnected</see> event
         ///     will be invoked.
         /// </remarks>
-        public volatile int DisconnectTimeout = 2500;
+        public volatile int DisconnectTimeout = 5000;
 
         /// <summary>
         ///     Class to hold packet data
@@ -110,11 +116,11 @@ namespace Hazel.Udp
 
             public int Retransmissions;
             public Stopwatch Stopwatch = new Stopwatch();
-            
+
             Packet()
             {
             }
-            
+
             internal void Set(ushort id, UdpConnection connection, byte[] data, int length, int timeout, Action ackCallback)
             {
                 this.Id = id;
@@ -151,7 +157,9 @@ namespace Hazel.Udp
 
                     if (lifetime >= this.NextTimeout)
                     {
-                        if (++this.Retransmissions > connection.ResendLimit)
+                        ++this.Retransmissions;
+                        if (connection.ResendLimit != 0
+                            && this.Retransmissions > connection.ResendLimit)
                         {
                             if (connection.reliableDataPacketsSent.TryRemove(this.Id, out Packet self))
                             {
@@ -163,7 +171,7 @@ namespace Hazel.Udp
                             return 0;
                         }
 
-                        this.NextTimeout = (int)Math.Min(this.NextTimeout * 3f, connection.DisconnectTimeout);
+                        this.NextTimeout = (int)Math.Min(this.NextTimeout * connection.ResendPingMultiplier, connection.DisconnectTimeout);
                         try
                         {
                             connection.WriteBytesToConnection(this.Data, this.Length);
@@ -190,13 +198,12 @@ namespace Hazel.Udp
                 PacketPool.PutObject(this);
             }
         }
-                
+
         internal int ManageReliablePackets()
         {
             int output = 0;
             if (this.reliableDataPacketsSent.Count > 0)
             {
-                double minTimeout = int.MaxValue;
                 foreach (var kvp in this.reliableDataPacketsSent)
                 {
                     Packet pkt = kvp.Value;
@@ -206,8 +213,6 @@ namespace Hazel.Udp
                         output += pkt.Resend();
                     }
                     catch { }
-
-                    minTimeout = Math.Min(pkt.NextTimeout, minTimeout);
                 }
             }
 
@@ -238,7 +243,7 @@ namespace Hazel.Udp
                 this,
                 buffer,
                 sendLength,
-                resendTimeout > 0 ? resendTimeout : (int)Math.Max(300, Math.Min(AveragePingMs * this.ResendPingMultiplier, 2000)),
+                ResendTimeout > 0 ? ResendTimeout : (int)Math.Max(300, Math.Min(AveragePingMs * this.ResendPingMultiplier, 2000)),
                 ackCallback);
 
             if (!reliableDataPacketsSent.TryAdd(id, packet))

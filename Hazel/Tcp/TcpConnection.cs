@@ -84,7 +84,9 @@ namespace Hazel.Tcp
             //Start receiving data
             try
             {
-                ListenForData(InvokeAndListen);
+                var msg = MessageReader.GetSized(ushort.MaxValue);
+
+                ListenForData(msg, InvokeAndListen);
             }
             catch (Exception e)
             {
@@ -170,31 +172,39 @@ namespace Hazel.Tcp
         {
             this.State = ConnectionState.Connected;
 
+            var buffer = MessageReader.GetSized(ushort.MaxValue);
             try
             {
+                buffer.Offset = 0;
+                buffer.Length = 4;
+                buffer.Position = 0;
+
                 ListenForData(
-                    delegate (MessageReader msg)
-                    {
-                        ListenForData(InvokeAndListen);
+                    buffer,
+                    m => ReadHeader(m,
+                        delegate (MessageReader msg)
+                        {
+                            ListenForData();
 
-                        //Remove version byte
-                        msg.Offset = 1;
-                        msg.Length -= 1;
-                        msg.Position = 0;
+                            //Remove version byte
+                            msg.Offset = 1;
+                            msg.Length -= 1;
+                            msg.Position = 0;
 
-                        callback.Invoke(msg);
-                    }
+                            callback.Invoke(msg);
+                        })
                 );
             }
             catch (Exception e)
             {
+                buffer.Recycle();
                 Disconnect("An exception occured while initiating the first receive operation: " + e.Message);
             }
         }
 
         private void InvokeAndListen(MessageReader msg)
         {
-            this.ListenForData(InvokeAndListen);
+            this.ListenForData();
 
             try
             {
@@ -202,58 +212,42 @@ namespace Hazel.Tcp
             }
             catch { }
         }
+        
+        private void ListenForData()
+        {
+            var msg = MessageReader.GetSized(ushort.MaxValue);
+            msg.Offset = 0;
+            msg.Length = 4;
+            msg.Position = 0;
 
-        private void ListenForData(Action<MessageReader> callback)
+            ListenForData(msg, m => ReadHeader(m, null));
+        }
+
+        private void ReadHeader(MessageReader msg, Action<MessageReader> callback)
+        {
+            msg.Length = GetLengthFromBytes(msg.Buffer);
+            msg.Position = 0;
+
+            ListenForData(msg, callback ?? InvokeAndListen);
+        }
+
+        private void ListenForData(MessageReader msg, Action<MessageReader> callback)
         {
             if (State == ConnectionState.Disconnecting || State == ConnectionState.NotConnected)
                 throw new HazelException("Not connected");
-
-            var msg = MessageReader.GetSized(ushort.MaxValue);
+            
             try
             {
-                socket.BeginReceive(msg.Buffer, 0, 4, SocketFlags.None, o => HeaderReadCallback(callback, o), msg);
+                socket.BeginReceive(msg.Buffer, msg.Position, msg.Length, SocketFlags.None, o => ReadUntilFull(callback, o), msg);
             }
             catch (SocketException s)
             {
+                msg.Recycle();
                 Disconnect("SocketException while reading header: " + s.Message);
             }
         }
-
-        private void HeaderReadCallback(Action<MessageReader> callback, IAsyncResult result)
-        {
-            int bytesRead;
-            try
-            {
-                bytesRead = socket.EndReceive(result);
-                if (bytesRead == 0)
-                {
-                    Disconnect("Received 0 bytes");
-                    return;
-                }
-
-                Statistics.LogFragmentedReceive(0, bytesRead);
-            }
-            catch (SocketException s)
-            {
-                Disconnect("SocketException while reading header: " + s.Message);
-                return;
-            }
-
-            // TODO: Could possibly fragment here...
-            var msg = (MessageReader)result.AsyncState;
-            msg.Length = GetLengthFromBytes(msg.Buffer);
-
-            try
-            {
-                socket.BeginReceive(msg.Buffer, 0, msg.Length, SocketFlags.None, o => BodyReadCallback(callback, o), msg);
-            }
-            catch (SocketException s)
-            {
-                Disconnect("SocketException while reading body: " + s.Message);
-            }
-        }
-
-        private void BodyReadCallback(Action<MessageReader> callback, IAsyncResult result)
+        
+        private void ReadUntilFull(Action<MessageReader> callback, IAsyncResult result)
         {
             int bytesRead;
             try
@@ -278,14 +272,7 @@ namespace Hazel.Tcp
 
             if (msg.Position < bytesRead)
             {
-                try
-                {
-                    socket.BeginReceive(msg.Buffer, msg.Position, msg.Length - msg.Position, SocketFlags.None, o => BodyReadCallback(callback, o), msg);
-                }
-                catch (SocketException s)
-                {
-                    Disconnect("SocketException while reading body: " + s.Message);
-                }
+                ListenForData(msg, callback);
             }
             else
             {

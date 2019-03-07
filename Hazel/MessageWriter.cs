@@ -57,8 +57,8 @@ namespace Hazel
                         }
                     case SendOption.Tcp:
                         {
-                            byte[] output = new byte[this.Length - 4];
-                            System.Buffer.BlockCopy(this.Buffer, 4, output, 0, this.Length - 4);
+                            byte[] output = new byte[this.Length];
+                            System.Buffer.BlockCopy(this.Buffer, 0, output, 0, this.Length);
                             return output;
                         }
                 }
@@ -113,9 +113,8 @@ namespace Hazel
 
         public void Clear(SendOption sendOption)
         {
-            this.Position = this.Length = 0;
+            this.messageStarts.Clear();
             this.SendOption = sendOption;
-
             this.Buffer[0] = (byte)sendOption;
             switch (sendOption)
             {
@@ -126,6 +125,7 @@ namespace Hazel
                     this.Length = this.Position = 3;
                     break;
                 case SendOption.Tcp:
+                    this.Length = this.Position = 0;
                     break;
             }
         }
