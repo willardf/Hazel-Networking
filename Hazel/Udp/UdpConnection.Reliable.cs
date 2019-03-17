@@ -147,7 +147,7 @@ namespace Hazel.Udp
                     {
                         if (connection.reliableDataPacketsSent.TryRemove(this.Id, out Packet self))
                         {
-                            connection.Disconnect($"Reliable packet {self.Id} was not ack'd after {lifetime}ms ({self.Retransmissions} resends)");
+                            connection.Disconnect($"Reliable packet {self.Id} (size={this.Length}) was not ack'd after {lifetime}ms ({self.Retransmissions} resends)");
 
                             self.Recycle();
                         }
@@ -163,7 +163,7 @@ namespace Hazel.Udp
                         {
                             if (connection.reliableDataPacketsSent.TryRemove(this.Id, out Packet self))
                             {
-                                connection.Disconnect($"Reliable packet {self.Id} was not ack'd after {self.Retransmissions} resends ({lifetime}ms)");
+                                connection.Disconnect($"Reliable packet {self.Id} (size={this.Length}) was not ack'd after {self.Retransmissions} resends ({lifetime}ms)");
 
                                 self.Recycle();
                             }

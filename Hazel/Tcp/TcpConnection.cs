@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 
 namespace Hazel.Tcp
 {
@@ -127,10 +128,12 @@ namespace Hazel.Tcp
 
             try
             {
-                socket.BeginSend(fullBytes, 0, fullBytes.Length, SocketFlags.None, null, null);
+                this.sem.WaitOne();
+                socket.BeginSend(fullBytes, 0, fullBytes.Length, SocketFlags.None, FinishSend, null);
             }
             catch (Exception e)
             {
+                try { this.sem.Set(); } catch (ObjectDisposedException) { }
                 Disconnect("Could not send data as an occured: " + e.Message);
             }
 
@@ -154,16 +157,32 @@ namespace Hazel.Tcp
 
             try
             {
-                socket.BeginSend(fullBytes, 0, fullBytes.Length, SocketFlags.None, null, null);
+                this.sem.WaitOne();
+                socket.BeginSend(fullBytes, 0, fullBytes.Length, SocketFlags.None, FinishSend, null);
             }
             catch (Exception e)
             {
+                try { this.sem.Set(); } catch (ObjectDisposedException) { }
                 Disconnect("Could not send data as an occured: " + e.Message);
             }
 
             Statistics.LogFragmentedSend(bytes.Length, fullBytes.Length);
         }
-                
+
+        private AutoResetEvent sem = new AutoResetEvent(true);
+        private void FinishSend(IAsyncResult ar)
+        {
+            try
+            {
+                this.socket.EndSend(ar);
+            }
+            catch { }
+            finally
+            {
+                try { this.sem.Set(); } catch (ObjectDisposedException) { }
+            }
+        }
+
         /// <summary>
         ///     Starts waiting for a first handshake packet to be received.
         /// </summary>
@@ -270,15 +289,15 @@ namespace Hazel.Tcp
 
             Statistics.LogFragmentedReceive(bytesRead, 0);
 
-            if (msg.Position < bytesRead)
+            if (msg.Position < msg.Length)
             {
                 ListenForData(msg, callback);
             }
             else
             {
-                msg.Position = 0;
                 try
                 {
+                    msg.Position = 0;
                     callback(msg);
                 }
                 catch { }
@@ -328,6 +347,16 @@ namespace Hazel.Tcp
         {
             if (disposing)
             {
+                try
+                {
+                    if (this.sem != null)
+                    {
+                        this.sem.Dispose();
+                        this.sem = null;
+                    }
+                }
+                catch { }
+
                 lock (this)
                 {
                     State = ConnectionState.NotConnected;
