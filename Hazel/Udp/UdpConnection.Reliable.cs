@@ -36,7 +36,7 @@ namespace Hazel.Udp
         /// A compounding multiplier to back off resend timeout.
         /// Applied to ping before first timeout when ResendTimeout == 0.
         /// </summary>
-        public volatile float ResendPingMultiplier = 3;
+        public volatile float ResendPingMultiplier = 2;
 
         /// <summary>
         ///     Holds the last ID allocated.
@@ -72,7 +72,7 @@ namespace Hazel.Udp
         ///     This returns the average ping for a one-way trip as calculated from the reliable packets that have been sent 
         ///     and acknowledged by the endpoint.
         /// </remarks>
-        public float AveragePingMs = 500;
+        public float AveragePingMs = 200;
 
         /// <summary>
         ///     The maximum times a message should be resent before marking the endpoint as disconnected.
@@ -171,7 +171,7 @@ namespace Hazel.Udp
                             return 0;
                         }
 
-                        this.NextTimeout = (int)Math.Min(this.NextTimeout * connection.ResendPingMultiplier, connection.DisconnectTimeout);
+                        this.NextTimeout = (int)Math.Min(this.NextTimeout * connection.ResendPingMultiplier, 1500);
                         try
                         {
                             connection.WriteBytesToConnection(this.Data, this.Length);
@@ -243,13 +243,20 @@ namespace Hazel.Udp
                 this,
                 buffer,
                 sendLength,
-                ResendTimeout > 0 ? ResendTimeout : (int)Math.Max(300, Math.Min(AveragePingMs * this.ResendPingMultiplier, 2000)),
+                ResendTimeout > 0 ? ResendTimeout : ClampToInt(AveragePingMs * this.ResendPingMultiplier, 300, 1000),
                 ackCallback);
 
             if (!reliableDataPacketsSent.TryAdd(id, packet))
             {
                 throw new Exception("That shouldn't be possible");
             }
+        }
+
+        public static int ClampToInt(float value, int min, int max)
+        {
+            if (value < min) return min;
+            if (value > max) return max;
+            return (int)value;
         }
 
         /// <summary>

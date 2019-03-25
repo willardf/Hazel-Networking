@@ -139,21 +139,9 @@ namespace Hazel.Udp
         {
             if (this.socket != null)
             {
-                try
-                {
-                    this.socket.Shutdown(SocketShutdown.Both);
-                }
-                catch { }
-                try
-                {
-                    this.socket.Close();
-                }
-                catch { }
-                try
-                {
-                    this.socket.Dispose();
-                }
-                catch { }
+                try { this.socket.Shutdown(SocketShutdown.Both); } catch { }
+                try { this.socket.Close(); } catch { }
+                try { this.socket.Dispose(); } catch { }
                 this.socket = null;
             }
         }

@@ -306,8 +306,10 @@ namespace Hazel.Udp
 
             if (this.socket != null)
             {
-                this.socket.Close();
-                this.socket.Dispose();
+                try { this.socket.Shutdown(SocketShutdown.Both); } catch { }
+                try { this.socket.Close(); } catch { }
+                try { this.socket.Dispose(); } catch { }
+
                 this.socket = null;
             }
 

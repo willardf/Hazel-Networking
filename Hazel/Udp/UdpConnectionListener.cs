@@ -57,8 +57,8 @@ namespace Hazel.Udp
                 this.socket.SetSocketOption(SocketOptionLevel.IPv6, (SocketOptionName)27, false);
             }
 
-            socket.ReceiveBufferSize = 4194304;
-            socket.SendBufferSize = 1048576;
+            socket.ReceiveBufferSize = BufferSize;
+            socket.SendBufferSize = BufferSize;
             
             reliablePacketTimer = new Timer(ManageReliablePackets, null, 100, Timeout.Infinite);
         }
@@ -330,13 +330,9 @@ namespace Hazel.Udp
 
             if (this.socket != null)
             {
-                try
-                {
-                    this.socket.Shutdown(SocketShutdown.Both);
-                }
-                catch { }
-                this.socket.Close();
-                this.socket.Dispose();
+                try { this.socket.Shutdown(SocketShutdown.Both); } catch { }
+                try { this.socket.Close(); } catch { }
+                try { this.socket.Dispose(); } catch { }
                 this.socket = null;
             }
 
