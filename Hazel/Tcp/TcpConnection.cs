@@ -128,12 +128,10 @@ namespace Hazel.Tcp
 
             try
             {
-                this.sem.WaitOne();
                 socket.BeginSend(fullBytes, 0, fullBytes.Length, SocketFlags.None, FinishSend, null);
             }
             catch (Exception e)
             {
-                try { this.sem.Set(); } catch (ObjectDisposedException) { }
                 Disconnect("Could not send data as an occured: " + e.Message);
             }
 
@@ -157,19 +155,16 @@ namespace Hazel.Tcp
 
             try
             {
-                this.sem.WaitOne();
                 socket.BeginSend(fullBytes, 0, fullBytes.Length, SocketFlags.None, FinishSend, null);
             }
             catch (Exception e)
             {
-                try { this.sem.Set(); } catch (ObjectDisposedException) { }
                 Disconnect("Could not send data as an occured: " + e.Message);
             }
 
             Statistics.LogFragmentedSend(bytes.Length, fullBytes.Length);
         }
 
-        private AutoResetEvent sem = new AutoResetEvent(true);
         private void FinishSend(IAsyncResult ar)
         {
             try
@@ -177,10 +172,6 @@ namespace Hazel.Tcp
                 this.socket.EndSend(ar);
             }
             catch { }
-            finally
-            {
-                try { this.sem.Set(); } catch (ObjectDisposedException) { }
-            }
         }
 
         /// <summary>
@@ -278,6 +269,7 @@ namespace Hazel.Tcp
                     return;
                 }
             }
+            catch (ObjectDisposedException) { return; }
             catch (SocketException s)
             {
                 Disconnect("SocketException while reading body: " + s.Message);
@@ -347,16 +339,6 @@ namespace Hazel.Tcp
         {
             if (disposing)
             {
-                try
-                {
-                    if (this.sem != null)
-                    {
-                        this.sem.Dispose();
-                        this.sem = null;
-                    }
-                }
-                catch { }
-
                 lock (this)
                 {
                     State = ConnectionState.NotConnected;

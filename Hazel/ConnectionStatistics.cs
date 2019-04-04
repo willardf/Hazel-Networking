@@ -16,7 +16,7 @@ namespace Hazel
         /// <summary>
         ///     The total number of messages sent.
         /// </summary>
-        public long MessagesSent
+        public int MessagesSent
         {
             get
             {
@@ -32,18 +32,18 @@ namespace Hazel
         ///     each time that LogUnreliableSend is called by the Connection. Messages that caused an error are not 
         ///     counted and messages are only counted once all other operations in the send are complete.
         /// </remarks>
-        public long UnreliableMessagesSent
+        public int UnreliableMessagesSent
         {
             get
             {
-                return Interlocked.Read(ref unreliableMessagesSent);
+                return unreliableMessagesSent;
             }
         }
 
         /// <summary>
         ///     The number of unreliable messages sent.
         /// </summary>
-        long unreliableMessagesSent;
+        int unreliableMessagesSent;
 
         /// <summary>
         ///     The number of reliable messages sent.
@@ -53,18 +53,18 @@ namespace Hazel
         ///     each time that LogReliableSend is called by the Connection. Messages that caused an error are not 
         ///     counted and messages are only counted once all other operations in the send are complete.
         /// </remarks>
-        public long ReliableMessagesSent
+        public int ReliableMessagesSent
         {
             get
             {
-                return Interlocked.Read(ref reliableMessagesSent);
+                return reliableMessagesSent;
             }
         }
 
         /// <summary>
         ///     The number of unreliable messages sent.
         /// </summary>
-        long reliableMessagesSent;
+        int reliableMessagesSent;
 
         /// <summary>
         ///     The number of fragmented messages sent.
@@ -74,18 +74,18 @@ namespace Hazel
         ///     each time that LogFragmentedSend is called by the Connection. Messages that caused an error are not 
         ///     counted and messages are only counted once all other operations in the send are complete.
         /// </remarks>
-        public long FragmentedMessagesSent
+        public int FragmentedMessagesSent
         {
             get
             {
-                return Interlocked.Read(ref fragmentedMessagesSent);
+                return fragmentedMessagesSent;
             }
         }
 
         /// <summary>
         ///     The number of fragmented messages sent.
         /// </summary>
-        long fragmentedMessagesSent;
+        int fragmentedMessagesSent;
 
         /// <summary>
         ///     The number of acknowledgement messages sent.
@@ -95,18 +95,18 @@ namespace Hazel
         ///     each time that LogAcknowledgementSend is called by the Connection. Messages that caused an error are not 
         ///     counted and messages are only counted once all other operations in the send are complete.
         /// </remarks>
-        public long AcknowledgementMessagesSent
+        public int AcknowledgementMessagesSent
         {
             get
             {
-                return Interlocked.Read(ref acknowledgementMessagesSent);
+                return acknowledgementMessagesSent;
             }
         }
 
         /// <summary>
         ///     The number of acknowledgement messages sent.
         /// </summary>
-        long acknowledgementMessagesSent;
+        int acknowledgementMessagesSent;
 
         /// <summary>
         ///     The number of hello messages sent.
@@ -116,18 +116,18 @@ namespace Hazel
         ///     each time that LogHelloSend is called by the Connection. Messages that caused an error are not 
         ///     counted and messages are only counted once all other operations in the send are complete.
         /// </remarks>
-        public long HelloMessagesSent
+        public int HelloMessagesSent
         {
             get
             {
-                return Interlocked.Read(ref helloMessagesSent);
+                return helloMessagesSent;
             }
         }
 
         /// <summary>
         ///     The number of hello messages sent.
         /// </summary>
-        long helloMessagesSent;
+        int helloMessagesSent;
 
         /// <summary>
         ///     The number of bytes of data sent.
@@ -185,7 +185,7 @@ namespace Hazel
         /// <summary>
         ///     The total number of messages received.
         /// </summary>
-        public long MessagesReceived
+        public int MessagesReceived
         {
             get
             {
@@ -200,18 +200,18 @@ namespace Hazel
         ///     This is the number of unreliable messages that were received by the <see cref="Connection"/>, incremented
         ///     each time that LogUnreliableReceive is called by the Connection. Messages are counted before the receive event is invoked.
         /// </remarks>
-        public long UnreliableMessagesReceived
+        public int UnreliableMessagesReceived
         {
             get
             {
-                return Interlocked.Read(ref unreliableMessagesReceived);
+                return unreliableMessagesReceived;
             }
         }
 
         /// <summary>
         ///     The number of unreliable messages received.
         /// </summary>
-        long unreliableMessagesReceived;
+        int unreliableMessagesReceived;
 
         /// <summary>
         ///     The number of reliable messages received.
@@ -220,18 +220,18 @@ namespace Hazel
         ///     This is the number of reliable messages that were received by the <see cref="Connection"/>, incremented
         ///     each time that LogReliableReceive is called by the Connection. Messages are counted before the receive event is invoked.
         /// </remarks>
-        public long ReliableMessagesReceived
+        public int ReliableMessagesReceived
         {
             get
             {
-                return Interlocked.Read(ref reliableMessagesReceived);
+                return reliableMessagesReceived;
             }
         }
 
         /// <summary>
         ///     The number of reliable messages received.
         /// </summary>
-        long reliableMessagesReceived;
+        int reliableMessagesReceived;
 
         /// <summary>
         ///     The number of fragmented messages received.
@@ -240,18 +240,18 @@ namespace Hazel
         ///     This is the number of fragmented messages that were received by the <see cref="Connection"/>, incremented
         ///     each time that LogFragmentedReceive is called by the Connection. Messages are counted before the receive event is invoked.
         /// </remarks>
-        public long FragmentedMessagesReceived
+        public int FragmentedMessagesReceived
         {
             get
             {
-                return Interlocked.Read(ref fragmentedMessagesReceived);
+                return fragmentedMessagesReceived;
             }
         }
 
         /// <summary>
         ///     The number of fragmented messages received.
         /// </summary>
-        long fragmentedMessagesReceived;
+        int fragmentedMessagesReceived;
 
         /// <summary>
         ///     The number of acknowledgement messages received.
@@ -260,18 +260,18 @@ namespace Hazel
         ///     This is the number of acknowledgement messages that were received by the <see cref="Connection"/>, incremented
         ///     each time that LogAcknowledgemntReceive is called by the Connection. Messages are counted before the receive event is invoked.
         /// </remarks>
-        public long AcknowledgementMessagesReceived
+        public int AcknowledgementMessagesReceived
         {
             get
             {
-                return Interlocked.Read(ref acknowledgementMessagesReceived);
+                return acknowledgementMessagesReceived;
             }
         }
 
         /// <summary>
         ///     The number of acknowledgement messages received.
         /// </summary>
-        long acknowledgementMessagesReceived;
+        int acknowledgementMessagesReceived;
 
         /// <summary>
         ///     The number of hello messages received.
@@ -280,18 +280,18 @@ namespace Hazel
         ///     This is the number of hello messages that were received by the <see cref="Connection"/>, incremented
         ///     each time that LogHelloReceive is called by the Connection. Messages are counted before the receive event is invoked.
         /// </remarks>
-        public long HelloMessagesReceived
+        public int HelloMessagesReceived
         {
             get
             {
-                return Interlocked.Read(ref helloMessagesReceived);
+                return helloMessagesReceived;
             }
         }
 
         /// <summary>
         ///     The number of hello messages received.
         /// </summary>
-        long helloMessagesReceived;
+        int helloMessagesReceived;
 
         /// <summary>
         ///     The number of bytes of data received.
