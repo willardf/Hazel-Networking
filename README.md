@@ -1,4 +1,4 @@
-#### Hazel Networking is a low-level networking library for C# providing connection orientated, message based communication via UDP and RUDP.
+#### Hazel Networking is a low-level networking library for C# providing connection-oriented, message based communication via UDP and RUDP.
 
 The aim of this fork is to create a simple interface for ultra-fast connection-based UDP communication for games.
 
@@ -15,15 +15,15 @@ The aim of this fork is to create a simple interface for ultra-fast connection-b
 
 -----
 
-### This fork has been heavily modified from the original to reduce allocations, copies, and locking. As such, it's fairly stable, but not guaranteed. However, my game Among Us currently runs on it with over 200k MAU, so that counts for something.
+### This fork has been heavily modified from the original to reduce allocations, copies, and locking. As such, it's fairly stable, but not guaranteed. However, my game Among Us currently runs on it with over 500k MAU, so that counts for something.
 
 -----
 
 HTML documentation, tutorials and quickstarts from the DarkRift Website [here](http://www.darkriftnetworking.com/Hazel/Docs) should be relatively accurate; but I doubt the original creator will want support calls for this fork. I can provide some limited support if you create an issue.
 
-I have changed some interfaces in "non-intuitive ways", such as when to recycle MessageReader from DataReceived vs MessageReader.ReadMessage. To be honest, sorry but ¯\_(ツ)_/¯. It's my belief that if a library becomes friendly and proper-API-like, you can expect it to be restrictive or perform slowly. I don't want either of those things, but I try to keep things fairly tidy.
+I have changed some interfaces in "non-intuitive ways", it is my hope that [this example repo](https://github.com/willardf/Hazel-Examples) will be able to help users get started.
 
-If you want to make improvements, I am open to pull requests. If you find bugs, raise issues.
+If you want to make improvements, I am open to pull requests. If you find bugs, feel free raise issues.
 
 -----
 
