@@ -343,9 +343,9 @@ namespace Hazel.Tcp
                 {
                     State = ConnectionState.NotConnected;
 
-                    if (socket.Connected)
-                        socket.Shutdown(SocketShutdown.Send);
-                    socket.Close();
+                    try { this.socket.Shutdown(SocketShutdown.Both); } catch { }
+                    try { this.socket.Close(); } catch { }
+                    try { this.socket.Dispose(); } catch { }
                 }
             }
 
