@@ -9,8 +9,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hazel.UnitTests", "Hazel.Un
 EndProject
 Project("{7CF6DF6D-3B04-46F8-A40B-537D21BCA0B4}") = "Hazel.Documentation", "Hazel.Documentation\Hazel.Documentation.shfbproj", "{B90BB577-2080-4C22-AE86-FB0CCFB40920}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Benchmark", "Benchmark\Benchmark.csproj", "{009A1440-7A39-498F-B27A-ACDEF1FE74B6}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -28,10 +26,6 @@ Global
 		{B90BB577-2080-4C22-AE86-FB0CCFB40920}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{B90BB577-2080-4C22-AE86-FB0CCFB40920}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B90BB577-2080-4C22-AE86-FB0CCFB40920}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{009A1440-7A39-498F-B27A-ACDEF1FE74B6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{009A1440-7A39-498F-B27A-ACDEF1FE74B6}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{009A1440-7A39-498F-B27A-ACDEF1FE74B6}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{009A1440-7A39-498F-B27A-ACDEF1FE74B6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
