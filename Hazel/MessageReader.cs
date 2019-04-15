@@ -44,18 +44,6 @@ namespace Hazel
             return output;
         }
         
-        public static MessageReader GetRaw(byte[] bytes, int offset, int length)
-        {
-            var output = ReaderPool.GetObject();
-
-            output.Buffer = bytes;
-            output.Offset = offset;
-            output.Position = 0;
-            output.Length = length;
-            output.Tag = byte.MaxValue;
-            return output;
-        }
-
         public static MessageReader Get(byte[] buffer)
         {
             var output = ReaderPool.GetObject();

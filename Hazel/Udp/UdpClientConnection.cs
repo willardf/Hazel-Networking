@@ -20,11 +20,6 @@ namespace Hazel.Udp
         /// </summary>
         private Socket socket;
 
-        /// <summary>
-        ///     The buffer to store incomming data in.
-        /// </summary>
-        private byte[] dataBuffer = new byte[ushort.MaxValue];
-
         private Timer reliablePacketTimer;
 
         /// <summary>
@@ -77,7 +72,7 @@ namespace Hazel.Udp
         }
 
         public event Action<byte[], int> DataSentRaw;
-        public event Action<byte[]> DataReceivedRaw;
+        public event Action<byte[], int> DataReceivedRaw;
 
         private void WriteBytesToConnectionReal(byte[] bytes, int length)
         {
@@ -97,6 +92,7 @@ namespace Hazel.Udp
                         {
                             socket.EndSendTo(result);
                         }
+                        catch (NullReferenceException) { }
                         catch (ObjectDisposedException)
                         {
                             Disconnect("Could not send as the socket was disposed of.");
@@ -208,7 +204,15 @@ namespace Hazel.Udp
         /// </summary>
         void StartListeningForData()
         {
-            socket.BeginReceive(dataBuffer, 0, dataBuffer.Length, SocketFlags.None, ReadCallback, dataBuffer);
+            var msg = MessageReader.GetSized(ushort.MaxValue);
+            try
+            {
+                socket.BeginReceive(msg.Buffer, 0, msg.Buffer.Length, SocketFlags.None, ReadCallback, msg);
+            }
+            catch
+            {
+                msg.Recycle();
+            }
         }
 
         /// <summary>
@@ -217,34 +221,36 @@ namespace Hazel.Udp
         /// <param name="result">The asyncronous operation's result.</param>
         void ReadCallback(IAsyncResult result)
         {
-            int bytesReceived;
+            var msg = (MessageReader)result.AsyncState;
 
-            //End the receive operation
             try
             {
-                bytesReceived = socket.EndReceive(result);
+                msg.Length = socket.EndReceive(result);
+            }
+            catch (NullReferenceException)
+            {
+                msg.Recycle();
+                return;
             }
             catch (ObjectDisposedException)
             {
-                //If the socket's been disposed then we can just end there.
+                msg.Recycle();
                 return;
             }
             catch (SocketException e)
             {
+                msg.Recycle();
                 Disconnect("Socket exception while reading data: " + e.Message);
                 return;
             }
 
             //Exit if no bytes read, we've failed.
-            if (bytesReceived == 0)
+            if (msg.Length == 0)
             {
+                msg.Recycle();
                 Disconnect("Received 0 bytes");
                 return;
             }
-
-            //Copy data to new array
-            byte[] bytes = new byte[bytesReceived];
-            Buffer.BlockCopy(dataBuffer, 0, bytes, 0, bytesReceived);
 
             //Begin receiving again
             try
@@ -274,9 +280,8 @@ namespace Hazel.Udp
                 }
             }
 
-            DataReceivedRaw?.Invoke(bytes);
-            MessageReader msg = MessageReader.GetRaw(bytes, 0, bytesReceived);
-            HandleReceive(msg, bytesReceived);
+            DataReceivedRaw?.Invoke(msg.Buffer, msg.Length);
+            HandleReceive(msg, msg.Length);
         }
 
         /// <summary>
