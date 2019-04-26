@@ -22,11 +22,6 @@ namespace Hazel
         /// </remarks>
         public EndPoint RemoteEndPoint { get; protected set; }
 
-        /// <summary>
-        ///     The <see cref="IPMode">IPMode</see> the client is connected using.
-        /// </summary>
-        public IPMode IPMode { get; protected set; }
-
         public long GetIP4Address()
         {
             if (IPMode == IPMode.IPv4)

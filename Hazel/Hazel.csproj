@@ -80,9 +80,6 @@
     <Compile Include="ObjectPool.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SendOption.cs" />
-    <Compile Include="Tcp\StateObject.cs" />
-    <Compile Include="Tcp\TcpConnection.cs" />
-    <Compile Include="Tcp\TcpConnectionListener.cs" />
     <Compile Include="Udp\SendOptionInternal.cs" />
     <Compile Include="ConnectionStatistics.cs" />
     <Compile Include="Udp\UdpBroadcaster.cs" />

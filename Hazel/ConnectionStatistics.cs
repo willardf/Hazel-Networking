@@ -25,6 +25,27 @@ namespace Hazel
         }
 
         /// <summary>
+        ///     The number of messages sent larger than 1400 bytes. This is smaller than most default MTUs.
+        /// </summary>
+        /// <remarks>
+        ///     This is the number of unreliable messages that were sent from the <see cref="Connection"/>, incremented 
+        ///     each time that LogUnreliableSend is called by the Connection. Messages that caused an error are not 
+        ///     counted and messages are only counted once all other operations in the send are complete.
+        /// </remarks>
+        public int FragmentableMessagesSent
+        {
+            get
+            {
+                return fragmentableMessagesSent;
+            }
+        }
+
+        /// <summary>
+        ///     The number of messages sent larger than 1400 bytes.
+        /// </summary>
+        int fragmentableMessagesSent;
+
+        /// <summary>
         ///     The number of unreliable messages sent.
         /// </summary>
         /// <remarks>
@@ -358,6 +379,11 @@ namespace Hazel
             Interlocked.Increment(ref unreliableMessagesSent);
             Interlocked.Add(ref dataBytesSent, dataLength);
             Interlocked.Add(ref totalBytesSent, totalLength);
+
+            if (totalLength > 1400)
+            {
+                Interlocked.Increment(ref fragmentableMessagesSent);
+            }
         }
 
         /// <summary>
@@ -373,6 +399,11 @@ namespace Hazel
             Interlocked.Increment(ref reliableMessagesSent);
             Interlocked.Add(ref dataBytesSent, dataLength);
             Interlocked.Add(ref totalBytesSent, totalLength);
+
+            if (totalLength > 1400)
+            {
+                Interlocked.Increment(ref fragmentableMessagesSent);
+            }
         }
 
         /// <summary>
@@ -388,6 +419,11 @@ namespace Hazel
             Interlocked.Increment(ref fragmentedMessagesSent);
             Interlocked.Add(ref dataBytesSent, dataLength);
             Interlocked.Add(ref totalBytesSent, totalLength);
+
+            if (totalLength > 1400)
+            {
+                Interlocked.Increment(ref fragmentableMessagesSent);
+            }
         }
 
         /// <summary>

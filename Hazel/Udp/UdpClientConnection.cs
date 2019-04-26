@@ -55,7 +55,11 @@ namespace Hazel.Udp
         private void ManageReliablePacketsInternal(object state)
         {
             base.ManageReliablePackets();
-            reliablePacketTimer.Change(100, Timeout.Infinite);
+            try
+            {
+                reliablePacketTimer.Change(100, Timeout.Infinite);
+            }
+            catch { }
         }
 
         /// <inheritdoc />

@@ -31,7 +31,5 @@ namespace Hazel
         ///     a larger number of protocol bytes and can be slower than unreliable delivery.
         /// </remarks>
         Reliable = 1,
-
-        Tcp = 2,
     }
 }

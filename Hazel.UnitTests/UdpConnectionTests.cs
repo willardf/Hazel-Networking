@@ -2,9 +2,9 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Net;
 using System.Threading;
-
 using Hazel.Udp;
 using System.Linq;
+using System.Collections.Generic;
 
 namespace Hazel.UnitTests
 {
@@ -95,7 +95,7 @@ namespace Hazel.UnitTests
                 }
             }
         }
-        
+
         /// <summary>
         ///     Tests IPv4 connectivity.
         /// </summary>
