@@ -41,7 +41,7 @@ namespace Hazel.Udp
                     throw new InvalidOperationException("IPV6 not supported!");
 
                 socket = new Socket(AddressFamily.InterNetworkV6, SocketType.Dgram, ProtocolType.Udp);
-                socket.SetSocketOption(SocketOptionLevel.IPv6, (SocketOptionName)27, false);    //TODO these lines shouldn't be needed anymore
+                socket.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.IPv6Only, false);
             }
 
             reliablePacketTimer = new Timer(ManageReliablePacketsInternal, null, 100, Timeout.Infinite);
@@ -90,59 +90,34 @@ namespace Hazel.Udp
                     length,
                     SocketFlags.None,
                     RemoteEndPoint,
-                    delegate (IAsyncResult result)
-                    {
-                        try
-                        {
-                            socket.EndSendTo(result);
-                        }
-                        catch (NullReferenceException) { }
-                        catch (ObjectDisposedException)
-                        {
-                            Disconnect("Could not send as the socket was disposed of.");
-                        }
-                        catch (SocketException)
-                        {
-                            Disconnect("Could not send data as a SocketException occured.");
-                        }
-                    },
-                    null
-                );
+                    HandleSendTo,
+                    null);
             }
+            catch (NullReferenceException) { }
             catch (ObjectDisposedException)
             {
-                //User probably called Disconnect in between this method starting and here so report the issue
-                throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
+                // Already disposed and disconnected...
             }
-            catch (SocketException)
+            catch (SocketException ex)
             {
-                Disconnect("Could not send data as a SocketException occured.");
-                throw;
+                Disconnect("Could not send data as a SocketException occured: " + ex.Message, true);
             }
         }
 
-        protected override void WriteBytesToConnectionSync(byte[] bytes, int length)
+        private void HandleSendTo(IAsyncResult result)
         {
-            DataSentRaw?.Invoke(bytes, length);
-
             try
             {
-                socket.SendTo(
-                    bytes,
-                    0,
-                    length,
-                    SocketFlags.None,
-                    RemoteEndPoint);
+                socket.EndSendTo(result);
             }
+            catch (NullReferenceException) { }
             catch (ObjectDisposedException)
             {
-                //User probably called Disconnect in between this method starting and here so report the issue
-                throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
+                // Already disposed and disconnected...
             }
-            catch (SocketException)
+            catch (SocketException ex)
             {
-                Disconnect("Could not send data as a SocketException occured.");
-                throw;
+                Disconnect("Could not send data as a SocketException occured: " + ex.Message, true);
             }
         }
 
@@ -295,7 +270,12 @@ namespace Hazel.Udp
         {
             try
             {
-                WriteBytesToConnectionSync(DisconnectBytes, 1);
+                socket.SendTo(
+                    DisconnectBytes,
+                    0,
+                    1,
+                    SocketFlags.None,
+                    RemoteEndPoint);
             }
             catch { }
         }
@@ -308,8 +288,8 @@ namespace Hazel.Udp
                 if (this._state == ConnectionState.Connected
                     || this._state == ConnectionState.Disconnecting)
                 {
-                    SendDisconnect();
                     this._state = ConnectionState.NotConnected;
+                    SendDisconnect();
                 }
             }
 

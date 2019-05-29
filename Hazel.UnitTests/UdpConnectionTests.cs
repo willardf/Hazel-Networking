@@ -11,6 +11,69 @@ namespace Hazel.UnitTests
     [TestClass]
     public class UdpConnectionTests
     {
+        [TestMethod]
+        public void ServerDisposeDisconnectsTest()
+        {
+            IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 4296);
+
+            bool serverConnected = false;
+            bool serverDisconnected = false;
+            bool clientDisconnected = false;
+
+            using (UdpConnectionListener listener = new UdpConnectionListener(new IPEndPoint(IPAddress.Any, 4296)))
+            using (UdpConnection connection = new UdpClientConnection(ep))
+            {
+                listener.NewConnection += (evt) =>
+                {
+                    serverConnected = true;
+                    evt.Connection.Disconnected += (o, et) => serverDisconnected = true;
+                };
+                connection.Disconnected += (o, evt) => clientDisconnected = true;
+
+                listener.Start();
+                connection.Connect();
+
+                listener.Dispose();
+                Thread.Sleep(10);
+
+                Assert.IsTrue(serverConnected);
+                Assert.IsTrue(clientDisconnected);
+                Assert.IsFalse(serverDisconnected);
+            }
+        }
+
+        [TestMethod]
+        public void ClientServerDisposeDisconnectsTest()
+        {
+            IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 4296);
+
+            bool serverConnected = false;
+            bool serverDisconnected = false;
+            bool clientDisconnected = false;
+
+            using (UdpConnectionListener listener = new UdpConnectionListener(new IPEndPoint(IPAddress.Any, 4296)))
+            using (UdpConnection connection = new UdpClientConnection(ep))
+            {
+                listener.NewConnection += (evt) =>
+                {
+                    serverConnected = true;
+                    evt.Connection.Disconnected += (o, et) => serverDisconnected = true;
+                };
+
+                connection.Disconnected += (o, et) => clientDisconnected = true;
+
+                listener.Start();
+                connection.Connect();
+                connection.Dispose();
+
+                Thread.Sleep(10);
+
+                Assert.IsTrue(serverConnected);
+                Assert.IsTrue(serverDisconnected);
+                Assert.IsFalse(clientDisconnected);
+            }
+        }
+
         /// <summary>
         ///     Tests the fields on UdpConnection.
         /// </summary>
@@ -208,7 +271,37 @@ namespace Hazel.UnitTests
                 TestHelper.RunClientToServerTest(listener, connection, 10, SendOption.Reliable);
             }
         }
-        
+
+        /// <summary>
+        ///     Tests the keepalive functionality from the client,
+        /// </summary>
+        [TestMethod]
+        public void PingDisconnectClientTest()
+        {
+#if DEBUG
+            using (UdpConnectionListener listener = new UdpConnectionListener(new IPEndPoint(IPAddress.Any, 4296)))
+            using (UdpConnection connection = new UdpClientConnection(new IPEndPoint(IPAddress.Loopback, 4296)))
+            {
+                listener.Start();
+
+                connection.Connect();
+
+                // After connecting, quietly stop responding to all messages to fake connection loss.
+                Thread.Sleep(10);
+                listener.TestDropRate = 1;
+
+                connection.KeepAliveInterval = 100;
+
+                Thread.Sleep(1050);    //Enough time for ~10 keep alive packets
+
+                Assert.AreEqual(ConnectionState.NotConnected, connection.State);
+                Assert.AreEqual(3 * connection.MissingPingsUntilDisconnect + 4, connection.Statistics.TotalBytesSent); // + 4 for connecting overhead
+            }
+#else
+            Assert.Inconclusive("Only works in DEBUG");
+#endif
+        }
+
         /// <summary>
         ///     Tests the keepalive functionality from the client,
         /// </summary>
@@ -225,6 +318,7 @@ namespace Hazel.UnitTests
 
                 System.Threading.Thread.Sleep(1050);    //Enough time for ~10 keep alive packets
 
+                Assert.AreEqual(ConnectionState.Connected, connection.State);
                 Assert.IsTrue(
                     connection.Statistics.TotalBytesSent >= 30 &&
                     connection.Statistics.TotalBytesSent <= 50,
@@ -244,24 +338,15 @@ namespace Hazel.UnitTests
             using (UdpConnectionListener listener = new UdpConnectionListener(new IPEndPoint(IPAddress.Any, 4296)))
             using (UdpConnection connection = new UdpClientConnection(new IPEndPoint(IPAddress.Loopback, 4296)))
             {
-                listener.NewConnection += delegate(NewConnectionEventArgs args)
+                UdpConnection client = null;
+                listener.NewConnection += delegate (NewConnectionEventArgs args)
                 {
-                    ((UdpConnection)args.Connection).KeepAliveInterval = 100;
+                    client = (UdpConnection)args.Connection;
+                    client.KeepAliveInterval = 100;
 
                     Thread.Sleep(1050);    //Enough time for ~10 keep alive packets
 
-                    try
-                    {
-                        Assert.IsTrue(
-                            args.Connection.Statistics.TotalBytesSent >= 30 &&
-                            args.Connection.Statistics.TotalBytesSent <= 50,
-                            "Sent: " + args.Connection.Statistics.TotalBytesSent
-                        );
-                    }
-                    finally
-                    {
-                        mutex.Set();
-                    }
+                    mutex.Set();
                 };
 
                 listener.Start();
@@ -269,6 +354,14 @@ namespace Hazel.UnitTests
                 connection.Connect();
 
                 mutex.WaitOne();
+
+                Assert.AreEqual(ConnectionState.Connected, client.State);
+
+                Assert.IsTrue(
+                    client.Statistics.TotalBytesSent >= 27 &&
+                    client.Statistics.TotalBytesSent <= 50,
+                    "Sent: " + client.Statistics.TotalBytesSent
+                );
             }
         }
 

@@ -54,7 +54,7 @@ namespace Hazel.Udp
                     throw new HazelException("IPV6 not supported!");
 
                 this.socket = new Socket(AddressFamily.InterNetworkV6, SocketType.Dgram, ProtocolType.Udp);
-                this.socket.SetSocketOption(SocketOptionLevel.IPv6, (SocketOptionName)27, false);
+                this.socket.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.IPv6Only, false);
             }
 
             socket.ReceiveBufferSize = BufferSize;
@@ -75,8 +75,12 @@ namespace Hazel.Udp
                 var sock = kvp.Value;
                 sock.ManageReliablePackets();
             }
-            
-            this.reliablePacketTimer.Change(100, Timeout.Infinite);
+
+            try
+            {
+                this.reliablePacketTimer.Change(100, Timeout.Infinite);
+            }
+            catch { }
         }
 
         /// <inheritdoc />
@@ -300,15 +304,7 @@ namespace Hazel.Udp
                     endPoint
                 );
             }
-            catch (SocketException e)
-            {
-                throw new HazelException("Could not send data as a SocketException occured.", e);
-            }
-            catch (ObjectDisposedException)
-            {
-                //Keep alive timer probably ran, ignore
-                return;
-            }
+            catch { }
         }
 
         /// <summary>

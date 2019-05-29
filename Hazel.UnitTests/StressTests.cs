@@ -8,11 +8,13 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Hazel.UnitTests
 {
     [TestClass]
-    public class UnitTest1
+    public class StressTests
     {
         // [TestMethod]
-        public void StressTest()
+        public void StressTestOpeningConnections()
         {
+            // Start a listener in another process, or even better, 
+            // adjust the target IP and start listening on another computer.
             var ep = new IPEndPoint(IPAddress.Loopback, 22023);
             Parallel.For(0, 10000,
                 new ParallelOptions { MaxDegreeOfParallelism = 64 },

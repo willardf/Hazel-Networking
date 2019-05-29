@@ -133,7 +133,7 @@ namespace Hazel
         /// <summary>
         ///     Reset event that is triggered when the connection is marked Connected.
         /// </summary>
-        ManualResetEvent connectWaitLock = new ManualResetEvent(false);
+        private ManualResetEvent connectWaitLock = new ManualResetEvent(false);
 
         /// <summary>
         ///     Constructor that initializes the ConnecitonStatistics object.
@@ -291,6 +291,7 @@ namespace Hazel
             {
                 this.DataReceived = null;
                 this.Disconnected = null;
+                this.connectWaitLock.Dispose();
             }
         }
     }

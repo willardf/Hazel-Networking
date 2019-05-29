@@ -46,14 +46,6 @@ namespace Hazel.Udp
         }
 
         /// <inheritdoc />
-        protected override void WriteBytesToConnectionSync(byte[] bytes, int length)
-        {
-            // No throw: As an internal interface, I want to try sending bytes whenever the I feel like it.
-
-            Listener.SendDataSync(bytes, length, RemoteEndPoint);
-        }
-
-        /// <inheritdoc />
         /// <remarks>
         ///     This will always throw a HazelException.
         /// </remarks>
@@ -79,7 +71,7 @@ namespace Hazel.Udp
         {
             try
             {
-                WriteBytesToConnection(DisconnectBytes, 1);
+                Listener.SendDataSync(DisconnectBytes, 1, RemoteEndPoint);
             }
             catch { }
         }

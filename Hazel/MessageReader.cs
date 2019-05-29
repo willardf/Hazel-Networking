@@ -57,6 +57,18 @@ namespace Hazel
             return output;
         }
 
+        public static MessageReader CopyMessageIntoParent(MessageReader source)
+        {
+            var output = MessageReader.GetSized(source.Length + 3);
+            System.Buffer.BlockCopy(source.Buffer, source.Offset - 3, output.Buffer, 0, source.Length + 3);
+
+            output.Offset = 0;
+            output.Position = 0;
+            output.Length = source.Length + 3;
+            
+            return output;
+        }
+
         public static MessageReader Get(MessageReader source)
         {
             var output = GetSized(source.Buffer.Length);

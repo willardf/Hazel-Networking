@@ -295,6 +295,26 @@ namespace Hazel
         int acknowledgementMessagesReceived;
 
         /// <summary>
+        ///     The number of ping messages received.
+        /// </summary>
+        /// <remarks>
+        ///     This is the number of hello messages that were received by the <see cref="Connection"/>, incremented
+        ///     each time that LogHelloReceive is called by the Connection. Messages are counted before the receive event is invoked.
+        /// </remarks>
+        public int PingMessagesReceived
+        {
+            get
+            {
+                return pingMessagesReceived;
+            }
+        }
+
+        /// <summary>
+        ///     The number of hello messages received.
+        /// </summary>
+        int pingMessagesReceived;
+
+        /// <summary>
         ///     The number of hello messages received.
         /// </summary>
         /// <remarks>
@@ -507,6 +527,19 @@ namespace Hazel
         internal void LogAcknowledgementReceive(int totalLength)
         {
             Interlocked.Increment(ref acknowledgementMessagesReceived);
+            Interlocked.Add(ref totalBytesReceived, totalLength);
+        }
+
+        /// <summary>
+        ///     Logs the receiving of a hello data packet in the statistics.
+        /// </summary>
+        /// <param name="totalLength">The total number of bytes received.</param>
+        /// <remarks>
+        ///     This should be called before the received event is invoked so it is up to date for subscribers to that event.
+        /// </remarks>
+        internal void LogPingReceive(int totalLength)
+        {
+            Interlocked.Increment(ref pingMessagesReceived);
             Interlocked.Add(ref totalBytesReceived, totalLength);
         }
 

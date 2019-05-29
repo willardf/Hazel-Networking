@@ -228,16 +228,13 @@ namespace Hazel.Udp
         void AttachReliableID(byte[] buffer, int offset, int sendLength, Action ackCallback = null)
         {
             //Find an ID not used yet.
-            ushort id;
+            ushort id = (ushort)Interlocked.Increment(ref lastIDAllocated);
+
+            buffer[offset] = (byte)(id >> 8);
+            buffer[offset + 1] = (byte)id;
 
             //Create packet object
             Packet packet = Packet.GetObject();
-
-            id = (ushort)Interlocked.Increment(ref lastIDAllocated);
-
-            buffer[offset] = (byte)((id >> 8) & 0xFF);
-            buffer[offset + 1] = (byte)id;
-
             packet.Set(
                 id,
                 this,
@@ -298,20 +295,6 @@ namespace Hazel.Udp
             WriteBytesToConnection(bytes, bytes.Length);
 
             Statistics.LogReliableSend(length, bytes.Length);
-        }
-
-        void ReliableSend(byte sendOption)
-        {
-            byte[] bytes = new byte[3];
-            bytes[0] = sendOption;
-
-            //Add reliable ID
-            AttachReliableID(bytes, 1, bytes.Length, null);
-
-            //Write to connection
-            WriteBytesToConnection(bytes, bytes.Length);
-
-            Statistics.LogReliableSend(0, bytes.Length);
         }
 
         /// <summary>
@@ -421,6 +404,8 @@ namespace Hazel.Udp
         /// <param name="bytes">The buffer containing the data.</param>
         void AcknowledgementMessageReceive(byte[] bytes)
         {
+            this.pingsSinceAck = 0;
+
             //Get ID
             ushort id = (ushort)((bytes[1] << 8) + bytes[2]);
 
@@ -437,6 +422,16 @@ namespace Hazel.Udp
                 {
                     this.AveragePingMs = Math.Max(50, this.AveragePingMs * .7f + rt * .3f);
                 }
+            }
+            else if (this.activePingPackets.TryRemove(id, out PingPacket pingPkt))
+            {
+                float rt = pingPkt.Stopwatch.ElapsedMilliseconds;
+                lock (PingLock)
+                {
+                    this.AveragePingMs = Math.Max(50, this.AveragePingMs * .7f + rt * .3f);
+                }
+
+                pingPkt.Recycle();
             }
 
             Statistics.LogReliableReceive(0, bytes.Length);

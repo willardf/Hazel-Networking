@@ -31,12 +31,6 @@ namespace Hazel.Udp
         /// <param name="bytes">The bytes to write.</param>
         protected abstract void WriteBytesToConnection(byte[] bytes, int length);
 
-        /// <summary>
-        ///     Writes the given bytes to the connection synchronously.
-        /// </summary>
-        /// <param name="bytes">The bytes to write.</param>
-        protected abstract void WriteBytesToConnectionSync(byte[] bytes, int length);
-
         /// <inheritdoc/>
         public override void Send(MessageWriter msg)
         {
