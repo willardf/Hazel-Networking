@@ -15,23 +15,22 @@ namespace Hazel
     {
         private int numberCreated;
         public int NumberCreated { get { return numberCreated; } }
+
         public int NumberInUse { get { return this.inuse.Count; } }
+        public int NumberNotInUse { get { return this.pool.Count; } }
 
-        public int Size { get { return this.pool.Count; } }
+        // Available objects
+        private readonly ConcurrentBag<T> pool = new ConcurrentBag<T>();
 
-        /// <summary>
-        ///     Our pool of objects
-        /// </summary>
-        ConcurrentBag<T> pool = new ConcurrentBag<T>();
-
-        private ConcurrentDictionary<T, bool> inuse = new ConcurrentDictionary<T, bool>();
+        // Unavailable objects
+        private readonly ConcurrentDictionary<T, bool> inuse = new ConcurrentDictionary<T, bool>();
 
         /// <summary>
         ///     The generator for creating new objects.
         /// </summary>
         /// <returns></returns>
-        Func<T> objectFactory;
-
+        private readonly Func<T> objectFactory;
+        
         /// <summary>
         ///     Internal constructor for our ObjectPool.
         /// </summary>

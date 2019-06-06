@@ -1,9 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
 using System.Threading;
 
 
@@ -105,8 +102,9 @@ namespace Hazel.Udp
 
         // Pings are special, quasi-reliable packets. 
         // We send them to trigger responses that validate our connection is alive
-        // They should never be the *cause* of a disconnect.
-        // Rather, the responses will reset our 
+        // An unacked ping should never be the sole cause of a disconnect.
+        // Rather, the responses will reset our pingsSinceAck, enough unacked 
+        // pings should cause a disconnect.
         void SendPing()
         {
             ushort id = (ushort)Interlocked.Increment(ref lastIDAllocated);
@@ -155,6 +153,14 @@ namespace Hazel.Udp
             {
                 this.keepAliveTimer = null;
                 timer.Dispose();
+            }
+
+            foreach (var kvp in activePingPackets)
+            {
+                if (this.activePingPackets.TryRemove(kvp.Key, out var pkt))
+                {
+                    pkt.Recycle();
+                }
             }
         }
     }

@@ -115,8 +115,6 @@ namespace Hazel.Udp
             }
             catch (SocketException)
             {
-                //Client no longer reachable, pretend it didn't happen
-                //TODO possibly able to disconnect client, see other TODO
                 message?.Recycle();
                 StartListeningForData();
                 return;
@@ -124,6 +122,7 @@ namespace Hazel.Udp
             catch (Exception ex)
             {
                 //If the socket's been disposed then we can just end there.
+                message.Recycle();
                 this.Logger?.Invoke("Stopped due to: " + ex.Message);
                 return;
             }
@@ -169,6 +168,7 @@ namespace Hazel.Udp
             catch (Exception ex)
             {
                 //If the socket's been disposed then we can just end there.
+                message.Recycle();
                 this.Logger?.Invoke("Stopped due to: " + ex.Message);
                 return;
             }

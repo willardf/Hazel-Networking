@@ -34,7 +34,6 @@ namespace Hazel.Udp
         /// <inheritdoc/>
         public override void Send(MessageWriter msg)
         {
-            //Early check
             if (this._state != ConnectionState.Connected)
                 throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
 

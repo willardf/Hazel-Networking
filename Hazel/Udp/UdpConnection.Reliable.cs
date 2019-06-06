@@ -227,13 +227,11 @@ namespace Hazel.Udp
         /// <param name="ackCallback">The callback to make once the packet has been acknowledged.</param>
         void AttachReliableID(byte[] buffer, int offset, int sendLength, Action ackCallback = null)
         {
-            //Find an ID not used yet.
             ushort id = (ushort)Interlocked.Increment(ref lastIDAllocated);
 
             buffer[offset] = (byte)(id >> 8);
             buffer[offset + 1] = (byte)id;
 
-            //Create packet object
             Packet packet = Packet.GetObject();
             packet.Set(
                 id,
@@ -409,9 +407,8 @@ namespace Hazel.Udp
             //Get ID
             ushort id = (ushort)((bytes[1] << 8) + bytes[2]);
 
-            //Dispose of timer and remove from dictionary
-            Packet packet;
-            if (reliableDataPacketsSent.TryRemove(id, out packet))
+            // Dispose of timer and remove from dictionary
+            if (reliableDataPacketsSent.TryRemove(id, out Packet packet))
             {
                 float rt = packet.Stopwatch.ElapsedMilliseconds;
 
@@ -426,12 +423,13 @@ namespace Hazel.Udp
             else if (this.activePingPackets.TryRemove(id, out PingPacket pingPkt))
             {
                 float rt = pingPkt.Stopwatch.ElapsedMilliseconds;
+
+                pingPkt.Recycle();
+
                 lock (PingLock)
                 {
                     this.AveragePingMs = Math.Max(50, this.AveragePingMs * .7f + rt * .3f);
                 }
-
-                pingPkt.Recycle();
             }
 
             Statistics.LogReliableReceive(0, bytes.Length);
@@ -464,8 +462,7 @@ namespace Hazel.Udp
         {
             foreach (var kvp in reliableDataPacketsSent)
             {
-                Packet pkt;
-                if (this.reliableDataPacketsSent.TryRemove(kvp.Key, out pkt))
+                if (this.reliableDataPacketsSent.TryRemove(kvp.Key, out var pkt))
                 {
                     pkt.Recycle();
                 }
