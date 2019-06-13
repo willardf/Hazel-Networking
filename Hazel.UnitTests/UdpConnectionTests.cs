@@ -3,8 +3,6 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Net;
 using System.Threading;
 using Hazel.Udp;
-using System.Linq;
-using System.Collections.Generic;
 
 namespace Hazel.UnitTests
 {
@@ -66,7 +64,7 @@ namespace Hazel.UnitTests
                 connection.Connect();
                 connection.Dispose();
 
-                Thread.Sleep(10);
+                Thread.Sleep(50);
 
                 Assert.IsTrue(serverConnected);
                 Assert.IsTrue(serverDisconnected);

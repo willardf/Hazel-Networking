@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Linq;
-using System.Text;
 using System.Threading;
 
 namespace Hazel
@@ -54,7 +52,7 @@ namespace Hazel
 
             if (!inuse.TryAdd(item, true))
             {
-                throw new Exception("Duplicate pull");
+                throw new Exception("Duplicate pull " + typeof(T).Name);
             }
 
             return item;
@@ -72,7 +70,7 @@ namespace Hazel
             }
             else
             {
-                throw new Exception("Duplicate add");
+                throw new Exception("Duplicate add " + typeof(T).Name);
             }
         }
     }

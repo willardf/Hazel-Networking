@@ -1,9 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading;
 
 
@@ -100,7 +97,7 @@ namespace Hazel.Udp
             }
             catch (SocketException ex)
             {
-                Disconnect("Could not send data as a SocketException occured: " + ex.Message, true);
+                Disconnect("Could not send data as a SocketException occured: " + ex.Message);
             }
         }
 
@@ -117,7 +114,7 @@ namespace Hazel.Udp
             }
             catch (SocketException ex)
             {
-                Disconnect("Could not send data as a SocketException occured: " + ex.Message, true);
+                Disconnect("Could not send data as a SocketException occured: " + ex.Message);
             }
         }
 

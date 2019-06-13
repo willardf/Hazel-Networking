@@ -41,17 +41,12 @@ namespace Hazel
         /// <param name="e">The exception if one was the cause.</param>
         public override void Disconnect(string reason)
         {
-            this.Disconnect(reason, false);
-        }
-
-        protected void Disconnect(string reason, bool skipSendDisconnect)
-        {
             bool invoke = false;
             lock (this)
             {
                 if (this._state == ConnectionState.Connected)
                 {
-                    this._state = skipSendDisconnect ? ConnectionState.NotConnected : ConnectionState.Disconnecting;
+                    this._state = ConnectionState.Disconnecting;
                     invoke = true;
                 }
             }
