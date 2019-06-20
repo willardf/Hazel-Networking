@@ -24,10 +24,5 @@ namespace Hazel
         ///     The Connection is connected and data can be transfered.
         /// </summary>
         Connected,
-
-        /// <summary>
-        ///     The Connection is currently disconnecting.
-        /// </summary>
-        Disconnecting
     }
 }

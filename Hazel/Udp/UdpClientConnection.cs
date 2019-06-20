@@ -262,19 +262,37 @@ namespace Hazel.Udp
 
         /// <summary>
         ///     Sends a disconnect message to the end point.
+        ///     You may include optional disconnect data. The SendOption must be unreliable.
         /// </summary>
-        protected override void SendDisconnect()
+        protected override bool SendDisconnect(MessageWriter data = null)
         {
+            lock (this)
+            {
+                if (this._state != ConnectionState.Connected) return false;
+                this._state = ConnectionState.NotConnected;
+            }
+
+            var bytes = EmptyDisconnectBytes;
+            if (data != null && data.Length > 0)
+            {
+                if (data.SendOption != SendOption.None) throw new ArgumentException("Disconnect messages can only be unreliable.");
+
+                bytes = data.ToByteArray(true);
+                bytes[0] = (byte)UdpSendOption.Disconnect;
+            }
+
             try
             {
                 socket.SendTo(
-                    DisconnectBytes,
+                    bytes,
                     0,
-                    1,
+                    bytes.Length,
                     SocketFlags.None,
                     RemoteEndPoint);
             }
             catch { }
+
+            return true;
         }
 
         /// <inheritdoc />
@@ -282,12 +300,7 @@ namespace Hazel.Udp
         {
             if (disposing)
             {
-                if (this._state == ConnectionState.Connected
-                    || this._state == ConnectionState.Disconnecting)
-                {
-                    this._state = ConnectionState.NotConnected;
-                    SendDisconnect();
-                }
+                SendDisconnect();
             }
 
             if (this.socket != null)

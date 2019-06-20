@@ -64,7 +64,7 @@ namespace Hazel.UnitTests
                 connection.Connect();
                 connection.Dispose();
 
-                Thread.Sleep(50);
+                Thread.Sleep(100);
 
                 Assert.IsTrue(serverConnected);
                 Assert.IsTrue(serverDisconnected);

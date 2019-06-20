@@ -1,11 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Net;
-using System.Net.Sockets;
-using System.Text;
-using System.Threading;
 
 namespace Hazel.Udp
 {
@@ -15,7 +8,7 @@ namespace Hazel.Udp
     /// <inheritdoc />
     public abstract partial class UdpConnection : NetworkConnection
     {
-        protected static readonly byte[] DisconnectBytes = new byte[] { (byte)UdpSendOption.Disconnect };
+        protected static readonly byte[] EmptyDisconnectBytes = new byte[] { (byte)UdpSendOption.Disconnect };
 
         /// <summary>
         ///     Creates a new UdpConnection and initializes the keep alive timer.

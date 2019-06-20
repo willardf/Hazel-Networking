@@ -203,11 +203,6 @@ namespace Hazel
         public abstract void ConnectAsync(byte[] bytes = null, int timeout = 5000);
 
         /// <summary>
-        ///     Sends a disconnect message to the end point.
-        /// </summary>
-        protected abstract void SendDisconnect();
-
-        /// <summary>
         ///     Invokes the DataReceived event.
         /// </summary>
         /// <param name="msg">The bytes received.</param>
@@ -235,19 +230,19 @@ namespace Hazel
         ///     Invokes the Disconnected event.
         /// </summary>
         /// <param name="e">The exception, if any, that occured to cause this.</param>
+        /// <param name="reader">Extra disconnect data</param>
         /// <remarks>
         ///     Invokes the <see cref="Disconnected"/> event to alert subscribres this connection has been disconnected either 
         ///     by the end point or because an error occured. If an error occured the error should be passed in in order to 
         ///     pass to the subscribers, otherwise null can be passed in.
         /// </remarks>
-        protected void InvokeDisconnected(string e)
+        protected void InvokeDisconnected(string e, MessageReader reader)
         {
             //Make a copy to avoid race condition between null check and invocation
             EventHandler<DisconnectedEventArgs> handler = Disconnected;
             if (handler != null)
             {
-                DisconnectedEventArgs args = DisconnectedEventArgs.GetObject();
-                args.Set(e);
+                DisconnectedEventArgs args = new DisconnectedEventArgs(e, reader);
                 handler.Invoke(this, args);
             }
         }
@@ -270,7 +265,7 @@ namespace Hazel
         /// For times when you want to force the disconnect handler to fire as well as close it.
         /// If you only want to close it, just use Dispose.
         /// </summary>
-        public abstract void Disconnect(string reason);
+        public abstract void Disconnect(string reason, MessageWriter writer = null, bool fireEvent = true);
         
         /// <summary>
         ///     Disposes of this NetworkConnection.

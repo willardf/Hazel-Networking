@@ -19,15 +19,6 @@ namespace Hazel
     public class DisconnectedEventArgs : EventArgs
     {
         /// <summary>
-        ///     Returns an instance of this object from the pool.
-        /// </summary>
-        /// <returns>A new or recycled DisconnectedEventArgs object.</returns>
-        internal static DisconnectedEventArgs GetObject()
-        {
-            return new DisconnectedEventArgs();
-        }
-
-        /// <summary>
         ///     The exception, if any, that caused the disconnect.
         /// </summary>
         /// <remarks>
@@ -36,23 +27,13 @@ namespace Hazel
         ///     that caused it or a <see cref="HazelException"/> with the details of the exception, if the disconnection 
         ///     wasn't caused by an error then this will contain null.
         /// </remarks>
-        public string Reason { get; private set; }
+        public readonly string Reason;
 
-        /// <summary>
-        ///     Private constructor for object pool.
-        /// </summary>
-        DisconnectedEventArgs()
+        public readonly MessageReader Message;
+
+        public DisconnectedEventArgs(string reason, MessageReader reader)
         {
 
-        }
-
-        /// <summary>
-        ///     Sets the given exception for the arguments.
-        /// </summary>
-        /// <param name="e">The exception if the cause.</param>
-        internal void Set(string reason)
-        {
-            this.Reason = reason;
         }
     }
 }

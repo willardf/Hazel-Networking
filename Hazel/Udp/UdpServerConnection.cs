@@ -59,17 +59,33 @@ namespace Hazel.Udp
             throw new InvalidOperationException("Cannot manually connect a UdpServerConnection, did you mean to use UdpClientConnection?");
         }
 
-
         /// <summary>
         ///     Sends a disconnect message to the end point.
         /// </summary>
-        protected override void SendDisconnect()
+        protected override bool SendDisconnect(MessageWriter data = null)
         {
+            lock (this)
+            {
+                if (this._state != ConnectionState.Connected) return false;
+                this._state = ConnectionState.NotConnected;
+            }
+            
+            var bytes = EmptyDisconnectBytes;
+            if (data != null && data.Length > 0)
+            {
+                if (data.SendOption != SendOption.None) throw new ArgumentException("Disconnect messages can only be unreliable.");
+
+                bytes = data.ToByteArray(true);
+                bytes[0] = (byte)UdpSendOption.Disconnect;
+            }
+
             try
             {
-                Listener.SendDataSync(DisconnectBytes, 1, RemoteEndPoint);
+                Listener.SendDataSync(bytes, bytes.Length, RemoteEndPoint);
             }
             catch { }
+
+            return true;
         }
 
         protected override void Dispose(bool disposing)
@@ -78,12 +94,7 @@ namespace Hazel.Udp
 
             if (disposing)
             {
-                if (this._state == ConnectionState.Connected
-                    || this._state == ConnectionState.Disconnecting)
-                {
-                    this._state = ConnectionState.NotConnected;
-                    SendDisconnect();
-                }
+                SendDisconnect();
             }
 
             
