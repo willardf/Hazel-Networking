@@ -1,9 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Text;
-
 
 namespace Hazel
 {
@@ -76,7 +71,7 @@ namespace Hazel
         /// </remarks>
         protected void InvokeNewConnection(MessageReader msg, Connection connection)
         {
-            //Make a copy to avoid race condition between null check and invocation
+            // Make a copy to avoid race condition between null check and invocation
             Action<NewConnectionEventArgs> handler = NewConnection;
             if (handler != null)
             {

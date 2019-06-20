@@ -139,7 +139,6 @@ namespace Hazel.Udp
         {
             this.State = ConnectionState.Connecting;
 
-            //Begin listening
             try
             {
                 if (IPMode == IPMode.IPv4)
@@ -149,7 +148,7 @@ namespace Hazel.Udp
             }
             catch (SocketException e)
             {
-                State = ConnectionState.NotConnected;
+                this.State = ConnectionState.NotConnected;
                 throw new HazelException("A socket exception occured while binding to the port.", e);
             }
 
@@ -159,9 +158,9 @@ namespace Hazel.Udp
             }
             catch (ObjectDisposedException)
             {
-                //If the socket's been disposed then we can just end there but make sure we're in NotConnected state.
-                //If we end up here I'm really lost...
-                State = ConnectionState.NotConnected;
+                // If the socket's been disposed then we can just end there but make sure we're in NotConnected state.
+                // If we end up here I'm really lost...
+                this.State = ConnectionState.NotConnected;
                 return;
             }
             catch (SocketException e)
@@ -170,9 +169,9 @@ namespace Hazel.Udp
                 throw new HazelException("A Socket exception occured while initiating a receive operation.", e);
             }
 
-            //Write bytes to the server to tell it hi (and to punch a hole in our NAT, if present)
-            //When acknowledged set the state to connected
-            SendHello(bytes, () => { State = ConnectionState.Connected; });
+            // Write bytes to the server to tell it hi (and to punch a hole in our NAT, if present)
+            // When acknowledged set the state to connected
+            SendHello(bytes, () => { this.State = ConnectionState.Connected; });
         }
 
         /// <summary>

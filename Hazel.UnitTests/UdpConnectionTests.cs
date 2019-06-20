@@ -31,8 +31,9 @@ namespace Hazel.UnitTests
                 listener.Start();
                 connection.Connect();
 
+                Thread.Sleep(100); // Gotta wait for the server to set up the events.
                 listener.Dispose();
-                Thread.Sleep(10);
+                Thread.Sleep(100);
 
                 Assert.IsTrue(serverConnected);
                 Assert.IsTrue(clientDisconnected);
@@ -62,6 +63,8 @@ namespace Hazel.UnitTests
 
                 listener.Start();
                 connection.Connect();
+
+                Thread.Sleep(100); // Gotta wait for the server to set up the events.
                 connection.Dispose();
 
                 Thread.Sleep(100);
@@ -314,7 +317,7 @@ namespace Hazel.UnitTests
                 connection.Connect();
                 connection.KeepAliveInterval = 100;
 
-                System.Threading.Thread.Sleep(1050);    //Enough time for ~10 keep alive packets
+                Thread.Sleep(1050);    //Enough time for ~10 keep alive packets
 
                 Assert.AreEqual(ConnectionState.Connected, connection.State);
                 Assert.IsTrue(
