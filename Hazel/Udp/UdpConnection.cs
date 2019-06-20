@@ -121,7 +121,9 @@ namespace Hazel.Udp
                     break;
 
                 case (byte)UdpSendOption.Disconnect:
-                    Disconnect("The remote sent a disconnect request");
+                    message.Offset = 1;
+                    message.Position = 0;
+                    DisconnectRemote("The remote sent a disconnect request", message);
                     message.Recycle();
                     break;
                     

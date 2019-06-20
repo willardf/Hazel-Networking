@@ -31,9 +31,10 @@ namespace Hazel
 
         public readonly MessageReader Message;
 
-        public DisconnectedEventArgs(string reason, MessageReader reader)
+        public DisconnectedEventArgs(string reason, MessageReader message)
         {
-
+            this.Reason = reason;
+            this.Message = message;
         }
     }
 }

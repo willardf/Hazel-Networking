@@ -40,11 +40,26 @@ namespace Hazel
         /// </summary>
         protected abstract bool SendDisconnect(MessageWriter writer);
 
-
         /// <summary>
         ///     Called when the socket has been disconnected at the remote host.
         /// </summary>
-        /// <param name="e">The exception if one was the cause.</param>
+        protected void DisconnectRemote(string reason, MessageReader reader)
+        {
+            if (this.SendDisconnect(null))
+            {
+                try
+                {
+                    InvokeDisconnected(reason, reader);
+                }
+                catch { }
+            }
+
+            this.Dispose();
+        }
+
+        /// <summary>
+        ///     Called when the socket has been disconnected locally.
+        /// </summary>
         public override void Disconnect(string reason, MessageWriter writer = null, bool fireEvent = true)
         {
             if (this.SendDisconnect(writer) && fireEvent)

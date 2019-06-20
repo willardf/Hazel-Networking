@@ -391,5 +391,41 @@ namespace Hazel.UnitTests
                 TestHelper.RunServerDisconnectTest(listener, connection);
             }
         }
+
+        /// <summary>
+        ///     Tests disconnection from the server.
+        /// </summary>
+        [TestMethod]
+        public void ServerExtraDataDisconnectTest()
+        {
+            using (UdpConnectionListener listener = new UdpConnectionListener(new IPEndPoint(IPAddress.Any, 4296)))
+            using (UdpConnection connection = new UdpClientConnection(new IPEndPoint(IPAddress.Loopback, 4296)))
+            {
+                MessageReader received = null;
+                ManualResetEvent mutex = new ManualResetEvent(false);
+
+                connection.Disconnected += delegate (object sender, DisconnectedEventArgs args)
+                {
+                    received = args.Message;
+                    mutex.Set();
+                };
+
+                listener.NewConnection += delegate (NewConnectionEventArgs args)
+                {
+                    MessageWriter writer = MessageWriter.Get(SendOption.None);
+                    writer.Write("Goodbye");
+                    args.Connection.Disconnect("Testing", writer);
+                };
+
+                listener.Start();
+
+                connection.Connect();
+
+                mutex.WaitOne();
+
+                Assert.IsNotNull(received);
+                Assert.AreEqual("Goodbye", received.ReadString());
+            }
+        }
     }
 }
