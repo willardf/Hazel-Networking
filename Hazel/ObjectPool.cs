@@ -43,8 +43,7 @@ namespace Hazel
         /// <returns>An instance of T.</returns>
         internal T GetObject()
         {
-            T item;
-            if (!pool.TryTake(out item))
+            if (!pool.TryTake(out T item))
             {
                 Interlocked.Increment(ref numberCreated);
                 item = objectFactory.Invoke();
@@ -72,6 +71,11 @@ namespace Hazel
             {
                 throw new Exception("Duplicate add " + typeof(T).Name);
             }
+        }
+
+        public bool IsObjectInUse(T item)
+        {
+            return inuse.ContainsKey(item);
         }
     }
 }

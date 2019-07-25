@@ -33,6 +33,7 @@ namespace Hazel.Udp
             this.IPMode = IPMode;
 
             State = ConnectionState.Connected;
+            this.InitializeKeepAliveTimer();
         }
 
         /// <inheritdoc />
@@ -97,7 +98,6 @@ namespace Hazel.Udp
                 SendDisconnect();
             }
 
-            
             base.Dispose(disposing);
         }
     }

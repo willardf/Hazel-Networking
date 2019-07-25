@@ -72,7 +72,7 @@ namespace Hazel.Udp
         ///     This returns the average ping for a one-way trip as calculated from the reliable packets that have been sent 
         ///     and acknowledged by the endpoint.
         /// </remarks>
-        public float AveragePingMs = 200;
+        public float AveragePingMs = 500;
 
         /// <summary>
         ///     The maximum times a message should be resent before marking the endpoint as disconnected.
@@ -171,7 +171,7 @@ namespace Hazel.Udp
                             return 0;
                         }
 
-                        this.NextTimeout = (int)Math.Min(this.NextTimeout * connection.ResendPingMultiplier, 1500);
+                        this.NextTimeout += (int)Math.Min(this.NextTimeout * connection.ResendPingMultiplier, 500);
                         try
                         {
                             connection.WriteBytesToConnection(this.Data, this.Length);
@@ -225,7 +225,7 @@ namespace Hazel.Udp
         /// <param name="buffer">The buffer to attach to.</param>
         /// <param name="offset">The offset to attach at.</param>
         /// <param name="ackCallback">The callback to make once the packet has been acknowledged.</param>
-        void AttachReliableID(byte[] buffer, int offset, int sendLength, Action ackCallback = null)
+        private void AttachReliableID(byte[] buffer, int offset, int sendLength, Action ackCallback = null)
         {
             ushort id = (ushort)Interlocked.Increment(ref lastIDAllocated);
 
@@ -260,7 +260,7 @@ namespace Hazel.Udp
         /// <param name="sendOption"></param>
         /// <param name="data">The byte array to write to.</param>
         /// <param name="ackCallback">The callback to make once the packet has been acknowledged.</param>
-        void ReliableSend(byte sendOption, byte[] data, Action ackCallback = null)
+        private void ReliableSend(byte sendOption, byte[] data, Action ackCallback = null)
         {
             this.ReliableSend(sendOption, data, 0, data.Length, ackCallback);
         }
@@ -273,7 +273,7 @@ namespace Hazel.Udp
         /// <param name="offset"></param>
         /// <param name="length"></param>
         /// <param name="ackCallback">The callback to make once the packet has been acknowledged.</param>
-        void ReliableSend(byte sendOption, byte[] data, int offset, int length, Action ackCallback = null)
+        private void ReliableSend(byte sendOption, byte[] data, int offset, int length, Action ackCallback = null)
         {
             //Inform keepalive not to send for a while
             ResetKeepAliveTimer();
@@ -299,7 +299,7 @@ namespace Hazel.Udp
         ///     Handles a reliable message being received and invokes the data event.
         /// </summary>
         /// <param name="message">The buffer received.</param>
-        void ReliableMessageReceive(MessageReader message, int bytesReceived)
+        private void ReliableMessageReceive(MessageReader message, int bytesReceived)
         {
             ushort id;
             if (ProcessReliableReceive(message.Buffer, 1, out id))
@@ -320,7 +320,7 @@ namespace Hazel.Udp
         /// <param name="bytes">The buffer containing the data.</param>
         /// <param name="offset">The offset of the reliable header.</param>
         /// <returns>Whether the packet was a new packet or not.</returns>
-        bool ProcessReliableReceive(byte[] bytes, int offset, out ushort id)
+        private bool ProcessReliableReceive(byte[] bytes, int offset, out ushort id)
         {
             byte b1 = bytes[offset];
             byte b2 = bytes[offset + 1];
@@ -400,7 +400,7 @@ namespace Hazel.Udp
         ///     Handles acknowledgement packets to us.
         /// </summary>
         /// <param name="bytes">The buffer containing the data.</param>
-        void AcknowledgementMessageReceive(byte[] bytes)
+        private void AcknowledgementMessageReceive(byte[] bytes)
         {
             this.pingsSinceAck = 0;
 
@@ -440,7 +440,7 @@ namespace Hazel.Udp
         /// </summary>
         /// <param name="byte1">The first identification byte.</param>
         /// <param name="byte2">The second identification byte.</param>
-        internal void SendAck(byte byte1, byte byte2)
+        private void SendAck(byte byte1, byte byte2)
         {
             byte[] bytes = new byte[]
             {
@@ -458,7 +458,7 @@ namespace Hazel.Udp
             catch (InvalidOperationException) { }
         }
 
-        void DisposeReliablePackets()
+        private void DisposeReliablePackets()
         {
             foreach (var kvp in reliableDataPacketsSent)
             {

@@ -60,9 +60,9 @@ namespace Hazel
         /// <summary>
         ///     Called when the socket has been disconnected locally.
         /// </summary>
-        public override void Disconnect(string reason, MessageWriter writer = null, bool fireEvent = true)
+        public override void Disconnect(string reason, MessageWriter writer = null)
         {
-            if (this.SendDisconnect(writer) && fireEvent)
+            if (this.SendDisconnect(writer))
             {
                 try
                 {

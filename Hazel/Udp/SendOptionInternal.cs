@@ -9,7 +9,7 @@ namespace Hazel.Udp
     /// <summary>
     ///     Extra internal states for SendOption enumeration when using UDP.
     /// </summary>
-    enum UdpSendOption : byte
+    public enum UdpSendOption : byte
     {
         /// <summary>
         ///     Hello message for initiating communication.

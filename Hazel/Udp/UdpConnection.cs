@@ -11,14 +11,6 @@ namespace Hazel.Udp
         protected static readonly byte[] EmptyDisconnectBytes = new byte[] { (byte)UdpSendOption.Disconnect };
 
         /// <summary>
-        ///     Creates a new UdpConnection and initializes the keep alive timer.
-        /// </summary>
-        protected UdpConnection()
-        {
-            InitializeKeepAliveTimer();
-        }
-
-        /// <summary>
         ///     Writes the given bytes to the connection.
         /// </summary>
         /// <param name="bytes">The bytes to write.</param>
@@ -36,8 +28,8 @@ namespace Hazel.Udp
             switch (msg.SendOption)
             {
                 case SendOption.Reliable:
-                    // Inform keepalive not to send for a while
                     ResetKeepAliveTimer();
+
                     AttachReliableID(buffer, 1, buffer.Length);
                     WriteBytesToConnection(buffer, buffer.Length);
                     Statistics.LogReliableSend(buffer.Length - 3, buffer.Length);

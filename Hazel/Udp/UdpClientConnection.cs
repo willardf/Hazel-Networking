@@ -97,7 +97,7 @@ namespace Hazel.Udp
             }
             catch (SocketException ex)
             {
-                Disconnect("Could not send data as a SocketException occured: " + ex.Message);
+                Disconnect("Could not send data as a SocketException occurred: " + ex.Message);
             }
         }
 
@@ -114,7 +114,7 @@ namespace Hazel.Udp
             }
             catch (SocketException ex)
             {
-                Disconnect("Could not send data as a SocketException occured: " + ex.Message);
+                Disconnect("Could not send data as a SocketException occurred: " + ex.Message);
             }
         }
 
@@ -149,7 +149,7 @@ namespace Hazel.Udp
             catch (SocketException e)
             {
                 this.State = ConnectionState.NotConnected;
-                throw new HazelException("A socket exception occured while binding to the port.", e);
+                throw new HazelException("A SocketException occurred while binding to the port.", e);
             }
 
             try
@@ -166,12 +166,16 @@ namespace Hazel.Udp
             catch (SocketException e)
             {
                 Dispose();
-                throw new HazelException("A Socket exception occured while initiating a receive operation.", e);
+                throw new HazelException("A SocketException occurred while initiating a receive operation.", e);
             }
 
             // Write bytes to the server to tell it hi (and to punch a hole in our NAT, if present)
             // When acknowledged set the state to connected
-            SendHello(bytes, () => { this.State = ConnectionState.Connected; });
+            SendHello(bytes, () =>
+            {
+                this.State = ConnectionState.Connected;
+                this.InitializeKeepAliveTimer();
+            });
         }
 
         /// <summary>
@@ -202,20 +206,15 @@ namespace Hazel.Udp
             {
                 msg.Length = socket.EndReceive(result);
             }
-            catch (NullReferenceException)
-            {
-                msg.Recycle();
-                return;
-            }
-            catch (ObjectDisposedException)
-            {
-                msg.Recycle();
-                return;
-            }
             catch (SocketException e)
             {
                 msg.Recycle();
                 Disconnect("Socket exception while reading data: " + e.Message);
+                return;
+            }
+            catch (Exception)
+            {
+                msg.Recycle();
                 return;
             }
 
@@ -267,7 +266,7 @@ namespace Hazel.Udp
         {
             lock (this)
             {
-                if (this._state != ConnectionState.Connected) return false;
+                if (this._state == ConnectionState.NotConnected) return false;
                 this._state = ConnectionState.NotConnected;
             }
 
@@ -302,14 +301,9 @@ namespace Hazel.Udp
                 SendDisconnect();
             }
 
-            if (this.socket != null)
-            {
-                try { this.socket.Shutdown(SocketShutdown.Both); } catch { }
-                try { this.socket.Close(); } catch { }
-                try { this.socket.Dispose(); } catch { }
-
-                this.socket = null;
-            }
+            try { this.socket.Shutdown(SocketShutdown.Both); } catch { }
+            try { this.socket.Close(); } catch { }
+            try { this.socket.Dispose(); } catch { }
 
             this.reliablePacketTimer.Dispose();
 

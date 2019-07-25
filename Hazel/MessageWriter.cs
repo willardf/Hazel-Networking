@@ -112,6 +112,7 @@ namespace Hazel
             this.Buffer[0] = (byte)sendOption;
             switch (sendOption)
             {
+                default:
                 case SendOption.None:
                     this.Length = this.Position = 1;
                     break;
@@ -234,10 +235,23 @@ namespace Hazel
             this.Write(bytes, length);
         }
 
+        public void WriteBytesAndSize(byte[] bytes, int offset, int length)
+        {
+            this.WritePacked((uint)length);
+            this.Write(bytes, offset, length);
+        }
+
         public void Write(byte[] bytes)
         {
             Array.Copy(bytes, 0, this.Buffer, this.Position, bytes.Length);
             this.Position += bytes.Length;
+            if (this.Position > this.Length) this.Length = this.Position;
+        }
+
+        public void Write(byte[] bytes, int offset, int length)
+        {
+            Array.Copy(bytes, offset, this.Buffer, this.Position, length);
+            this.Position += length;
             if (this.Position > this.Length) this.Length = this.Position;
         }
 
@@ -270,6 +284,25 @@ namespace Hazel
             } while (value > 0);
         }
         #endregion
+
+        public void Write(MessageWriter msg, bool includeHeader)
+        {
+            int offset = 0;
+            if (!includeHeader)
+            {
+                switch (msg.SendOption)
+                {
+                    case SendOption.None:
+                        offset = 1;
+                        break;
+                    case SendOption.Reliable:
+                        offset = 3;
+                        break;
+                }
+            }
+
+            this.Write(msg.Buffer, offset, msg.Length - offset);
+        }
 
         public unsafe static bool IsLittleEndian()
         {

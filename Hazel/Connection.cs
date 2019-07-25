@@ -94,22 +94,8 @@ namespace Hazel
         ///     The state of this connection.
         /// </summary>
         /// <remarks>
-        ///     <para>
-        ///         Connections go round 4 states in their lifetime: they start as <see cref="ConnectionState.NotConnected"/> to 
-        ///         indicate they have no endpoint, calling <see cref="Connect"/> takes them into 
-        ///         <see cref="ConnectionState.Connecting"/>, once they have received confirmation they are connected they enter
-        ///         <see cref="ConnectionState.Connected"/> and finally calling <see cref="Dispose"/> sets them to 
-        ///         <see cref="ConnectionState.Disconnecting"/> and then the sequence repeats back to
-        ///         <see cref="ConnectionState.NotConnected"/> once disconnection is complete.
-        ///     </para>
-        ///     <para>
-        ///         Data can only be sent while in <see cref="ConnectionState.Connected"/> and all attempts to send data when
-        ///         in any other state will throw an InvalidOperationException.
-        ///     </para>
-        ///     <para>
-        ///         All implementers should be aware that when this is set to <see cref="ConnectionState.Connected"/> it will
-        ///         release all threads that are blocked on <see cref="WaitOnConnect"/>.
-        ///     </para>
+        ///     All implementers should be aware that when this is set to ConnectionState.Connected it will
+        ///     release all threads that are blocked on <see cref="WaitOnConnect"/>.
         /// </remarks>
         public ConnectionState State
         {
@@ -179,27 +165,19 @@ namespace Hazel
         
         /// <summary>
         ///     Connects the connection to a server and begins listening.
+        ///     This method blocks and may thrown if there is a problem connecting.
         /// </summary>
         /// <param name="bytes">The bytes of data to send in the handshake.</param>
         /// <param name="timeout">The number of milliseconds to wait before giving up on the connect attempt.</param>
-        /// <remarks>
-        ///     Calling Connect makes the connection attempt to connect to the end point that's specified in the 
-        ///     constructor. This method will block until the connection attempt completes and will throw a 
-        ///     <see cref="HazelException"/> if there is a problem connecting.
-        /// </remarks>
         public abstract void Connect(byte[] bytes = null, int timeout = 5000);
 
 
         /// <summary>
         ///     Connects the connection to a server and begins listening.
+        ///     This method does not block.
         /// </summary>
         /// <param name="bytes">The bytes of data to send in the handshake.</param>
         /// <param name="timeout">The number of milliseconds to wait before giving up on the connect attempt.</param>
-        /// <remarks>
-        ///     Calling Connect makes the connection attempt to connect to the end point that's specified in the 
-        ///     constructor. This method will block until the connection attempt completes and will throw a 
-        ///     <see cref="HazelException"/> if there is a problem connecting.
-        /// </remarks>
         public abstract void ConnectAsync(byte[] bytes = null, int timeout = 5000);
 
         /// <summary>
@@ -229,11 +207,11 @@ namespace Hazel
         /// <summary>
         ///     Invokes the Disconnected event.
         /// </summary>
-        /// <param name="e">The exception, if any, that occured to cause this.</param>
+        /// <param name="e">The exception, if any, that occurred to cause this.</param>
         /// <param name="reader">Extra disconnect data</param>
         /// <remarks>
         ///     Invokes the <see cref="Disconnected"/> event to alert subscribres this connection has been disconnected either 
-        ///     by the end point or because an error occured. If an error occured the error should be passed in in order to 
+        ///     by the end point or because an error occurred. If an error occurred the error should be passed in in order to 
         ///     pass to the subscribers, otherwise null can be passed in.
         /// </remarks>
         protected void InvokeDisconnected(string e, MessageReader reader)
@@ -251,11 +229,6 @@ namespace Hazel
         ///     Blocks until the Connection is connected.
         /// </summary>
         /// <param name="timeout">The number of milliseconds to wait before timing out.</param>
-        /// <remarks>
-        ///     This is a helper method for waiting until the connection is connected. It will block until the 
-        ///     <see cref="State"/> property is set to <see cref="ConnectionState.Connected"/> allowing the main thread to 
-        ///     wait until specific data is received etc. before returning to the user's code.
-        /// </remarks>
         protected bool WaitOnConnect(int timeout)
         {
             return connectWaitLock.WaitOne(timeout);
@@ -265,7 +238,7 @@ namespace Hazel
         /// For times when you want to force the disconnect handler to fire as well as close it.
         /// If you only want to close it, just use Dispose.
         /// </summary>
-        public abstract void Disconnect(string reason, MessageWriter writer = null, bool fireEvent = true);
+        public abstract void Disconnect(string reason, MessageWriter writer = null);
         
         /// <summary>
         ///     Disposes of this NetworkConnection.

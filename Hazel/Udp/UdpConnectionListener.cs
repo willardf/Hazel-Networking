@@ -1,11 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading;
 
 namespace Hazel.Udp
@@ -19,6 +15,9 @@ namespace Hazel.Udp
         public const int BufferSize = ushort.MaxValue;
 
         public int MinConnectionLength = 0;
+
+        public delegate bool AcceptConnectionCheck(out byte[] response);
+        public AcceptConnectionCheck AcceptConnection;
 
         /// <summary>
         ///     The socket listening for connections.
@@ -92,7 +91,7 @@ namespace Hazel.Udp
             }
             catch (SocketException e)
             {
-                throw new HazelException("Could not start listening as a SocketException occured", e);
+                throw new HazelException("Could not start listening as a SocketException occurred", e);
             }
 
             StartListeningForData();
@@ -111,11 +110,14 @@ namespace Hazel.Udp
                 message = MessageReader.GetSized(BufferSize);
 
                 socket.BeginReceiveFrom(message.Buffer, 0, message.Buffer.Length, SocketFlags.None, ref remoteEP, ReadCallback, message);
-                Interlocked.Increment(ref ActiveListeners);
             }
-            catch (SocketException)
+            catch (SocketException sx)
             {
                 message?.Recycle();
+
+                this.Logger?.Invoke("Socket Ex in StartListening: " + sx.Message);
+
+                Thread.Sleep(10);
                 StartListeningForData();
                 return;
             }
@@ -127,20 +129,11 @@ namespace Hazel.Udp
                 return;
             }
         }
-        
-        /// <summary>
-        ///     Called when data has been received by the listener.
-        /// </summary>
-        /// <param name="result">The asyncronous operation's result.</param>
-        
-        public int ActiveListeners;
-        public int PacketsReceived;
 
+        public volatile int ActiveCallbacks;
         void ReadCallback(IAsyncResult result)
         {
-            Interlocked.Decrement(ref ActiveListeners);
-            Interlocked.Increment(ref PacketsReceived);
-
+            Interlocked.Increment(ref this.ActiveCallbacks);
             var message = (MessageReader)result.AsyncState;
             int bytesReceived;
             EndPoint remoteEndPoint = new IPEndPoint(IPMode == IPMode.IPv4 ? IPAddress.Any : IPAddress.IPv6Any, 0);
@@ -153,7 +146,7 @@ namespace Hazel.Udp
                 message.Offset = 0;
                 message.Length = bytesReceived;
             }
-            catch (SocketException)
+            catch (SocketException sx)
             {
                 // Client no longer reachable, pretend it didn't happen
                 // TODO should this not inform the connection this client is lost???
@@ -161,8 +154,11 @@ namespace Hazel.Udp
                 // This thread suggests the IP is not passed out from WinSoc so maybe not possible
                 // http://stackoverflow.com/questions/2576926/python-socket-error-on-udp-data-receive-10054
                 message.Recycle();
-                
+                this.Logger?.Invoke("Socket Ex in ReadCallback: " + sx.Message);
+
+                Thread.Sleep(10);
                 StartListeningForData();
+                Interlocked.Decrement(ref this.ActiveCallbacks);
                 return;
             }
             catch (Exception ex)
@@ -170,6 +166,7 @@ namespace Hazel.Udp
                 //If the socket's been disposed then we can just end there.
                 message.Recycle();
                 this.Logger?.Invoke("Stopped due to: " + ex.Message);
+                Interlocked.Decrement(ref this.ActiveCallbacks);
                 return;
             }
 
@@ -178,7 +175,10 @@ namespace Hazel.Udp
             if (bytesReceived == 0)
             {
                 message.Recycle();
+                this.Logger?.Invoke("Received 0 bytes");
+                Thread.Sleep(10);
                 StartListeningForData();
+                Interlocked.Decrement(ref this.ActiveCallbacks);
                 return;
             }
 
@@ -198,21 +198,26 @@ namespace Hazel.Udp
                 if (!isHello)
                 {
                     message.Recycle();
+                    Interlocked.Decrement(ref this.ActiveCallbacks);
                     return;
                 }
 
-                lock (this.allConnections)
+                if (AcceptConnection != null)
                 {
-                    aware = this.allConnections.TryGetValue(remoteEndPoint, out connection);
-                    if (!aware)
+                    if (!AcceptConnection(out var response))
                     {
-                        connection = new UdpServerConnection(this, (IPEndPoint)remoteEndPoint, this.IPMode);
-                        if (!this.allConnections.TryAdd(remoteEndPoint, connection))
-                        {
-                            throw new Exception();
-                        }
+                        message.Recycle();
+                        SendData(response, response.Length, remoteEndPoint);
+                        Interlocked.Decrement(ref this.ActiveCallbacks);
+                        return;
                     }
                 }
+
+                connection = this.allConnections.GetOrAdd(remoteEndPoint, (ep) =>
+                {
+                    aware = false;
+                    return new UdpServerConnection(this, (IPEndPoint)ep, this.IPMode);
+                });
             }
 
             //Inform the connection of the buffer (new connections need to send an ack back to client)
@@ -231,6 +236,8 @@ namespace Hazel.Udp
             {
                 message.Recycle();
             }
+
+            Interlocked.Decrement(ref this.ActiveCallbacks);
         }
 
 #if DEBUG
@@ -278,7 +285,7 @@ namespace Hazel.Udp
             }
             catch (SocketException e)
             {
-                throw new HazelException("Could not send data as a SocketException occured.", e);
+                throw new HazelException("Could not send data as a SocketException occurred.", e);
             }
             catch (ObjectDisposedException)
             {
@@ -324,13 +331,9 @@ namespace Hazel.Udp
                 kvp.Value.Dispose();
             }
 
-            if (this.socket != null)
-            {
-                try { this.socket.Shutdown(SocketShutdown.Both); } catch { }
-                try { this.socket.Close(); } catch { }
-                try { this.socket.Dispose(); } catch { }
-                this.socket = null;
-            }
+            try { this.socket.Shutdown(SocketShutdown.Both); } catch { }
+            try { this.socket.Close(); } catch { }
+            try { this.socket.Dispose(); } catch { }
 
             this.reliablePacketTimer.Dispose();
 

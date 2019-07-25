@@ -55,43 +55,41 @@ namespace Hazel.Udp
             set
             {
                 keepAliveInterval = value;
-
-                //Update timer
                 ResetKeepAliveTimer();
             }
         }
-        int keepAliveInterval = 1500;
+        private int keepAliveInterval = 1500;
 
         public int MissingPingsUntilDisconnect { get; set; } = 6;
-        int pingsSinceAck = 0;
+        private volatile int pingsSinceAck = 0;
 
         /// <summary>
         ///     The timer creating keepalive pulses.
         /// </summary>
-        Timer keepAliveTimer;
+        private Timer keepAliveTimer;
 
         /// <summary>
         ///     Starts the keepalive timer.
         /// </summary>
-        void InitializeKeepAliveTimer()
+        protected void InitializeKeepAliveTimer()
         {
             keepAliveTimer = new Timer(
                 (o) =>
                 {
                     if (this.pingsSinceAck >= this.MissingPingsUntilDisconnect)
                     {
+                        this.DisposeKeepAliveTimer();
                         this.Disconnect($"Sent {this.pingsSinceAck} pings that remote has not responded to.");
                         return;
                     }
 
                     try
                     {
-                        SendPing();
                         this.pingsSinceAck++;
+                        SendPing();
                     }
                     catch
                     {
-                        DisposeKeepAliveTimer();
                     }
                 },
                 null,
@@ -105,7 +103,7 @@ namespace Hazel.Udp
         // An unacked ping should never be the sole cause of a disconnect.
         // Rather, the responses will reset our pingsSinceAck, enough unacked 
         // pings should cause a disconnect.
-        void SendPing()
+        private void SendPing()
         {
             ushort id = (ushort)Interlocked.Increment(ref lastIDAllocated);
 
@@ -134,7 +132,7 @@ namespace Hazel.Udp
         /// <summary>
         ///     Resets the keepalive timer to zero.
         /// </summary>
-        void ResetKeepAliveTimer()
+        private void ResetKeepAliveTimer()
         {
             try
             {
@@ -146,13 +144,11 @@ namespace Hazel.Udp
         /// <summary>
         ///     Disposes of the keep alive timer.
         /// </summary>
-        void DisposeKeepAliveTimer()
+        private void DisposeKeepAliveTimer()
         {
-            var timer = this.keepAliveTimer;
-            if (timer != null)
+            if (this.keepAliveTimer != null)
             {
-                this.keepAliveTimer = null;
-                timer.Dispose();
+                this.keepAliveTimer.Dispose();
             }
 
             foreach (var kvp in activePingPackets)

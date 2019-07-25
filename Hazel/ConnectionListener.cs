@@ -8,9 +8,7 @@ namespace Hazel
     /// <remarks>
     ///     <para>
     ///         ConnectionListeners are server side objects that listen for clients and create matching server side connections 
-    ///         for each client in a similar way to TCP does. These connections should already have a 
-    ///         <see cref="Connection.State">State</see> of <see cref="ConnectionState.Connected"/> and so should be ready for 
-    ///         comunication immediately.
+    ///         for each client in a similar way to TCP does. These connections should be ready for communication immediately.
     ///     </para>
     ///     <para>
     ///         Each time a client connects the <see cref="NewConnection"/> event will be invoked to alert all subscribers to
