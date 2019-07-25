@@ -31,7 +31,7 @@ namespace Hazel.Udp
         /// <summary>
         ///     The connections we currently hold
         /// </summary>
-        ConcurrentDictionary<EndPoint, UdpServerConnection> allConnections = new ConcurrentDictionary<EndPoint, UdpServerConnection>();
+        private ConcurrentDictionary<EndPoint, UdpServerConnection> allConnections = new ConcurrentDictionary<EndPoint, UdpServerConnection>();
         
         public int ConnectionCount { get { return this.allConnections.Count; } }
 
@@ -194,30 +194,37 @@ namespace Hazel.Udp
             UdpServerConnection connection;
             if (!this.allConnections.TryGetValue(remoteEndPoint, out connection))
             {
-                //Check for malformed connection attempts
-                if (!isHello)
+                lock (this.allConnections)
                 {
-                    message.Recycle();
-                    Interlocked.Decrement(ref this.ActiveCallbacks);
-                    return;
-                }
-
-                if (AcceptConnection != null)
-                {
-                    if (!AcceptConnection(out var response))
+                    if (!this.allConnections.TryGetValue(remoteEndPoint, out connection))
                     {
-                        message.Recycle();
-                        SendData(response, response.Length, remoteEndPoint);
-                        Interlocked.Decrement(ref this.ActiveCallbacks);
-                        return;
+                        //Check for malformed connection attempts
+                        if (!isHello)
+                        {
+                            message.Recycle();
+                            Interlocked.Decrement(ref this.ActiveCallbacks);
+                            return;
+                        }
+
+                        if (AcceptConnection != null)
+                        {
+                            if (!AcceptConnection(out var response))
+                            {
+                                message.Recycle();
+                                SendData(response, response.Length, remoteEndPoint);
+                                Interlocked.Decrement(ref this.ActiveCallbacks);
+                                return;
+                            }
+                        }
+
+                        aware = false;
+                        connection = new UdpServerConnection(this, (IPEndPoint)remoteEndPoint, this.IPMode);
+                        if (!this.allConnections.TryAdd(remoteEndPoint, connection))
+                        {
+                            throw new HazelException("Failed to add a connection. This should never happen.");
+                        }
                     }
                 }
-
-                connection = this.allConnections.GetOrAdd(remoteEndPoint, (ep) =>
-                {
-                    aware = false;
-                    return new UdpServerConnection(this, (IPEndPoint)ep, this.IPMode);
-                });
             }
 
             //Inform the connection of the buffer (new connections need to send an ack back to client)
@@ -272,14 +279,7 @@ namespace Hazel.Udp
                     length,
                     SocketFlags.None,
                     endPoint,
-                    delegate (IAsyncResult result)
-                    {
-                        try
-                        {
-                            socket.EndSendTo(result);
-                        }
-                        catch { }
-                    },
+                    SendCallback,
                     null
                 );
             }
@@ -292,6 +292,15 @@ namespace Hazel.Udp
                 //Keep alive timer probably ran, ignore
                 return;
             }
+        }
+
+        private void SendCallback(IAsyncResult result)
+        {
+            try
+            {
+                socket.EndSendTo(result);
+            }
+            catch { }
         }
 
         /// <summary>

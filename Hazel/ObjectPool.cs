@@ -72,10 +72,5 @@ namespace Hazel
                 throw new Exception("Duplicate add " + typeof(T).Name);
             }
         }
-
-        public bool IsObjectInUse(T item)
-        {
-            return inuse.ContainsKey(item);
-        }
     }
 }

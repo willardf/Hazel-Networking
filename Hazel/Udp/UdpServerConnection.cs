@@ -7,7 +7,7 @@ namespace Hazel.Udp
     ///     Represents a servers's connection to a client that uses the UDP protocol.
     /// </summary>
     /// <inheritdoc/>
-    sealed class UdpServerConnection : UdpConnection
+    internal sealed class UdpServerConnection : UdpConnection
     {
         /// <summary>
         ///     The connection listener that we use the socket of.
@@ -17,7 +17,7 @@ namespace Hazel.Udp
         ///     created this connection and is hence the listener this conenction sends and receives via.
         /// </remarks>
         public UdpConnectionListener Listener { get; private set; }
-        
+
         /// <summary>
         ///     Creates a UdpConnection for the virtual connection to the endpoint.
         /// </summary>

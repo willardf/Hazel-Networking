@@ -23,7 +23,7 @@ namespace Hazel
                 this.readHead = value + Offset;
             }
         }
-        
+
         private int _position;
         private int readHead;
         
@@ -123,7 +123,6 @@ namespace Hazel
             return output;
         }
 
-        ///
         public void Recycle()
         {
             ReaderPool.PutObject(this);
