@@ -8,7 +8,7 @@ namespace Hazel.Udp
     /// <inheritdoc />
     public abstract partial class UdpConnection : NetworkConnection
     {
-        protected static readonly byte[] EmptyDisconnectBytes = new byte[] { (byte)UdpSendOption.Disconnect };
+        public static readonly byte[] EmptyDisconnectBytes = new byte[] { (byte)UdpSendOption.Disconnect };
 
         /// <summary>
         ///     Writes the given bytes to the connection.
@@ -97,19 +97,19 @@ namespace Hazel.Udp
 
                 //Handle acknowledgments
                 case (byte)UdpSendOption.Acknowledgement:
-                    AcknowledgementMessageReceive(message.Buffer);
+                    AcknowledgementMessageReceive(message.Buffer, bytesReceived);
                     message.Recycle();
                     break;
 
                 //We need to acknowledge hello and ping messages but dont want to invoke any events!
                 case (byte)UdpSendOption.Ping:
                     ProcessReliableReceive(message.Buffer, 1, out id);
-                    Statistics.LogHelloReceive(message.Length);
+                    Statistics.LogHelloReceive(bytesReceived);
                     message.Recycle();
                     break;
                 case (byte)UdpSendOption.Hello:
                     ProcessReliableReceive(message.Buffer, 1, out id);
-                    Statistics.LogHelloReceive(message.Length);
+                    Statistics.LogHelloReceive(bytesReceived);
                     break;
 
                 case (byte)UdpSendOption.Disconnect:
@@ -122,7 +122,7 @@ namespace Hazel.Udp
                 //Treat everything else as unreliable
                 default:
                     InvokeDataReceived(SendOption.None, message, 1, bytesReceived);
-                    Statistics.LogUnreliableReceive(message.Length - 1, message.Length);
+                    Statistics.LogUnreliableReceive(bytesReceived - 1, bytesReceived);
                     break;
             }
         }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 
 namespace Hazel.Udp
 {
@@ -48,6 +49,7 @@ namespace Hazel.Udp
         public UdpBroadcastListener(int port)
         {
             this.socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            this.socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, true);
             this.endpoint = new IPEndPoint(IPAddress.Any, port);
             this.socket.Bind(this.endpoint);
         }
@@ -64,7 +66,7 @@ namespace Hazel.Udp
                 var result = this.socket.BeginReceiveFrom(buffer, 0, buffer.Length, SocketFlags.None, ref endpt, this.HandleData, null);
                 if (result.CompletedSynchronously)
                 {
-                    this.HandleData(result);
+                    ThreadPool.QueueUserWorkItem(_ => this.HandleData(result));
                 }
             }
             catch

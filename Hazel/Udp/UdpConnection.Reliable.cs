@@ -41,7 +41,7 @@ namespace Hazel.Udp
         /// <summary>
         ///     Holds the last ID allocated.
         /// </summary>
-        private int lastIDAllocated = ushort.MaxValue + 1;
+        private int lastIDAllocated = 0;
 
         /// <summary>
         ///     The packets of data that have been transmitted reliably and not acknowledged.
@@ -400,7 +400,7 @@ namespace Hazel.Udp
         ///     Handles acknowledgement packets to us.
         /// </summary>
         /// <param name="bytes">The buffer containing the data.</param>
-        private void AcknowledgementMessageReceive(byte[] bytes)
+        private void AcknowledgementMessageReceive(byte[] bytes, int bytesReceived)
         {
             this.pingsSinceAck = 0;
 
@@ -432,7 +432,7 @@ namespace Hazel.Udp
                 }
             }
 
-            Statistics.LogReliableReceive(0, bytes.Length);
+            Statistics.LogReliableReceive(bytesReceived - 3, bytesReceived);
         }
 
         /// <summary>

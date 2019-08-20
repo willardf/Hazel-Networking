@@ -16,7 +16,7 @@ namespace Hazel.Udp
 
         public int MinConnectionLength = 0;
 
-        public delegate bool AcceptConnectionCheck(out byte[] response);
+        public delegate bool AcceptConnectionCheck(byte[] input, out byte[] response);
         public AcceptConnectionCheck AcceptConnection;
 
         /// <summary>
@@ -109,7 +109,11 @@ namespace Hazel.Udp
             {
                 message = MessageReader.GetSized(BufferSize);
 
-                socket.BeginReceiveFrom(message.Buffer, 0, message.Buffer.Length, SocketFlags.None, ref remoteEP, ReadCallback, message);
+                var result = socket.BeginReceiveFrom(message.Buffer, 0, message.Buffer.Length, SocketFlags.None, ref remoteEP, ReadCallback, message);
+                if (result.CompletedSynchronously)
+                {
+                    this.Logger("Operation completed synchronously");
+                }
             }
             catch (SocketException sx)
             {
@@ -208,7 +212,7 @@ namespace Hazel.Udp
 
                         if (AcceptConnection != null)
                         {
-                            if (!AcceptConnection(out var response))
+                            if (!AcceptConnection(message.Buffer, out var response))
                             {
                                 message.Recycle();
                                 SendData(response, response.Length, remoteEndPoint);
