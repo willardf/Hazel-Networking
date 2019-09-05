@@ -7,19 +7,12 @@ using System.Threading;
 
 namespace Hazel.Udp
 {
-    ///
     public class BroadcastPacket
     {
-        ///
         public string Data;
-
-        ///
         public DateTime ReceiveTime;
-        
-        ///
         public IPEndPoint Sender;
 
-        ///
         public BroadcastPacket(string data, IPEndPoint sender)
         {
             this.Data = data;
@@ -33,11 +26,11 @@ namespace Hazel.Udp
         }
     }
 
-    ///
     public class UdpBroadcastListener : IDisposable
     {
         private Socket socket;
         private EndPoint endpoint;
+        private Action<string> logger;
 
         private byte[] buffer = new byte[1024];
 
@@ -46,10 +39,12 @@ namespace Hazel.Udp
         public bool Running { get; private set; }
 
         ///
-        public UdpBroadcastListener(int port)
+        public UdpBroadcastListener(int port, Action<string> logger = null)
         {
+            this.logger = logger;
             this.socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-            this.socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, true);
+            this.socket.EnableBroadcast = true;
+            this.socket.MulticastLoopback = false;
             this.endpoint = new IPEndPoint(IPAddress.Any, port);
             this.socket.Bind(this.endpoint);
         }
@@ -59,7 +54,7 @@ namespace Hazel.Udp
         {
             if (this.Running) return;
             this.Running = true;
-            
+
             try
             {
                 EndPoint endpt = new IPEndPoint(IPAddress.Any, 0);
@@ -69,8 +64,10 @@ namespace Hazel.Udp
                     ThreadPool.QueueUserWorkItem(_ => this.HandleData(result));
                 }
             }
-            catch
+            catch (NullReferenceException) { }
+            catch (Exception e)
             {
+                this.logger?.Invoke("BroadcastListener: " + e);
                 this.Dispose();
             }
         }
@@ -85,13 +82,19 @@ namespace Hazel.Udp
             {
                 numBytes = this.socket.EndReceiveFrom(result, ref endpt);
             }
-            catch
+            catch (NullReferenceException)
             {
+                // Already disposed
+                return;
+            }
+            catch (Exception e)
+            {
+                this.logger?.Invoke("BroadcastListener: " + e);
                 this.Dispose();
                 return;
             }
 
-            if (numBytes < 2
+            if (numBytes < 3 
                 || buffer[0] != 4 || buffer[1] != 2)
             {
                 this.StartListen();
@@ -108,6 +111,13 @@ namespace Hazel.Udp
                 for (int i = 0; i < this.packets.Count; ++i)
                 {
                     var pkt = this.packets[i];
+                    if (pkt == null || pkt.Data == null)
+                    {
+                        this.packets.RemoveAt(i);
+                        i--;
+                        continue;
+                    }
+
                     if (pkt.Data.GetHashCode() == dataHash
                         && pkt.Sender.Equals(ipEnd))
                     {

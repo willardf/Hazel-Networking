@@ -8,20 +8,18 @@ namespace Hazel.Udp
     ///
     public class UdpBroadcaster : IDisposable
     {
-        ///
         private Socket socket;
-
-        ///
         private byte[] data;
-
-        ///
         private EndPoint endpoint;
+        private Action<string> logger;
 
         ///
-        public UdpBroadcaster(int port)
+        public UdpBroadcaster(int port, Action<string> logger = null)
         {
+            this.logger = logger;
             this.socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-            this.socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, true);
+            this.socket.EnableBroadcast = true;
+            this.socket.MulticastLoopback = false;
             this.endpoint = new IPEndPoint(IPAddress.Broadcast, port);
         }
 
@@ -44,7 +42,26 @@ namespace Hazel.Udp
                 return;
             }
 
-            this.socket.BeginSendTo(data, 0, data.Length, SocketFlags.None, this.endpoint, (evt) => this.socket.EndSendTo(evt), null);
+            try
+            {
+                this.socket.BeginSendTo(data, 0, data.Length, SocketFlags.None, this.endpoint, this.FinishSendTo, null);
+            }
+            catch (Exception e)
+            {
+                this.logger?.Invoke("BroadcastListener: " + e);
+            }
+        }
+
+        private void FinishSendTo(IAsyncResult evt)
+        {
+            try
+            {
+                this.socket.EndSendTo(evt);
+            }
+            catch (Exception e)
+            {
+                this.logger?.Invoke("BroadcastListener: " + e);
+            }
         }
 
         ///
