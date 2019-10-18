@@ -16,7 +16,7 @@ namespace Hazel.Udp
 
         public int MinConnectionLength = 0;
 
-        public delegate bool AcceptConnectionCheck(byte[] input, out byte[] response);
+        public delegate bool AcceptConnectionCheck(IPEndPoint endPoint, byte[] input, out byte[] response);
         public AcceptConnectionCheck AcceptConnection;
 
         /// <summary>
@@ -212,7 +212,7 @@ namespace Hazel.Udp
 
                         if (AcceptConnection != null)
                         {
-                            if (!AcceptConnection(message.Buffer, out var response))
+                            if (!AcceptConnection((IPEndPoint)remoteEndPoint, message.Buffer, out var response))
                             {
                                 message.Recycle();
                                 SendData(response, response.Length, remoteEndPoint);

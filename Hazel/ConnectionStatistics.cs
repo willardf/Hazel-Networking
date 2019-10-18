@@ -386,6 +386,9 @@ namespace Hazel
         /// </summary>
         long totalBytesReceived;
 
+        public int MessagesResent { get { return messagesResent; } }
+        int messagesResent;
+
         /// <summary>
         ///     Logs the sending of an unreliable data packet in the statistics.
         /// </summary>
@@ -554,6 +557,11 @@ namespace Hazel
         {
             Interlocked.Increment(ref helloMessagesReceived);
             Interlocked.Add(ref totalBytesReceived, totalLength);
+        }
+
+        internal void LogMessageResent()
+        {
+            Interlocked.Increment(ref messagesResent);
         }
     }
 }

@@ -19,6 +19,11 @@ namespace Hazel.Udp
 
         private Timer reliablePacketTimer;
 
+#if DEBUG
+        public event Action<byte[], int> DataSentRaw;
+        public event Action<byte[], int> DataReceivedRaw;
+#endif
+
         /// <summary>
         ///     Creates a new UdpClientConnection.
         /// </summary>
@@ -62,22 +67,23 @@ namespace Hazel.Udp
         /// <inheritdoc />
         protected override void WriteBytesToConnection(byte[] bytes, int length)
         {
+#if DEBUG
             if (TestLagMs > 0)
             {
                 ThreadPool.QueueUserWorkItem(a => { Thread.Sleep(this.TestLagMs); WriteBytesToConnectionReal(bytes, length); });
             }
             else
+#endif
             {
                 WriteBytesToConnectionReal(bytes, length);
             }
         }
 
-        public event Action<byte[], int> DataSentRaw;
-        public event Action<byte[], int> DataReceivedRaw;
-
         private void WriteBytesToConnectionReal(byte[] bytes, int length)
         {
+#if DEBUG
             DataSentRaw?.Invoke(bytes, length);
+#endif
 
             try
             {
@@ -183,6 +189,13 @@ namespace Hazel.Udp
         /// </summary>
         void StartListeningForData()
         {
+#if DEBUG
+            if (this.TestLagMs > 0)
+            {
+                Thread.Sleep(this.TestLagMs);
+            }
+#endif
+
             var msg = MessageReader.GetSized(ushort.MaxValue);
             try
             {
@@ -241,11 +254,7 @@ namespace Hazel.Udp
                 return;
             }
 
-            if (this.TestLagMs > 0)
-            {
-                Thread.Sleep(this.TestLagMs);
-            }
-
+#if DEBUG
             if (this.TestDropRate > 0)
             {
                 if ((this.testDropCount++ % this.TestDropRate) == 0)
@@ -255,6 +264,7 @@ namespace Hazel.Udp
             }
 
             DataReceivedRaw?.Invoke(msg.Buffer, msg.Length);
+#endif
             HandleReceive(msg, msg.Length);
         }
 

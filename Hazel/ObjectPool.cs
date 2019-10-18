@@ -16,6 +16,7 @@ namespace Hazel
 
         public int NumberInUse { get { return this.inuse.Count; } }
         public int NumberNotInUse { get { return this.pool.Count; } }
+        public int Size { get { return this.NumberInUse + this.NumberNotInUse; } }
 
         // Available objects
         private readonly ConcurrentBag<T> pool = new ConcurrentBag<T>();

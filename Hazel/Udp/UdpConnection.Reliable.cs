@@ -171,10 +171,11 @@ namespace Hazel.Udp
                             return 0;
                         }
 
-                        this.NextTimeout += (int)Math.Min(this.NextTimeout * connection.ResendPingMultiplier, 500);
+                        this.NextTimeout += (int)Math.Min(this.NextTimeout * connection.ResendPingMultiplier, 1000);
                         try
                         {
                             connection.WriteBytesToConnection(this.Data, this.Length);
+                            connection.Statistics.LogMessageResent();
                             return 1;
                         }
                         catch (InvalidOperationException)
@@ -238,7 +239,7 @@ namespace Hazel.Udp
                 this,
                 buffer,
                 sendLength,
-                ResendTimeout > 0 ? ResendTimeout : ClampToInt(AveragePingMs * this.ResendPingMultiplier, 300, 1000),
+                ResendTimeout > 0 ? ResendTimeout : (int)Math.Min(AveragePingMs * this.ResendPingMultiplier, 300),
                 ackCallback);
 
             if (!reliableDataPacketsSent.TryAdd(id, packet))

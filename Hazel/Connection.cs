@@ -196,7 +196,7 @@ namespace Hazel
             Action<DataReceivedEventArgs> handler = DataReceived;
             if (handler != null)
             {
-                handler(new DataReceivedEventArgs(msg, sendOption));
+                handler(new DataReceivedEventArgs(this, msg, sendOption));
             }
             else
             {

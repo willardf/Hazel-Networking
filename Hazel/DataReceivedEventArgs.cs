@@ -7,6 +7,8 @@ namespace Hazel
 {
     public struct DataReceivedEventArgs
     {
+        public readonly Connection Sender;
+
         /// <summary>
         ///     The bytes received from the client.
         /// </summary>
@@ -17,8 +19,9 @@ namespace Hazel
         /// </summary>
         public readonly SendOption SendOption;
         
-        public DataReceivedEventArgs(MessageReader msg, SendOption sendOption)
+        public DataReceivedEventArgs(Connection sender, MessageReader msg, SendOption sendOption)
         {
+            this.Sender = sender;
             this.Message = msg;
             this.SendOption = sendOption;
         }
