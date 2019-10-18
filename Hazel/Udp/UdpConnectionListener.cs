@@ -112,7 +112,7 @@ namespace Hazel.Udp
                 var result = socket.BeginReceiveFrom(message.Buffer, 0, message.Buffer.Length, SocketFlags.None, ref remoteEP, ReadCallback, message);
                 if (result.CompletedSynchronously)
                 {
-                    this.Logger("Operation completed synchronously");
+                    this.Logger?.Invoke("Operation completed synchronously");
                 }
             }
             catch (SocketException sx)
