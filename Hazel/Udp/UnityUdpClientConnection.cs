@@ -10,7 +10,7 @@ namespace Hazel.Udp
     ///     Represents a client's connection to a server that uses the UDP protocol.
     /// </summary>
     /// <inheritdoc/>
-    public sealed class UdpClientConnection : UdpConnection
+    public class UnityUdpClientConnection : UdpConnection
     {
         /// <summary>
         ///     The socket we're connected via.
@@ -18,22 +18,10 @@ namespace Hazel.Udp
         private Socket socket;
 
         /// <summary>
-        ///     Reset event that is triggered when the connection is marked Connected.
-        /// </summary>
-        private ManualResetEvent connectWaitLock = new ManualResetEvent(false);
-
-        private Timer reliablePacketTimer;
-
-#if DEBUG
-        public event Action<byte[], int> DataSentRaw;
-        public event Action<byte[], int> DataReceivedRaw;
-#endif
-
-        /// <summary>
         ///     Creates a new UdpClientConnection.
         /// </summary>
         /// <param name="remoteEndPoint">A <see cref="NetworkEndPoint"/> to connect to.</param>
-        public UdpClientConnection(IPEndPoint remoteEndPoint, IPMode ipMode = IPMode.IPv4)
+        public UnityUdpClientConnection(IPEndPoint remoteEndPoint, IPMode ipMode = IPMode.IPv4)
             : base()
         {
             this.EndPoint = remoteEndPoint;
@@ -41,46 +29,21 @@ namespace Hazel.Udp
             this.IPMode = ipMode;
 
             this.socket = CreateSocket(ipMode);
-
-            reliablePacketTimer = new Timer(ManageReliablePacketsInternal, null, 100, Timeout.Infinite);
         }
         
-        ~UdpClientConnection()
+        ~UnityUdpClientConnection()
         {
             this.Dispose(false);
         }
 
-        private void ManageReliablePacketsInternal(object state)
+        public void FixedUpdate()
         {
             base.ManageReliablePackets();
-            try
-            {
-                reliablePacketTimer.Change(100, Timeout.Infinite);
-            }
-            catch { }
         }
 
         /// <inheritdoc />
         protected override void WriteBytesToConnection(byte[] bytes, int length)
         {
-#if DEBUG
-            if (TestLagMs > 0)
-            {
-                ThreadPool.QueueUserWorkItem(a => { Thread.Sleep(this.TestLagMs); WriteBytesToConnectionReal(bytes, length); });
-            }
-            else
-#endif
-            {
-                WriteBytesToConnectionReal(bytes, length);
-            }
-        }
-
-        private void WriteBytesToConnectionReal(byte[] bytes, int length)
-        {
-#if DEBUG
-            DataSentRaw?.Invoke(bytes, length);
-#endif
-
             try
             {
                 socket.BeginSendTo(
@@ -120,20 +83,9 @@ namespace Hazel.Udp
             }
         }
 
-        /// <inheritdoc />
         public override void Connect(byte[] bytes = null, int timeout = 5000)
         {
-            this.ConnectAsync(bytes, timeout);
-
-            //Wait till hello packet is acknowledged and the state is set to Connected
-            bool timedOut = !WaitOnConnect(timeout);
-
-            //If we timed out raise an exception
-            if (timedOut)
-            {
-                Dispose();
-                throw new HazelException("Connection attempt timed out.");
-            }
+            throw new NotImplementedException("Use ConnectAsync and check State != ConnectionState.Connecting instead.");
         }
 
         /// <inheritdoc />
@@ -185,13 +137,6 @@ namespace Hazel.Udp
         /// </summary>
         void StartListeningForData()
         {
-#if DEBUG
-            if (this.TestLagMs > 0)
-            {
-                Thread.Sleep(this.TestLagMs);
-            }
-#endif
-
             var msg = MessageReader.GetSized(ushort.MaxValue);
             try
             {
@@ -202,23 +147,6 @@ namespace Hazel.Udp
                 msg.Recycle();
                 this.Dispose();
             }
-        }
-
-        protected override void SetState(ConnectionState state)
-        {
-            if (state == ConnectionState.Connected)
-                connectWaitLock.Set();
-            else
-                connectWaitLock.Reset();
-        }
-
-        /// <summary>
-        ///     Blocks until the Connection is connected.
-        /// </summary>
-        /// <param name="timeout">The number of milliseconds to wait before timing out.</param>
-        public bool WaitOnConnect(int timeout)
-        {
-            return connectWaitLock.WaitOne(timeout);
         }
 
         /// <summary>
@@ -268,17 +196,6 @@ namespace Hazel.Udp
                 return;
             }
 
-#if DEBUG
-            if (this.TestDropRate > 0)
-            {
-                if ((this.testDropCount++ % this.TestDropRate) == 0)
-                {
-                    return;
-                }
-            }
-
-            DataReceivedRaw?.Invoke(msg.Buffer, msg.Length);
-#endif
             HandleReceive(msg, msg.Length);
         }
 
@@ -328,9 +245,6 @@ namespace Hazel.Udp
             try { this.socket.Shutdown(SocketShutdown.Both); } catch { }
             try { this.socket.Close(); } catch { }
             try { this.socket.Dispose(); } catch { }
-
-            this.reliablePacketTimer.Dispose();
-            this.connectWaitLock.Dispose();
 
             base.Dispose(disposing);
         }

@@ -25,7 +25,7 @@ namespace Hazel
         }
 
         /// <summary>
-        ///     The number of messages sent larger than 1400 bytes. This is smaller than most default MTUs.
+        ///     The number of messages sent larger than 576 bytes. This is smaller than most default MTUs.
         /// </summary>
         /// <remarks>
         ///     This is the number of unreliable messages that were sent from the <see cref="Connection"/>, incremented 
@@ -41,7 +41,7 @@ namespace Hazel
         }
 
         /// <summary>
-        ///     The number of messages sent larger than 1400 bytes.
+        ///     The number of messages sent larger than 576 bytes.
         /// </summary>
         int fragmentableMessagesSent;
 
@@ -403,7 +403,7 @@ namespace Hazel
             Interlocked.Add(ref dataBytesSent, dataLength);
             Interlocked.Add(ref totalBytesSent, totalLength);
 
-            if (totalLength > 1400)
+            if (totalLength > 576)
             {
                 Interlocked.Increment(ref fragmentableMessagesSent);
             }

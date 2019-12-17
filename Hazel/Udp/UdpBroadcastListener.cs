@@ -58,11 +58,7 @@ namespace Hazel.Udp
             try
             {
                 EndPoint endpt = new IPEndPoint(IPAddress.Any, 0);
-                var result = this.socket.BeginReceiveFrom(buffer, 0, buffer.Length, SocketFlags.None, ref endpt, this.HandleData, null);
-                if (result.CompletedSynchronously)
-                {
-                    ThreadPool.QueueUserWorkItem(_ => this.HandleData(result));
-                }
+                this.socket.BeginReceiveFrom(buffer, 0, buffer.Length, SocketFlags.None, ref endpt, this.HandleData, null);
             }
             catch (NullReferenceException) { }
             catch (Exception e)

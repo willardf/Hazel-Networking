@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Net.Sockets;
 
 namespace Hazel.Udp
 {
@@ -8,7 +9,42 @@ namespace Hazel.Udp
     /// <inheritdoc />
     public abstract partial class UdpConnection : NetworkConnection
     {
+        private const int SioUdpConnectionReset = -1744830452;
+
         public static readonly byte[] EmptyDisconnectBytes = new byte[] { (byte)UdpSendOption.Disconnect };
+
+        internal static Socket CreateSocket(IPMode ipMode)
+        {
+            Socket socket;
+            if (ipMode == IPMode.IPv4)
+            {
+                socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            }
+            else
+            {
+                if (!Socket.OSSupportsIPv6)
+                    throw new InvalidOperationException("IPV6 not supported!");
+
+                socket = new Socket(AddressFamily.InterNetworkV6, SocketType.Dgram, ProtocolType.Udp);
+                socket.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.IPv6Only, false);
+            }
+
+            try
+            {
+                socket.DontFragment = false;
+            }
+            catch { }
+
+
+            try
+            {
+                const int SIO_UDP_CONNRESET = -1744830452;
+                socket.IOControl(SIO_UDP_CONNRESET, new byte[1], null);
+            }
+            catch { } // Only necessary on Windows
+
+            return socket;
+        }
 
         /// <summary>
         ///     Writes the given bytes to the connection.

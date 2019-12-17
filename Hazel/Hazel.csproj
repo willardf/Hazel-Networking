@@ -87,6 +87,7 @@
     <Compile Include="ConnectionStatistics.cs" />
     <Compile Include="Udp\UdpBroadcaster.cs" />
     <Compile Include="Udp\UdpBroadcastListener.cs" />
+    <Compile Include="Udp\UnityUdpClientConnection.cs" />
     <Compile Include="Udp\UdpClientConnection.cs" />
     <Compile Include="Udp\UdpConnection.cs">
       <SubType>Code</SubType>

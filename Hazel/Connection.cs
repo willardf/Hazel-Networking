@@ -107,20 +107,13 @@ namespace Hazel
             protected set
             {
                 this._state = value;
-                if (this._state == ConnectionState.Connected)
-                    connectWaitLock.Set();
-                else
-                    connectWaitLock.Reset();
+                this.SetState(value);
             }
         }
 
         protected ConnectionState _state;
-
-        /// <summary>
-        ///     Reset event that is triggered when the connection is marked Connected.
-        /// </summary>
-        private ManualResetEvent connectWaitLock = new ManualResetEvent(false);
-
+        protected virtual void SetState(ConnectionState state) { }
+        
         /// <summary>
         ///     Constructor that initializes the ConnecitonStatistics object.
         /// </summary>
@@ -226,15 +219,6 @@ namespace Hazel
         }
 
         /// <summary>
-        ///     Blocks until the Connection is connected.
-        /// </summary>
-        /// <param name="timeout">The number of milliseconds to wait before timing out.</param>
-        protected bool WaitOnConnect(int timeout)
-        {
-            return connectWaitLock.WaitOne(timeout);
-        }
-
-        /// <summary>
         /// For times when you want to force the disconnect handler to fire as well as close it.
         /// If you only want to close it, just use Dispose.
         /// </summary>
@@ -259,7 +243,6 @@ namespace Hazel
             {
                 this.DataReceived = null;
                 this.Disconnected = null;
-                this.connectWaitLock.Dispose();
             }
         }
     }
