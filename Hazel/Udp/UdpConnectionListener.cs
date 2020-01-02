@@ -96,12 +96,11 @@ namespace Hazel.Udp
             {
                 message = MessageReader.GetSized(BufferSize);
 
-                socket.BeginReceiveFrom(message.Buffer, 0, message.Buffer.Length, SocketFlags.None, ref remoteEP, ReadCallback, message);
-            }
-            catch (ObjectDisposedException)
-            {
-                message.Recycle();
-                return;
+                var result = socket.BeginReceiveFrom(message.Buffer, 0, message.Buffer.Length, SocketFlags.None, ref remoteEP, ReadCallback, message);
+                if (result.CompletedSynchronously)
+                {
+                    this.Logger?.Invoke("Operation completed synchronously");
+                }
             }
             catch (SocketException sx)
             {
