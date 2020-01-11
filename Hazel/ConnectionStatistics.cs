@@ -13,6 +13,8 @@ namespace Hazel
     /// <threadsafety static="true" instance="true"/>
     public class ConnectionStatistics
     {
+        private const int ExpectedMTU = 1200;
+
         /// <summary>
         ///     The total number of messages sent.
         /// </summary>
@@ -403,7 +405,7 @@ namespace Hazel
             Interlocked.Add(ref dataBytesSent, dataLength);
             Interlocked.Add(ref totalBytesSent, totalLength);
 
-            if (totalLength > 576)
+            if (totalLength > ExpectedMTU)
             {
                 Interlocked.Increment(ref fragmentableMessagesSent);
             }
@@ -423,7 +425,7 @@ namespace Hazel
             Interlocked.Add(ref dataBytesSent, dataLength);
             Interlocked.Add(ref totalBytesSent, totalLength);
 
-            if (totalLength > 1400)
+            if (totalLength > ExpectedMTU)
             {
                 Interlocked.Increment(ref fragmentableMessagesSent);
             }
@@ -443,7 +445,7 @@ namespace Hazel
             Interlocked.Add(ref dataBytesSent, dataLength);
             Interlocked.Add(ref totalBytesSent, totalLength);
 
-            if (totalLength > 1400)
+            if (totalLength > ExpectedMTU)
             {
                 Interlocked.Increment(ref fragmentableMessagesSent);
             }

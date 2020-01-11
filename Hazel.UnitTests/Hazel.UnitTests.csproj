@@ -64,6 +64,7 @@
     <Compile Include="UdpConnectionTests.cs" />
     <Compile Include="MessageWriterTests.cs" />
     <Compile Include="StressTests.cs" />
+    <Compile Include="UPnPTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Hazel\Hazel.csproj">

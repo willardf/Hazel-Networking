@@ -95,12 +95,7 @@ namespace Hazel.Udp
             try
             {
                 message = MessageReader.GetSized(BufferSize);
-
-                var result = socket.BeginReceiveFrom(message.Buffer, 0, message.Buffer.Length, SocketFlags.None, ref remoteEP, ReadCallback, message);
-                if (result.CompletedSynchronously)
-                {
-                    this.Logger?.Invoke("Operation completed synchronously");
-                }
+                socket.BeginReceiveFrom(message.Buffer, 0, message.Buffer.Length, SocketFlags.None, ref remoteEP, ReadCallback, message);
             }
             catch (SocketException sx)
             {
@@ -139,7 +134,6 @@ namespace Hazel.Udp
                 message.Recycle();
                 return;
             }
-            catch (InvalidOperationException) { return; } // Callback called twice, somehow...
             catch (SocketException sx)
             {
                 // Client no longer reachable, pretend it didn't happen

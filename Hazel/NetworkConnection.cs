@@ -7,12 +7,27 @@ using System.Text;
 
 namespace Hazel
 {
+    public enum HazelInternalErrors
+    {
+        SocketExceptionSend,
+        SocketExceptionReceive,
+        ReceivedZeroBytes,
+        PingsWithoutResponse,
+        ReliablePacketWithoutResponse,
+        ConnectionDisconnected
+    }
+
     /// <summary>
     ///     Abstract base class for a <see cref="Connection"/> to a remote end point via a network protocol like TCP or UDP.
     /// </summary>
     /// <threadsafety static="true" instance="true"/>
     public abstract class NetworkConnection : Connection
     {
+        /// <summary>
+        /// An event that gives us a chance to send well-formed disconnect messages to clients when an internal disconnect happens.
+        /// </summary>
+        public Func<HazelInternalErrors, MessageWriter> OnInternalDisconnect;
+
         /// <summary>
         ///     The remote end point of this connection.
         /// </summary>
@@ -55,6 +70,37 @@ namespace Hazel
             }
 
             this.Dispose();
+        }
+
+        /// <summary>
+        /// Called when socket is disconnected internally
+        /// </summary>
+        internal void DisconnectInternal(HazelInternalErrors error, string reason)
+        {
+            var handler = this.OnInternalDisconnect;
+            if (handler != null)
+            {
+                MessageWriter messageToRemote = handler(error);
+                if (messageToRemote != null)
+                {
+                    try
+                    {
+                        Disconnect(reason, messageToRemote);
+                    }
+                    finally
+                    {
+                        messageToRemote.Recycle();
+                    }
+                }
+                else
+                {
+                    Disconnect(reason);
+                }
+            }
+            else
+            {
+                Disconnect(reason);
+            }
         }
 
         /// <summary>

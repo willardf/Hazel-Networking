@@ -79,7 +79,7 @@ namespace Hazel.Udp
                     if (this.pingsSinceAck >= this.MissingPingsUntilDisconnect)
                     {
                         this.DisposeKeepAliveTimer();
-                        this.Disconnect($"Sent {this.pingsSinceAck} pings that remote has not responded to.");
+                        this.DisconnectInternal(HazelInternalErrors.PingsWithoutResponse, $"Sent {this.pingsSinceAck} pings that remote has not responded to.");
                         return;
                     }
 

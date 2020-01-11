@@ -7,20 +7,14 @@ using System.Threading;
 namespace Hazel.Udp
 {
     /// <summary>
-    ///     Represents a client's connection to a server that uses the UDP protocol.
+    /// Unity doesn't always get along with thread pools well, so this interface will hopefully suit that case better.
+    /// Be very careful since this interface is likely unstable or actively changing
     /// </summary>
     /// <inheritdoc/>
     public class UnityUdpClientConnection : UdpConnection
     {
-        /// <summary>
-        ///     The socket we're connected via.
-        /// </summary>
         private Socket socket;
 
-        /// <summary>
-        ///     Creates a new UdpClientConnection.
-        /// </summary>
-        /// <param name="remoteEndPoint">A <see cref="NetworkEndPoint"/> to connect to.</param>
         public UnityUdpClientConnection(IPEndPoint remoteEndPoint, IPMode ipMode = IPMode.IPv4)
             : base()
         {
@@ -62,7 +56,7 @@ namespace Hazel.Udp
             }
             catch (SocketException ex)
             {
-                Disconnect("Could not send data as a SocketException occurred: " + ex.Message);
+                DisconnectInternal(HazelInternalErrors.SocketExceptionSend, "Could not send data as a SocketException occurred: " + ex.Message);
             }
         }
 
@@ -79,7 +73,7 @@ namespace Hazel.Udp
             }
             catch (SocketException ex)
             {
-                Disconnect("Could not send data as a SocketException occurred: " + ex.Message);
+                DisconnectInternal(HazelInternalErrors.SocketExceptionSend, "Could not send data as a SocketException occurred: " + ex.Message);
             }
         }
 
@@ -164,7 +158,7 @@ namespace Hazel.Udp
             catch (SocketException e)
             {
                 msg.Recycle();
-                Disconnect("Socket exception while reading data: " + e.Message);
+                DisconnectInternal(HazelInternalErrors.SocketExceptionReceive, "Socket exception while reading data: " + e.Message);
                 return;
             }
             catch (Exception)
@@ -177,7 +171,7 @@ namespace Hazel.Udp
             if (msg.Length == 0)
             {
                 msg.Recycle();
-                Disconnect("Received 0 bytes");
+                DisconnectInternal(HazelInternalErrors.ReceivedZeroBytes, "Received 0 bytes");
                 return;
             }
 
@@ -188,7 +182,7 @@ namespace Hazel.Udp
             }
             catch (SocketException e)
             {
-                Disconnect("Socket exception during receive: " + e.Message);
+                DisconnectInternal(HazelInternalErrors.SocketExceptionReceive, "Socket exception during receive: " + e.Message);
             }
             catch (ObjectDisposedException)
             {

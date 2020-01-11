@@ -99,7 +99,7 @@ namespace Hazel.Udp
             }
             catch (SocketException ex)
             {
-                Disconnect("Could not send data as a SocketException occurred: " + ex.Message);
+                DisconnectInternal(HazelInternalErrors.SocketExceptionSend, "Could not send data as a SocketException occurred: " + ex.Message);
             }
         }
 
@@ -116,7 +116,7 @@ namespace Hazel.Udp
             }
             catch (SocketException ex)
             {
-                Disconnect("Could not send data as a SocketException occurred: " + ex.Message);
+                DisconnectInternal(HazelInternalErrors.SocketExceptionSend, "Could not send data as a SocketException occurred: " + ex.Message);
             }
         }
 
@@ -236,7 +236,7 @@ namespace Hazel.Udp
             catch (SocketException e)
             {
                 msg.Recycle();
-                Disconnect("Socket exception while reading data: " + e.Message);
+                DisconnectInternal(HazelInternalErrors.SocketExceptionReceive, "Socket exception while reading data: " + e.Message);
                 return;
             }
             catch (Exception)
@@ -249,7 +249,7 @@ namespace Hazel.Udp
             if (msg.Length == 0)
             {
                 msg.Recycle();
-                Disconnect("Received 0 bytes");
+                DisconnectInternal(HazelInternalErrors.ReceivedZeroBytes, "Received 0 bytes");
                 return;
             }
 
@@ -260,7 +260,7 @@ namespace Hazel.Udp
             }
             catch (SocketException e)
             {
-                Disconnect("Socket exception during receive: " + e.Message);
+                DisconnectInternal(HazelInternalErrors.SocketExceptionReceive, "Socket exception during receive: " + e.Message);
             }
             catch (ObjectDisposedException)
             {
