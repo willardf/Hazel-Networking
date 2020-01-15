@@ -77,7 +77,7 @@ namespace Hazel.UPnP
             }
             catch(Exception e)
             {
-                this.logger.LogInfo("Exception listening for UPnP: " + e.Message);
+                this.logger.WriteInfo("Exception listening for UPnP: " + e.Message);
             }
         }
 
@@ -133,7 +133,7 @@ namespace Hazel.UPnP
 
             byte[] buffer = System.Text.Encoding.UTF8.GetBytes(str);
 
-            this.logger.LogInfo("Attempting UPnP discovery");
+            this.logger.WriteInfo("Attempting UPnP discovery");
 
             socket.SendTo(buffer, new IPEndPoint(NetUtility.GetBroadcastAddress(), 1900));
         }
@@ -166,14 +166,14 @@ namespace Hazel.UPnP
                 }
 
                 serviceUrl = CombineUrls(resp, node.Value);
-                this.logger.LogInfo("UPnP service ready");
+                this.logger.WriteInfo("UPnP service ready");
                 Status = UPnPStatus.Available;
                 discoveryComplete.Set();
                 return true;
             }
             catch (Exception e)
             {
-                this.logger.LogError("Exception while parsing UPnP Service URL: " + e.Message);
+                this.logger.WriteError("Exception while parsing UPnP Service URL: " + e.Message);
                 return false;
             }
         }
@@ -252,12 +252,12 @@ namespace Hazel.UPnP
                     "</u:AddPortMapping>",
                     "AddPortMapping");
 
-                this.logger.LogInfo("Sent UPnP port forward request.");
+                this.logger.WriteInfo("Sent UPnP port forward request.");
                 return true;
             }
             catch (Exception ex)
             {
-                this.logger.LogError("UPnP port forward failed: " + ex.Message);
+                this.logger.WriteError("UPnP port forward failed: " + ex.Message);
                 return false;
             }
         }

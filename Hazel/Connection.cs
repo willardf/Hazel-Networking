@@ -164,7 +164,6 @@ namespace Hazel
         /// <param name="timeout">The number of milliseconds to wait before giving up on the connect attempt.</param>
         public abstract void Connect(byte[] bytes = null, int timeout = 5000);
 
-
         /// <summary>
         ///     Connects the connection to a server and begins listening.
         ///     This method does not block.
@@ -185,11 +184,15 @@ namespace Hazel
         /// </remarks>
         protected void InvokeDataReceived(MessageReader msg, SendOption sendOption)
         {
-            //Make a copy to avoid race condition between null check and invocation
+            // Make a copy to avoid race condition between null check and invocation
             Action<DataReceivedEventArgs> handler = DataReceived;
             if (handler != null)
             {
-                handler(new DataReceivedEventArgs(this, msg, sendOption));
+                try
+                {
+                    handler(new DataReceivedEventArgs(this, msg, sendOption));
+                }
+                catch { }
             }
             else
             {
@@ -209,12 +212,18 @@ namespace Hazel
         /// </remarks>
         protected void InvokeDisconnected(string e, MessageReader reader)
         {
-            //Make a copy to avoid race condition between null check and invocation
+            // Make a copy to avoid race condition between null check and invocation
             EventHandler<DisconnectedEventArgs> handler = Disconnected;
             if (handler != null)
             {
                 DisconnectedEventArgs args = new DisconnectedEventArgs(e, reader);
-                handler.Invoke(this, args);
+                try
+                {
+                    handler(this, args);
+                }
+                catch
+                {
+                }
             }
         }
 

@@ -72,6 +72,9 @@
     <Compile Include="ConnectionState.cs" />
     <Compile Include="DataReceivedEventArgs.cs" />
     <Compile Include="DisconnectedEventArgs.cs" />
+    <Compile Include="FewerThreads\HazelThreadPool.cs" />
+    <Compile Include="FewerThreads\UdpConnectionListener2.cs" />
+    <Compile Include="FewerThreads\UdpServerConnection2.cs" />
     <Compile Include="HazelException.cs" />
     <Compile Include="IPMode.cs" />
     <Compile Include="IRecyclable.cs" />

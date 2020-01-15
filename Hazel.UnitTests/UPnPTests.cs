@@ -30,12 +30,12 @@ namespace Hazel.UnitTests
     {
         public static readonly ILogger Instance = new Logger();
 
-        public void LogError(string msg)
+        public void WriteError(string msg)
         {
             Console.WriteLine(msg);
         }
 
-        public void LogInfo(string msg)
+        public void WriteInfo(string msg)
         {
             Console.WriteLine(msg);
         }

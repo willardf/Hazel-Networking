@@ -4,11 +4,24 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Hazel.UPnP
+namespace Hazel
 {
     public interface ILogger
     {
-        void LogInfo(string msg);
-        void LogError(string msg);
+        void WriteError(string msg);
+        void WriteInfo(string msg);
+    }
+
+    public class NullLogger : ILogger
+    {
+        public static readonly NullLogger Instance = new NullLogger();
+
+        public void WriteError(string msg)
+        {
+        }
+
+        public void WriteInfo(string msg)
+        {
+        }
     }
 }
