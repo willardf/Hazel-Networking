@@ -123,7 +123,7 @@ namespace Hazel.Udp
         /// <inheritdoc />
         public override void Connect(byte[] bytes = null, int timeout = 5000)
         {
-            this.ConnectAsync(bytes, timeout);
+            this.ConnectAsync(bytes);
 
             //Wait till hello packet is acknowledged and the state is set to Connected
             bool timedOut = !WaitOnConnect(timeout);
@@ -137,7 +137,7 @@ namespace Hazel.Udp
         }
 
         /// <inheritdoc />
-        public override void ConnectAsync(byte[] bytes = null, int timeout = 5000)
+        public override void ConnectAsync(byte[] bytes = null)
         {
             this.State = ConnectionState.Connecting;
 

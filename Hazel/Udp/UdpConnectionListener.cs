@@ -213,10 +213,9 @@ namespace Hazel.Udp
                 }
             }
 
-            //Inform the connection of the buffer (new connections need to send an ack back to client)
-            connection.HandleReceive(message, bytesReceived);
-            
-            //If it's a new connection invoke the NewConnection event.
+            // If it's a new connection invoke the NewConnection event.
+            // This needs to happen before handling the message because in localhost scenarios, the ACK and
+            // subsequent messages can happen before the NewConnection event sets up OnDataRecieved handlers
             if (!aware)
             {
                 // Skip header and hello byte;
@@ -225,7 +224,11 @@ namespace Hazel.Udp
                 message.Position = 0;
                 InvokeNewConnection(message, connection);
             }
-            else if (isHello)
+
+            //Inform the connection of the buffer (new connections need to send an ack back to client)
+            connection.HandleReceive(message, bytesReceived);
+
+            if (aware && isHello)
             {
                 message.Recycle();
             }

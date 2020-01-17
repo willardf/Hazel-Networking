@@ -76,6 +76,8 @@ namespace Hazel.Udp
             keepAliveTimer = new Timer(
                 (o) =>
                 {
+                    if (this.State != ConnectionState.Connected) return;
+
                     if (this.pingsSinceAck >= this.MissingPingsUntilDisconnect)
                     {
                         this.DisposeKeepAliveTimer();

@@ -289,7 +289,6 @@ namespace Hazel.Udp.FewerThreads
             return this.allConnections.TryRemove(endPoint, out var conn);
         }
 
-        /// <inheritdoc />
         protected virtual void Dispose(bool disposing)
         {
             foreach (var kvp in this.allConnections)

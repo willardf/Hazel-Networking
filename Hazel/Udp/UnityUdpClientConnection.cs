@@ -83,7 +83,7 @@ namespace Hazel.Udp
         }
 
         /// <inheritdoc />
-        public override void ConnectAsync(byte[] bytes = null, int timeout = 5000)
+        public override void ConnectAsync(byte[] bytes = null)
         {
             this.State = ConnectionState.Connecting;
 
@@ -122,8 +122,9 @@ namespace Hazel.Udp
             SendHello(bytes, () =>
             {
                 this.State = ConnectionState.Connected;
-                this.InitializeKeepAliveTimer();
             });
+
+            this.InitializeKeepAliveTimer();
         }
 
         /// <summary>

@@ -169,8 +169,7 @@ namespace Hazel
         ///     This method does not block.
         /// </summary>
         /// <param name="bytes">The bytes of data to send in the handshake.</param>
-        /// <param name="timeout">The number of milliseconds to wait before giving up on the connect attempt.</param>
-        public abstract void ConnectAsync(byte[] bytes = null, int timeout = 5000);
+        public abstract void ConnectAsync(byte[] bytes = null);
 
         /// <summary>
         ///     Invokes the DataReceived event.

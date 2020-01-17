@@ -29,10 +29,8 @@ namespace Hazel
         ///         client.
         ///     </para>
         ///     <para>
-        ///         Hazel doesn't store connections so it is your responsibility to keep track of the connections to your 
-        ///         server. Note that as <see cref="Connection"/> implements <see cref="IDisposable"/> if you are not storing
-        ///         a connection then as a bare minimum you should call <see cref="Connection.Dispose()"/> here in order to 
-        ///         release the connection correctly.
+        ///         Hazel may or may not store connections so it is your responsibility to keep track and properly Dispose of 
+        ///         connections to your server. 
         ///     </para>
         ///     <include file="DocInclude/common.xml" path="docs/item[@name='Event_Thread_Safety_Warning']/*" />
         /// </remarks>
@@ -79,18 +77,6 @@ namespace Hazel
             {
                 msg.Recycle();
             }
-        }
-
-        /// <summary>
-        ///     Closes the connection listener safely.
-        /// </summary>
-        /// <remarks>
-        ///     Internally this simply calls Dispose therefore trying to reuse the ConnectionListener after calling Close will
-        ///     cause ObjectDisposedExceptions.
-        /// </remarks>
-        public virtual void Close()
-        {
-            Dispose();
         }
 
         /// <summary>
