@@ -56,12 +56,7 @@ namespace Hazel.Udp
         /// <summary>
         ///     The packet id that was received last.
         /// </summary>
-        private volatile ushort reliableReceiveLast = 0;
-
-        /// <summary>
-        ///     Has the connection received anything yet
-        /// </summary>
-        private volatile bool hasReceivedSomething = false;
+        private volatile ushort reliableReceiveLast = ushort.MaxValue;
 
         private object PingLock = new object();
 
@@ -330,7 +325,7 @@ namespace Hazel.Udp
             id = (ushort)((b1 << 8) + b2);
 
             //Send an acknowledgement
-            SendAck(b1, b2);
+            SendAck(id);
 
             /*
              * It gets a little complicated here (note the fact I'm actually using a multiline comment for once...)
@@ -370,7 +365,7 @@ namespace Hazel.Udp
                     isNew = id > reliableReceiveLast && id <= overwritePointer;     //Figure (3)
                 
                 //If it's new or we've not received anything yet
-                if (isNew || !hasReceivedSomething)
+                if (isNew)
                 {
                     //Mark items between the most recent receive and the id received as missing
                     for (ushort i = (ushort)(reliableReceiveLast + 1); i < id; i++)
@@ -380,7 +375,6 @@ namespace Hazel.Udp
 
                     //Update the most recently received
                     reliableReceiveLast = id;
-                    hasReceivedSomething = true;
                 }
                 
                 //Else it could be a missing packet
@@ -405,9 +399,33 @@ namespace Hazel.Udp
         {
             this.pingsSinceAck = 0;
 
-            //Get ID
+            // Get ID
             ushort id = (ushort)((bytes[1] << 8) + bytes[2]);
+            AcknowledgeMessageId(id);
 
+            if (bytesReceived == 4)
+            {
+                byte recentPackets = bytes[3];
+                for (int i = 1; i <= 8; ++i)
+                {
+                    if ((recentPackets & 1) != 0)
+                    {
+                        AcknowledgeMessageId((ushort)(id - i));
+                    }
+
+                    recentPackets >>= 1;
+                }
+
+                Statistics.LogReliableReceive(bytesReceived - 4, bytesReceived);
+            }
+            else
+            {
+                Statistics.LogReliableReceive(bytesReceived - 3, bytesReceived);
+            }
+        }
+
+        private void AcknowledgeMessageId(ushort id)
+        {
             // Dispose of timer and remove from dictionary
             if (reliableDataPacketsSent.TryRemove(id, out Packet packet))
             {
@@ -432,8 +450,6 @@ namespace Hazel.Udp
                     this.AveragePingMs = Math.Max(50, this.AveragePingMs * .7f + rt * .3f);
                 }
             }
-
-            Statistics.LogReliableReceive(bytesReceived - 3, bytesReceived);
         }
 
         /// <summary>
@@ -441,13 +457,27 @@ namespace Hazel.Udp
         /// </summary>
         /// <param name="byte1">The first identification byte.</param>
         /// <param name="byte2">The second identification byte.</param>
-        private void SendAck(byte byte1, byte byte2)
+        private void SendAck(ushort id)
         {
+            const byte Found = 1;
+            const byte Missing = 1;
+
+            byte recentPackets = 0;
+            lock (this.reliableDataPacketsMissing)
+            {
+                for (int i = 1; i <= 8; ++i)
+                {
+                    recentPackets |= this.reliableDataPacketsMissing.Contains((ushort)(id - i)) ? Found : Missing;
+                    recentPackets <<= 1;
+                }
+            }
+
             byte[] bytes = new byte[]
             {
                 (byte)UdpSendOption.Acknowledgement,
-                byte1,
-                byte2
+                (byte)(id >> 8),
+                (byte)(id >> 0),
+                recentPackets
             };
 
             // Always reply with acknowledgement in order to stop the sender repeatedly sending it
