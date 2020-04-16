@@ -67,6 +67,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Channels\CircularBuffer.cs" />
+    <Compile Include="Channels\IClientServerComparer.cs" />
+    <Compile Include="Channels\ReconcilingServerChannel.cs" />
+    <Compile Include="Channels\ReconcilingClientChannel.cs" />
     <Compile Include="Connection.cs" />
     <Compile Include="ConnectionListener.cs" />
     <Compile Include="ConnectionState.cs" />
@@ -86,6 +90,7 @@
     <Compile Include="ObjectPool.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SendOption.cs" />
+    <Compile Include="Channels\SequencedChannel.cs" />
     <Compile Include="Udp\SendOptionInternal.cs" />
     <Compile Include="ConnectionStatistics.cs" />
     <Compile Include="Udp\UdpBroadcaster.cs" />
