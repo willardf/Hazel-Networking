@@ -28,7 +28,7 @@
     <LangVersion>7.3</LangVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
+    <DebugType>portable</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
@@ -39,6 +39,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Prefer32Bit>false</Prefer32Bit>
     <LangVersion>7.3</LangVersion>
+    <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
   <PropertyGroup>
     <SignAssembly>true</SignAssembly>
@@ -73,8 +74,8 @@
     <Compile Include="DataReceivedEventArgs.cs" />
     <Compile Include="DisconnectedEventArgs.cs" />
     <Compile Include="FewerThreads\HazelThreadPool.cs" />
-    <Compile Include="FewerThreads\UdpConnectionListener2.cs" />
-    <Compile Include="FewerThreads\UdpServerConnection2.cs" />
+    <Compile Include="FewerThreads\ThreadLimitedUdpConnectionListener.cs" />
+    <Compile Include="FewerThreads\ThreadLimitedUdpServerConnection.cs" />
     <Compile Include="HazelException.cs" />
     <Compile Include="IPMode.cs" />
     <Compile Include="IRecyclable.cs" />
@@ -103,7 +104,6 @@
     <Compile Include="UPnP\NetUtility.cs" />
     <Compile Include="UPnP\UPnPHelper.cs" />
   </ItemGroup>
-  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

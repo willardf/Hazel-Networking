@@ -4,10 +4,10 @@ using System.Net;
 namespace Hazel.Udp.FewerThreads
 {
     /// <summary>
-    ///     Represents a servers's connection to a client that uses the UDP protocol.
+    /// Represents a servers's connection to a client that uses the UDP protocol.
     /// </summary>
     /// <inheritdoc/>
-    internal sealed class UdpServerConnection2 : UdpConnection
+    internal sealed class ThreadLimitedUdpServerConnection : UdpConnection
     {
         /// <summary>
         ///     The connection listener that we use the socket of.
@@ -16,7 +16,7 @@ namespace Hazel.Udp.FewerThreads
         ///     Udp server connections utilize the same socket in the listener for sends/receives, this is the listener that 
         ///     created this connection and is hence the listener this conenction sends and receives via.
         /// </remarks>
-        public UdpConnectionListener2 Listener { get; private set; }
+        public ThreadLimitedUdpConnectionListener Listener { get; private set; }
 
         /// <summary>
         ///     Creates a UdpConnection for the virtual connection to the endpoint.
@@ -24,7 +24,7 @@ namespace Hazel.Udp.FewerThreads
         /// <param name="listener">The listener that created this connection.</param>
         /// <param name="endPoint">The endpoint that we are connected to.</param>
         /// <param name="IPMode">The IPMode we are connected using.</param>
-        internal UdpServerConnection2(UdpConnectionListener2 listener, IPEndPoint endPoint, IPMode IPMode)
+        internal ThreadLimitedUdpServerConnection(ThreadLimitedUdpConnectionListener listener, IPEndPoint endPoint, IPMode IPMode)
             : base()
         {
             this.Listener = listener;

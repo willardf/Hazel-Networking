@@ -49,7 +49,7 @@ namespace Hazel.Udp
         internal ConcurrentDictionary<ushort, Packet> reliableDataPacketsSent = new ConcurrentDictionary<ushort, Packet>();
 
         /// <summary>
-        ///     The last packets that were received.
+        ///     Packet ids that have not been received, but are expected. 
         /// </summary>
         private HashSet<ushort> reliableDataPacketsMissing = new HashSet<ushort>();
 
@@ -367,10 +367,21 @@ namespace Hazel.Udp
                 //If it's new or we've not received anything yet
                 if (isNew)
                 {
-                    //Mark items between the most recent receive and the id received as missing
-                    for (ushort i = (ushort)(reliableReceiveLast + 1); i < id; i++)
+                    // Mark items between the most recent receive and the id received as missing
+                    if (id > reliableReceiveLast)
                     {
-                        reliableDataPacketsMissing.Add(i);
+                        for (ushort i = (ushort)(reliableReceiveLast + 1); i < id; i++)
+                        {
+                            reliableDataPacketsMissing.Add(i);
+                        }
+                    }
+                    else
+                    {
+                        int cnt = (ushort.MaxValue - reliableReceiveLast) + id;
+                        for (ushort i = 1; i < cnt; ++i)
+                        {
+                            reliableDataPacketsMissing.Add((ushort)(i + reliableReceiveLast));
+                        }
                     }
 
                     //Update the most recently received
@@ -399,7 +410,6 @@ namespace Hazel.Udp
         {
             this.pingsSinceAck = 0;
 
-            // Get ID
             ushort id = (ushort)((bytes[1] << 8) + bytes[2]);
             AcknowledgeMessageId(id);
 
@@ -415,13 +425,9 @@ namespace Hazel.Udp
 
                     recentPackets >>= 1;
                 }
+            }
 
-                Statistics.LogReliableReceive(bytesReceived - 4, bytesReceived);
-            }
-            else
-            {
-                Statistics.LogReliableReceive(bytesReceived - 3, bytesReceived);
-            }
+            Statistics.LogReliableReceive(0, bytesReceived);
         }
 
         private void AcknowledgeMessageId(ushort id)
@@ -459,16 +465,15 @@ namespace Hazel.Udp
         /// <param name="byte2">The second identification byte.</param>
         private void SendAck(ushort id)
         {
-            const byte Found = 1;
-            const byte Missing = 1;
-
             byte recentPackets = 0;
             lock (this.reliableDataPacketsMissing)
             {
                 for (int i = 1; i <= 8; ++i)
                 {
-                    recentPackets |= this.reliableDataPacketsMissing.Contains((ushort)(id - i)) ? Found : Missing;
-                    recentPackets <<= 1;
+                    if (!this.reliableDataPacketsMissing.Contains((ushort)(id - i)))
+                    {
+                        recentPackets |= (byte)(1 << (i - 1));
+                    }
                 }
             }
 
@@ -480,8 +485,6 @@ namespace Hazel.Udp
                 recentPackets
             };
 
-            // Always reply with acknowledgement in order to stop the sender repeatedly sending it
-            // TODO: group acks together
             try
             {
                 WriteBytesToConnection(bytes, bytes.Length);

@@ -11,7 +11,7 @@ namespace Hazel.Udp.FewerThreads
     ///     Listens for new UDP connections and creates UdpConnections for them.
     /// </summary>
     /// <inheritdoc />
-    public class UdpConnectionListener2 : IDisposable
+    public class ThreadLimitedUdpConnectionListener : IDisposable
     {
         private struct SendMessageInfo
         {
@@ -49,7 +49,7 @@ namespace Hazel.Udp.FewerThreads
         private Thread sendThread;
         private HazelThreadPool processThreads;
 
-        private ConcurrentDictionary<EndPoint, UdpServerConnection2> allConnections = new ConcurrentDictionary<EndPoint, UdpServerConnection2>();
+        private ConcurrentDictionary<EndPoint, ThreadLimitedUdpServerConnection> allConnections = new ConcurrentDictionary<EndPoint, ThreadLimitedUdpServerConnection>();
 
         private Queue<ReceiveMessageInfo> receiveQueue = new Queue<ReceiveMessageInfo>();
         private Queue<SendMessageInfo> sendQueue = new Queue<SendMessageInfo>();
@@ -60,7 +60,7 @@ namespace Hazel.Udp.FewerThreads
 
         private bool isActive;
 
-        public UdpConnectionListener2(IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
+        public ThreadLimitedUdpConnectionListener(int numWorkers, IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
         {
             this.Logger = logger;
             this.EndPoint = endPoint;
@@ -75,10 +75,10 @@ namespace Hazel.Udp.FewerThreads
             this.reliablePacketThread = new Thread(ManageReliablePackets);
             this.sendThread = new Thread(SendLoop);
             this.receiveThread = new Thread(ReceiveLoop);
-            this.processThreads = new HazelThreadPool(4, ProcessingLoop);
+            this.processThreads = new HazelThreadPool(numWorkers, ProcessingLoop);
         }
 
-        ~UdpConnectionListener2()
+        ~ThreadLimitedUdpConnectionListener()
         {
             this.Dispose(false);
         }
@@ -121,7 +121,7 @@ namespace Hazel.Udp.FewerThreads
             {
                 if (this.socket.Poll(Timeout.Infinite, SelectMode.SelectRead))
                 {
-                    EndPoint remoteEP = new IPEndPoint(IPMode == IPMode.IPv4 ? IPAddress.Any : IPAddress.IPv6Any, this.EndPoint.Port);
+                    EndPoint remoteEP = new IPEndPoint(this.EndPoint.Address, this.EndPoint.Port);
                     MessageReader message = MessageReader.GetSized(BufferSize);
                     try
                     {
@@ -215,7 +215,7 @@ namespace Hazel.Udp.FewerThreads
 
             // If we're aware of this connection use the one already
             // If this is a new client then connect with them!
-            UdpServerConnection2 connection;
+            ThreadLimitedUdpServerConnection connection;
             if (!this.allConnections.TryGetValue(remoteEndPoint, out connection))
             {
                 lock (this.allConnections)
@@ -244,7 +244,7 @@ namespace Hazel.Udp.FewerThreads
                         }
 
                         aware = false;
-                        connection = new UdpServerConnection2(this, (IPEndPoint)remoteEndPoint, this.IPMode);
+                        connection = new ThreadLimitedUdpServerConnection(this, (IPEndPoint)remoteEndPoint, this.IPMode);
                         if (!this.allConnections.TryAdd(remoteEndPoint, connection))
                         {
                             throw new HazelException("Failed to add a connection. This should never happen.");
@@ -253,10 +253,9 @@ namespace Hazel.Udp.FewerThreads
                 }
             }
 
-            //Inform the connection of the buffer (new connections need to send an ack back to client)
-            connection.HandleReceive(message, bytesReceived);
-            
-            //If it's a new connection invoke the NewConnection event.
+            // If it's a new connection invoke the NewConnection event.
+            // This needs to happen before handling the message because in localhost scenarios, the ACK and
+            // subsequent messages can happen before the NewConnection event sets up OnDataRecieved handlers
             if (!aware)
             {
                 // Skip header and hello byte;
@@ -265,7 +264,11 @@ namespace Hazel.Udp.FewerThreads
                 message.Position = 0;
                 this.NewConnection?.Invoke(new NewConnectionEventArgs(message, connection));
             }
-            else if (isHello)
+
+            // Inform the connection of the buffer (new connections need to send an ack back to client)
+            connection.HandleReceive(message, bytesReceived);
+
+            if (isHello)
             {
                 message.Recycle();
             }
