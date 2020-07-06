@@ -221,7 +221,7 @@ namespace Hazel.Udp
         /// <param name="buffer">The buffer to attach to.</param>
         /// <param name="offset">The offset to attach at.</param>
         /// <param name="ackCallback">The callback to make once the packet has been acknowledged.</param>
-        private void AttachReliableID(byte[] buffer, int offset, int sendLength, Action ackCallback = null)
+        protected void AttachReliableID(byte[] buffer, int offset, int sendLength, Action ackCallback = null)
         {
             ushort id = (ushort)Interlocked.Increment(ref lastIDAllocated);
 
@@ -258,23 +258,10 @@ namespace Hazel.Udp
         /// <param name="ackCallback">The callback to make once the packet has been acknowledged.</param>
         private void ReliableSend(byte sendOption, byte[] data, Action ackCallback = null)
         {
-            this.ReliableSend(sendOption, data, 0, data.Length, ackCallback);
-        }
-
-        /// <summary>
-        ///     Sends the bytes reliably and stores the send.
-        /// </summary>
-        /// <param name="sendOption"></param>
-        /// <param name="data">The byte array to write to.</param>
-        /// <param name="offset"></param>
-        /// <param name="length"></param>
-        /// <param name="ackCallback">The callback to make once the packet has been acknowledged.</param>
-        private void ReliableSend(byte sendOption, byte[] data, int offset, int length, Action ackCallback = null)
-        {
             //Inform keepalive not to send for a while
             ResetKeepAliveTimer();
 
-            byte[] bytes = new byte[length + 3];
+            byte[] bytes = new byte[data.Length + 3];
 
             //Add message type
             bytes[0] = sendOption;
@@ -283,12 +270,12 @@ namespace Hazel.Udp
             AttachReliableID(bytes, 1, bytes.Length, ackCallback);
 
             //Copy data into new array
-            Buffer.BlockCopy(data, offset, bytes, bytes.Length - length, length);
+            Buffer.BlockCopy(data, 0, bytes, bytes.Length - data.Length, data.Length);
 
             //Write to connection
             WriteBytesToConnection(bytes, bytes.Length);
 
-            Statistics.LogReliableSend(length, bytes.Length);
+            Statistics.LogReliableSend(data.Length, bytes.Length);
         }
 
         /// <summary>

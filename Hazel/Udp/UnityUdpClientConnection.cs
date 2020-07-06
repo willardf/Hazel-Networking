@@ -15,8 +15,6 @@ namespace Hazel.Udp
     {
         private Socket socket;
 
-        public EndPoint LocalEndpoint { get { return this.socket.LocalEndPoint; } }
-
         public UnityUdpClientConnection(IPEndPoint remoteEndPoint, IPMode ipMode = IPMode.IPv4)
             : base()
         {
