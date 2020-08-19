@@ -268,7 +268,7 @@ namespace Hazel.Udp.FewerThreads
             // Inform the connection of the buffer (new connections need to send an ack back to client)
             connection.HandleReceive(message, bytesReceived);
 
-            if (isHello)
+            if (isHello && aware)
             {
                 message.Recycle();
             }

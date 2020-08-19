@@ -24,4 +24,17 @@ namespace Hazel
         {
         }
     }
+
+    public class ConsoleLogger : ILogger
+    {
+        public void WriteError(string msg)
+        {
+            Console.WriteLine($"{DateTime.Now} [ERROR] {msg}");
+        }
+
+        public void WriteInfo(string msg)
+        {
+            Console.WriteLine($"{DateTime.Now} [INFO] {msg}");
+        }
+    }
 }
