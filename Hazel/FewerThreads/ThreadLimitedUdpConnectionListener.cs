@@ -51,12 +51,12 @@ namespace Hazel.Udp.FewerThreads
 
         private ConcurrentDictionary<EndPoint, ThreadLimitedUdpServerConnection> allConnections = new ConcurrentDictionary<EndPoint, ThreadLimitedUdpServerConnection>();
 
-        private Queue<ReceiveMessageInfo> receiveQueue = new Queue<ReceiveMessageInfo>();
+        private BlockingCollection<ReceiveMessageInfo> receiveQueue;
         private Queue<SendMessageInfo> sendQueue = new Queue<SendMessageInfo>();
 
         public int ConnectionCount { get { return this.allConnections.Count; } }
         public int SendQueueLength { get { lock(this.sendQueue) return this.sendQueue.Count; } }
-        public int ReceiveQueueLength { get { lock (this.receiveQueue) return this.receiveQueue.Count; } }
+        public int ReceiveQueueLength { get { return this.receiveQueue.Count; } }
 
         private bool isActive;
 
@@ -65,6 +65,8 @@ namespace Hazel.Udp.FewerThreads
             this.Logger = logger;
             this.EndPoint = endPoint;
             this.IPMode = ipMode;
+
+            this.receiveQueue = new BlockingCollection<ReceiveMessageInfo>(10000);
 
             this.socket = UdpConnection.CreateSocket(this.IPMode);
             this.socket.Blocking = false;
@@ -140,11 +142,7 @@ namespace Hazel.Udp.FewerThreads
                         return;
                     }
 
-                    lock (this.receiveQueue)
-                    {
-                        this.receiveQueue.Enqueue(new ReceiveMessageInfo() { Message = message, Sender = remoteEP });
-                        Monitor.Pulse(this.receiveQueue);
-                    }
+                    this.receiveQueue.Add(new ReceiveMessageInfo() { Message = message, Sender = remoteEP });
                 }
             }
         }
@@ -153,28 +151,15 @@ namespace Hazel.Udp.FewerThreads
         {
             while (this.isActive)
             {
-                ReceiveMessageInfo msg;
-                lock (this.receiveQueue)
-                {
-                    if (this.receiveQueue.Count == 0)
-                    {
-                        Monitor.Wait(this.receiveQueue);
-
-                        if (this.receiveQueue.Count == 0)
-                        {
-                            continue;
-                        }
-                    }
-
-                    msg = this.receiveQueue.Dequeue();
-                }
-
+                ReceiveMessageInfo msg = this.receiveQueue.Take();
+                
                 try
                 {
                     this.ReadCallback(msg.Message, msg.Sender);
                 }
                 catch
                 {
+
                 }
             }
         }
@@ -306,7 +291,8 @@ namespace Hazel.Udp.FewerThreads
             this.isActive = false;
 
             lock (this.sendQueue) Monitor.PulseAll(this.sendQueue);
-            lock (this.receiveQueue) Monitor.PulseAll(this.receiveQueue);
+
+            this.receiveQueue.CompleteAdding();
 
             this.reliablePacketThread.Join();
             this.sendThread.Join();

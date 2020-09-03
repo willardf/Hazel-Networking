@@ -99,7 +99,9 @@ namespace Hazel
             }
             else
             {
+#if DEBUG
                 throw new Exception("Duplicate add " + typeof(T).Name);
+#endif
             }
         }
     }
