@@ -54,6 +54,22 @@ namespace Hazel.Udp.FewerThreads
         private BlockingCollection<ReceiveMessageInfo> receiveQueue;
         private Queue<SendMessageInfo> sendQueue = new Queue<SendMessageInfo>();
 
+        public int MaxAge
+        {
+            get
+            {
+                var now = DateTime.UtcNow;
+                TimeSpan max = new TimeSpan();
+                foreach (var con in allConnections.Values)
+                {
+                    var val = now - con.CreationTime;
+                    if (val > max) max = val;
+                }
+
+                return (int)max.TotalSeconds;
+            }
+        }
+
         public int ConnectionCount { get { return this.allConnections.Count; } }
         public int SendQueueLength { get { lock(this.sendQueue) return this.sendQueue.Count; } }
         public int ReceiveQueueLength { get { return this.receiveQueue.Count; } }
@@ -83,6 +99,18 @@ namespace Hazel.Udp.FewerThreads
         ~ThreadLimitedUdpConnectionListener()
         {
             this.Dispose(false);
+        }
+
+        public void DisconnectOldConnections(TimeSpan maxAge, MessageWriter disconnectMessage)
+        {
+            var now = DateTime.UtcNow;
+            foreach (var conn in this.allConnections.Values)
+            {
+                if (now - conn.CreationTime > maxAge)
+                {
+                    conn.Disconnect("Stale Connection", disconnectMessage);
+                }
+            }
         }
         
         private void ManageReliablePackets()
