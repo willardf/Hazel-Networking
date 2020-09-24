@@ -214,9 +214,16 @@ namespace Hazel.Udp.FewerThreads
 
                 try
                 {
-                    this.socket.SendTo(msg.Buffer, 0, msg.Buffer.Length, SocketFlags.None, msg.Recipient);
+                    if (this.socket.Poll(Timeout.Infinite, SelectMode.SelectWrite))
+                    {
+                        this.socket.SendTo(msg.Buffer, 0, msg.Buffer.Length, SocketFlags.None, msg.Recipient);
+                    }
                 }
-                catch { }
+                catch (Exception e)
+                {
+                    this.Logger.WriteError("Error in loop while sending: " + e.Message);
+                    Thread.Sleep(1);
+                }
             }
         }
 
