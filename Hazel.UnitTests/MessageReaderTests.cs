@@ -166,6 +166,48 @@ namespace Hazel.UnitTests
         }
 
         [TestMethod]
+        public void ReadStringProtectsAgainstOverrun()
+        {
+            const string TestDataFromAPreviousPacket = "You shouldn't be able to see this data";
+
+            // An extra byte from the length of TestData when written via MessageWriter
+            int DataLength = TestDataFromAPreviousPacket.Length + 1;
+
+            // THE BUG
+            //
+            // No bound checks. When the server wants to read a string from
+            // an offset, it reads the packed int at that offset, treats it
+            // as a length and then proceeds to read the data that comes after
+            // it without any bound checks. This can be chained with something
+            // else to create an infoleak.
+
+            MessageWriter writer = MessageWriter.Get(SendOption.None);
+
+            // This will be our malicious "string length"
+            writer.WritePacked(DataLength);
+
+            // This is data from a "previous packet"
+            writer.Write(TestDataFromAPreviousPacket);
+
+            byte[] testData = writer.ToByteArray(includeHeader: false);
+
+            // One extra byte for the MessageWriter header, one more for the malicious data
+            Assert.AreEqual(DataLength + 1, testData.Length);
+
+            var dut = MessageReader.Get(testData);
+
+            // If Length is short by even a byte, ReadString should obey that.
+            dut.Length--;
+
+            try
+            {
+                dut.ReadString();
+                Assert.Fail("ReadString is expected to throw");
+            }
+            catch (InvalidDataException) { }
+        }
+
+        [TestMethod]
         public void GetLittleEndian()
         {
             Assert.IsTrue(MessageWriter.IsLittleEndian());
