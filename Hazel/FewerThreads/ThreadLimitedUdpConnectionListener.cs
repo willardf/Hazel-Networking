@@ -85,6 +85,7 @@ namespace Hazel.Udp.FewerThreads
             this.receiveQueue = new BlockingCollection<ReceiveMessageInfo>(10000);
 
             this.socket = UdpConnection.CreateSocket(this.IPMode);
+            this.socket.ExclusiveAddressUse = true;
             this.socket.Blocking = false;
 
             this.socket.ReceiveBufferSize = SendReceiveBufferSize;

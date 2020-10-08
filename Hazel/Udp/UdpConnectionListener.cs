@@ -271,7 +271,7 @@ namespace Hazel.Udp
             }
             catch (SocketException e)
             {
-                throw new HazelException("Could not send data as a SocketException occurred.", e);
+                this.Logger?.Invoke("Could not send data as a SocketException occurred: " + e);
             }
             catch (ObjectDisposedException)
             {
