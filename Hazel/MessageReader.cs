@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
 
@@ -13,6 +14,8 @@ namespace Hazel
 
         public int Length;
         public int Offset;
+
+        public int BytesRemaining => this.Length - this.Position;
 
         public int Position
         {
@@ -201,6 +204,8 @@ namespace Hazel
         public string ReadString()
         {
             int len = this.ReadPackedInt32();
+            if (this.BytesRemaining < len) throw new InvalidDataException($"Read length is longer than message length: {len} of {this.BytesRemaining}");
+
             string output = UTF8Encoding.UTF8.GetString(this.Buffer, this.readHead, len);
 
             this.Position += len;
@@ -210,11 +215,15 @@ namespace Hazel
         public byte[] ReadBytesAndSize()
         {
             int len = this.ReadPackedInt32();
+            if (this.BytesRemaining < len) throw new InvalidDataException($"Read length is longer than message length: {len} of {this.BytesRemaining}");
+
             return this.ReadBytes(len);
         }
 
         public byte[] ReadBytes(int length)
         {
+            if (this.BytesRemaining < length) throw new InvalidDataException($"Read length is longer than message length: {length} of {this.BytesRemaining}");
+
             byte[] output = new byte[length];
             Array.Copy(this.Buffer, this.readHead, output, 0, output.Length);
             this.Position += output.Length;
@@ -236,6 +245,8 @@ namespace Hazel
 
             while (readMore)
             {
+                if (this.BytesRemaining < 1) throw new InvalidDataException($"Read length is longer than message length.");
+
                 byte b = this.ReadByte();
                 if (b >= 0x80)
                 {
