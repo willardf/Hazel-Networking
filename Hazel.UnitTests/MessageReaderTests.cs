@@ -144,7 +144,6 @@ namespace Hazel.UnitTests
             msg.Write("HO");
             msg.EndMessage();
             msg.StartMessage(2);
-            msg.Write("NO");
             msg.EndMessage();
             msg.EndMessage();
 
@@ -160,9 +159,8 @@ namespace Hazel.UnitTests
             Assert.AreEqual("HO", sub.ReadString());
 
             sub = reader.ReadMessage();
-            Assert.AreEqual(3, sub.Length);
+            Assert.AreEqual(0, sub.Length);
             Assert.AreEqual(2, sub.Tag);
-            Assert.AreEqual("NO", sub.ReadString());
         }
 
         [TestMethod]
@@ -203,6 +201,47 @@ namespace Hazel.UnitTests
             {
                 dut.ReadString();
                 Assert.Fail("ReadString is expected to throw");
+            }
+            catch (InvalidDataException) { }
+        }
+
+        [TestMethod]
+        public void ReadMessageProtectsAgainstOverrun()
+        {
+            const string TestDataFromAPreviousPacket = "You shouldn't be able to see this data";
+            
+            // An extra byte from the length of TestData when written via MessageWriter
+            // Extra 3 bytes for the length + tag header for ReadMessage.
+            int DataLength = TestDataFromAPreviousPacket.Length + 1 + 3;
+
+            // THE BUG
+            //
+            // No bound checks. When the server wants to read a message, it
+            // reads the uint16 at that offset, treats it as a length without any bound checks.
+            // This can be allow a later ReadString or ReadBytes to create an infoleak.
+
+            MessageWriter writer = MessageWriter.Get(SendOption.None);
+
+            // This is the malicious length. No data in this message, so it should be zero.
+            writer.Write((ushort)1); 
+            writer.Write((byte)0); // Tag
+
+            // This is data from a "previous packet"
+            writer.Write(TestDataFromAPreviousPacket);
+
+            byte[] testData = writer.ToByteArray(includeHeader: false);
+
+            Assert.AreEqual(DataLength, testData.Length);
+
+            var outer = MessageReader.Get(testData);
+
+            // Length is just the malicious message header.
+            outer.Length = 3;
+
+            try
+            {
+                outer.ReadMessage();
+                Assert.Fail("ReadMessage is expected to throw");
             }
             catch (InvalidDataException) { }
         }

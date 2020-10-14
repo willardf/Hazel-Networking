@@ -108,7 +108,7 @@ namespace Hazel
         public MessageReader ReadMessage()
         {
             // Ensure there is at least a header
-            if (this.readHead + 3 > this.Buffer.Length) return null;
+            if (this.BytesRemaining < 3) throw new InvalidDataException($"ReadMessage header is longer than message length: 3 of {this.BytesRemaining}");
 
             var output = new MessageReader();
 
@@ -121,6 +121,8 @@ namespace Hazel
 
             output.Offset += 3;
             output.Position = 0;
+
+            if (this.BytesRemaining < output.Length + 3) throw new InvalidDataException($"Message length is longer than message length: {output.Length + 3} of {this.BytesRemaining}");
 
             this.Position += output.Length + 3;
             return output;
