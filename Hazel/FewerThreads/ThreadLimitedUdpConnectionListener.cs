@@ -52,7 +52,7 @@ namespace Hazel.Udp.FewerThreads
         private ConcurrentDictionary<EndPoint, ThreadLimitedUdpServerConnection> allConnections = new ConcurrentDictionary<EndPoint, ThreadLimitedUdpServerConnection>();
 
         private BlockingCollection<ReceiveMessageInfo> receiveQueue;
-        private Queue<SendMessageInfo> sendQueue = new Queue<SendMessageInfo>();
+        private BlockingCollection<SendMessageInfo> sendQueue = new BlockingCollection<SendMessageInfo>();
 
         public int MaxAge
         {
@@ -71,7 +71,7 @@ namespace Hazel.Udp.FewerThreads
         }
 
         public int ConnectionCount { get { return this.allConnections.Count; } }
-        public int SendQueueLength { get { lock(this.sendQueue) return this.sendQueue.Count; } }
+        public int SendQueueLength { get { return this.sendQueue.Count; } }
         public int ReceiveQueueLength { get { return this.receiveQueue.Count; } }
 
         private bool isActive;
@@ -197,21 +197,7 @@ namespace Hazel.Udp.FewerThreads
         {
             while (this.isActive)
             {
-                SendMessageInfo msg;
-                lock (this.sendQueue)
-                {
-                    if (this.sendQueue.Count == 0)
-                    {
-                        Monitor.Wait(this.sendQueue);
-
-                        if (this.sendQueue.Count == 0)
-                        {
-                            continue;
-                        }
-                    }
-
-                    msg = this.sendQueue.Dequeue();
-                }
+                SendMessageInfo msg = this.sendQueue.Take();
 
                 try
                 {
@@ -297,11 +283,7 @@ namespace Hazel.Udp.FewerThreads
 
         internal void SendDataRaw(byte[] response, EndPoint remoteEndPoint)
         {
-            lock (this.sendQueue)
-            {
-                this.sendQueue.Enqueue(new SendMessageInfo() { Buffer = response, Recipient = remoteEndPoint });
-                Monitor.Pulse(this.sendQueue);
-            }
+            this.sendQueue.Add(new SendMessageInfo() { Buffer = response, Recipient = remoteEndPoint });
         }
 
         /// <summary>
@@ -326,9 +308,8 @@ namespace Hazel.Udp.FewerThreads
 
             this.isActive = false;
 
-            lock (this.sendQueue) Monitor.PulseAll(this.sendQueue);
-
             this.receiveQueue.CompleteAdding();
+            this.sendQueue.CompleteAdding();
 
             this.reliablePacketThread.Join();
             this.sendThread.Join();
