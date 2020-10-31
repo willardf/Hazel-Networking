@@ -84,8 +84,11 @@ namespace Hazel
         ///
         public void StartMessage(byte typeFlag)
         {
-            messageStarts.Push(this.Position);
-            this.Position += 2; // Skip for size
+            var messageStart = this.Position;
+            messageStarts.Push(messageStart);
+            this.Buffer[messageStart] = 0;
+            this.Buffer[messageStart + 1] = 0;
+            this.Position += 2;
             this.Write(typeFlag);
         }
 

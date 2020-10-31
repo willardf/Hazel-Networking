@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 
@@ -17,6 +18,8 @@ namespace Hazel
 
         public int BytesRemaining => this.Length - this.Position;
 
+        private MessageReader Parent;
+
         public int Position
         {
             get { return this._position; }
@@ -29,7 +32,7 @@ namespace Hazel
 
         private int _position;
         private int readHead;
-        
+
         public static MessageReader GetSized(int minSize)
         {
             var output = ReaderPool.GetObject();
@@ -39,10 +42,11 @@ namespace Hazel
             }
 
             output.Offset = 0;
+            output.Position = 0;
             output.Tag = byte.MaxValue;
             return output;
         }
-        
+
         public static MessageReader Get(byte[] buffer)
         {
             var output = ReaderPool.GetObject();
@@ -52,7 +56,7 @@ namespace Hazel
             output.Position = 0;
             output.Length = buffer.Length;
             output.Tag = byte.MaxValue;
-            
+
             return output;
         }
 
@@ -64,7 +68,7 @@ namespace Hazel
             output.Offset = 0;
             output.Position = 0;
             output.Length = source.Length + 3;
-            
+
             return output;
         }
 
@@ -104,7 +108,9 @@ namespace Hazel
             return output;
         }
 
-        ///
+        /// <summary>
+        /// Produces a MessageReader using the parent's buffer. This MessageReader should **NOT** be recycled.
+        /// </summary>
         public MessageReader ReadMessage()
         {
             // Ensure there is at least a header
@@ -112,6 +118,7 @@ namespace Hazel
 
             var output = new MessageReader();
 
+            output.Parent = this;
             output.Buffer = this.Buffer;
             output.Offset = this.readHead;
             output.Position = 0;
@@ -128,8 +135,76 @@ namespace Hazel
             return output;
         }
 
+        /// <summary>
+        /// Produces a MessageReader with a new buffer. This MessageReader should be recycled.
+        /// </summary>
+        public MessageReader ReadMessageAsNewBuffer()
+        {
+            if (this.BytesRemaining < 3) throw new InvalidDataException($"ReadMessage header is longer than message length: 3 of {this.BytesRemaining}");
+
+            var len = this.ReadUInt16();
+            var tag = this.ReadByte();
+
+            if (this.BytesRemaining < len) throw new InvalidDataException($"Message length is longer than message length: {len} of {this.BytesRemaining}");
+
+            var output = MessageReader.GetSized(len);
+
+            output.Parent = this;
+            Array.Copy(this.Buffer, this.readHead, output.Buffer, 0, len);
+
+            output.Length = len;
+            output.Tag = tag;
+
+            this.Position += output.Length;
+            return output;
+        }
+
+        public void RemoveMessage(MessageReader reader)
+        {
+            var temp = MessageReader.GetSized(reader.Buffer.Length);
+            try
+            {
+                var headerOffset = reader.Offset - 3;
+                var endOfMessage = reader.Offset + reader.Length;
+                var len = reader.Buffer.Length - endOfMessage;
+
+                Array.Copy(reader.Buffer, endOfMessage, temp.Buffer, 0, len);
+                Array.Copy(temp.Buffer, 0, this.Buffer, headerOffset, len);
+
+                this.AdjustLength(reader.Offset, reader.Length + 3);
+            }
+            finally
+            {
+                temp.Recycle();
+            }
+        }
+
+        private void AdjustLength(int offset, int amount)
+        {
+            if (this.readHead > offset)
+            {
+                this.Position -= amount;
+            }
+
+            if (Parent != null)
+            {
+                var lengthOffset = this.Offset - 3;
+                var curLen = this.Buffer[lengthOffset]
+                    | (this.Buffer[lengthOffset + 1] << 8);
+
+                curLen -= amount;
+                this.Length -= amount;
+
+                this.Buffer[lengthOffset] = (byte)curLen;
+                this.Buffer[lengthOffset + 1] = (byte)(this.Buffer[lengthOffset + 1] >> 8);
+
+                Parent.AdjustLength(offset, amount);
+            }
+        }
+
         public void Recycle()
         {
+            this.Parent = null;
             ReaderPool.PutObject(this);
         }
 

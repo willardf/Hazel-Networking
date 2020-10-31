@@ -88,7 +88,61 @@ namespace Hazel.UnitTests
             MessageReader reader = MessageReader.Get(msg.Buffer, 0);
 
             Assert.AreEqual(Test1, reader.ReadSingle());
+        }
 
+        [TestMethod]
+        public void RemoveMessageWorks()
+        {
+            const byte Test0 = 11;
+            const byte Test3 = 33;
+            const byte Test4 = 44;
+            const byte Test5 = 55;
+
+            var msg = new MessageWriter(2048);
+            msg.StartMessage(0);
+            msg.Write(Test0);
+            msg.EndMessage();
+
+            msg.StartMessage(12);
+            msg.StartMessage(23);
+
+            msg.StartMessage(34);
+            msg.Write(Test3);
+            msg.EndMessage();
+
+            msg.StartMessage(45);
+            msg.Write(Test4);
+            msg.EndMessage();
+
+            msg.EndMessage();
+            msg.EndMessage();
+
+            msg.StartMessage(56);
+            msg.Write(Test5);
+            msg.EndMessage();
+
+            MessageReader reader = MessageReader.Get(msg.Buffer);
+            reader.Length = msg.Length;
+
+            var zero = reader.ReadMessage();
+
+            var one = reader.ReadMessage();
+            var two = one.ReadMessage();
+            var three = two.ReadMessage();
+            two.RemoveMessage(three);
+
+            // Reader becomes invalid
+            Assert.AreNotEqual(Test3, three.ReadByte()); 
+
+            // Unrealistic, but nice. Earlier data is not affected
+            Assert.AreEqual(Test0, zero.ReadByte()); 
+
+            // Continuing to read depth-first works
+            var four = two.ReadMessage();
+            Assert.AreEqual(Test4, four.ReadByte());
+
+            var five = reader.ReadMessage();
+            Assert.AreEqual(Test5, five.ReadByte());
         }
 
         [TestMethod]
@@ -161,6 +215,38 @@ namespace Hazel.UnitTests
             sub = reader.ReadMessage();
             Assert.AreEqual(0, sub.Length);
             Assert.AreEqual(2, sub.Tag);
+        }
+
+        [TestMethod]
+        public void ReadMessageAsNewBufferLength()
+        {
+            var msg = new MessageWriter(2048);
+            msg.StartMessage(1);
+            msg.Write(65534);
+            msg.StartMessage(2);
+            msg.Write("HO");
+            msg.EndMessage();
+            msg.StartMessage(232);
+            msg.EndMessage();
+            msg.EndMessage();
+
+            Assert.AreEqual(msg.Length, msg.Position);
+
+            MessageReader reader = MessageReader.Get(msg.Buffer, 0);
+            Assert.AreEqual(1, reader.Tag);
+            Assert.AreEqual(65534, reader.ReadInt32()); // Content
+
+            var sub = reader.ReadMessageAsNewBuffer();
+            Assert.AreEqual(3, sub.Length);
+            Assert.AreEqual(2, sub.Tag);
+            Assert.AreEqual("HO", sub.ReadString());
+
+            sub.Recycle();
+
+            sub = reader.ReadMessageAsNewBuffer();
+            Assert.AreEqual(0, sub.Length);
+            Assert.AreEqual(232, sub.Tag);
+            sub.Recycle();
         }
 
         [TestMethod]

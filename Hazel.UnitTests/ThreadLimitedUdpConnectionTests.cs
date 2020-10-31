@@ -313,36 +313,6 @@ namespace Hazel.UnitTests
         ///     Tests the keepalive functionality from the client,
         /// </summary>
         [TestMethod]
-        public void PingDisconnectClientTest()
-        {
-#if DEBUG
-            using (ThreadLimitedUdpConnectionListener listener = new ThreadLimitedUdpConnectionListener(2, new IPEndPoint(IPAddress.Any, 4296), new NullLogger()))
-            using (UdpConnection connection = new UdpClientConnection(new IPEndPoint(IPAddress.Loopback, 4296)))
-            {
-                listener.Start();
-
-                connection.Connect();
-
-                // After connecting, quietly stop responding to all messages to fake connection loss.
-                Thread.Sleep(10);
-                // listener.TestDropRate = 1;
-
-                connection.KeepAliveInterval = 100;
-
-                Thread.Sleep(1050);    //Enough time for ~10 keep alive packets
-
-                Assert.AreEqual(ConnectionState.NotConnected, connection.State);
-                Assert.AreEqual(3 * connection.MissingPingsUntilDisconnect + 4, connection.Statistics.TotalBytesSent); // + 4 for connecting overhead
-            }
-#else
-            Assert.Inconclusive("Only works in DEBUG");
-#endif
-        }
-
-        /// <summary>
-        ///     Tests the keepalive functionality from the client,
-        /// </summary>
-        [TestMethod]
         public void KeepAliveClientTest()
         {
             using (ThreadLimitedUdpConnectionListener listener = new ThreadLimitedUdpConnectionListener(2, new IPEndPoint(IPAddress.Any, 4296), new NullLogger()))
