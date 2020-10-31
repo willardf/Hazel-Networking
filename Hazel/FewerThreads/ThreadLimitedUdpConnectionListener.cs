@@ -11,7 +11,7 @@ namespace Hazel.Udp.FewerThreads
     ///     Listens for new UDP connections and creates UdpConnections for them.
     /// </summary>
     /// <inheritdoc />
-    public class UdpConnectionListener2 : IDisposable
+    public class ThreadLimitedUdpConnectionListener : IDisposable
     {
         private struct SendMessageInfo
         {
@@ -49,24 +49,43 @@ namespace Hazel.Udp.FewerThreads
         private Thread sendThread;
         private HazelThreadPool processThreads;
 
-        private ConcurrentDictionary<EndPoint, UdpServerConnection2> allConnections = new ConcurrentDictionary<EndPoint, UdpServerConnection2>();
+        private ConcurrentDictionary<EndPoint, ThreadLimitedUdpServerConnection> allConnections = new ConcurrentDictionary<EndPoint, ThreadLimitedUdpServerConnection>();
 
-        private Queue<ReceiveMessageInfo> receiveQueue = new Queue<ReceiveMessageInfo>();
+        private BlockingCollection<ReceiveMessageInfo> receiveQueue;
         private Queue<SendMessageInfo> sendQueue = new Queue<SendMessageInfo>();
+
+        public int MaxAge
+        {
+            get
+            {
+                var now = DateTime.UtcNow;
+                TimeSpan max = new TimeSpan();
+                foreach (var con in allConnections.Values)
+                {
+                    var val = now - con.CreationTime;
+                    if (val > max) max = val;
+                }
+
+                return (int)max.TotalSeconds;
+            }
+        }
 
         public int ConnectionCount { get { return this.allConnections.Count; } }
         public int SendQueueLength { get { lock(this.sendQueue) return this.sendQueue.Count; } }
-        public int ReceiveQueueLength { get { lock (this.receiveQueue) return this.receiveQueue.Count; } }
+        public int ReceiveQueueLength { get { return this.receiveQueue.Count; } }
 
         private bool isActive;
 
-        public UdpConnectionListener2(IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
+        public ThreadLimitedUdpConnectionListener(int numWorkers, IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
         {
             this.Logger = logger;
             this.EndPoint = endPoint;
             this.IPMode = ipMode;
 
+            this.receiveQueue = new BlockingCollection<ReceiveMessageInfo>(10000);
+
             this.socket = UdpConnection.CreateSocket(this.IPMode);
+            this.socket.ExclusiveAddressUse = true;
             this.socket.Blocking = false;
 
             this.socket.ReceiveBufferSize = SendReceiveBufferSize;
@@ -75,12 +94,24 @@ namespace Hazel.Udp.FewerThreads
             this.reliablePacketThread = new Thread(ManageReliablePackets);
             this.sendThread = new Thread(SendLoop);
             this.receiveThread = new Thread(ReceiveLoop);
-            this.processThreads = new HazelThreadPool(4, ProcessingLoop);
+            this.processThreads = new HazelThreadPool(numWorkers, ProcessingLoop);
         }
 
-        ~UdpConnectionListener2()
+        ~ThreadLimitedUdpConnectionListener()
         {
             this.Dispose(false);
+        }
+
+        public void DisconnectOldConnections(TimeSpan maxAge, MessageWriter disconnectMessage)
+        {
+            var now = DateTime.UtcNow;
+            foreach (var conn in this.allConnections.Values)
+            {
+                if (now - conn.CreationTime > maxAge)
+                {
+                    conn.Disconnect("Stale Connection", disconnectMessage);
+                }
+            }
         }
         
         private void ManageReliablePackets()
@@ -121,7 +152,7 @@ namespace Hazel.Udp.FewerThreads
             {
                 if (this.socket.Poll(Timeout.Infinite, SelectMode.SelectRead))
                 {
-                    EndPoint remoteEP = new IPEndPoint(IPMode == IPMode.IPv4 ? IPAddress.Any : IPAddress.IPv6Any, this.EndPoint.Port);
+                    EndPoint remoteEP = new IPEndPoint(this.EndPoint.Address, this.EndPoint.Port);
                     MessageReader message = MessageReader.GetSized(BufferSize);
                     try
                     {
@@ -140,11 +171,7 @@ namespace Hazel.Udp.FewerThreads
                         return;
                     }
 
-                    lock (this.receiveQueue)
-                    {
-                        this.receiveQueue.Enqueue(new ReceiveMessageInfo() { Message = message, Sender = remoteEP });
-                        Monitor.Pulse(this.receiveQueue);
-                    }
+                    this.receiveQueue.Add(new ReceiveMessageInfo() { Message = message, Sender = remoteEP });
                 }
             }
         }
@@ -153,28 +180,15 @@ namespace Hazel.Udp.FewerThreads
         {
             while (this.isActive)
             {
-                ReceiveMessageInfo msg;
-                lock (this.receiveQueue)
-                {
-                    if (this.receiveQueue.Count == 0)
-                    {
-                        Monitor.Wait(this.receiveQueue);
-
-                        if (this.receiveQueue.Count == 0)
-                        {
-                            continue;
-                        }
-                    }
-
-                    msg = this.receiveQueue.Dequeue();
-                }
-
+                ReceiveMessageInfo msg = this.receiveQueue.Take();
+                
                 try
                 {
                     this.ReadCallback(msg.Message, msg.Sender);
                 }
                 catch
                 {
+
                 }
             }
         }
@@ -201,9 +215,16 @@ namespace Hazel.Udp.FewerThreads
 
                 try
                 {
-                    this.socket.SendTo(msg.Buffer, 0, msg.Buffer.Length, SocketFlags.None, msg.Recipient);
+                    if (this.socket.Poll(Timeout.Infinite, SelectMode.SelectWrite))
+                    {
+                        this.socket.SendTo(msg.Buffer, 0, msg.Buffer.Length, SocketFlags.None, msg.Recipient);
+                    }
                 }
-                catch { }
+                catch (Exception e)
+                {
+                    this.Logger.WriteError("Error in loop while sending: " + e.Message);
+                    Thread.Sleep(1);
+                }
             }
         }
 
@@ -215,7 +236,7 @@ namespace Hazel.Udp.FewerThreads
 
             // If we're aware of this connection use the one already
             // If this is a new client then connect with them!
-            UdpServerConnection2 connection;
+            ThreadLimitedUdpServerConnection connection;
             if (!this.allConnections.TryGetValue(remoteEndPoint, out connection))
             {
                 lock (this.allConnections)
@@ -244,7 +265,7 @@ namespace Hazel.Udp.FewerThreads
                         }
 
                         aware = false;
-                        connection = new UdpServerConnection2(this, (IPEndPoint)remoteEndPoint, this.IPMode);
+                        connection = new ThreadLimitedUdpServerConnection(this, (IPEndPoint)remoteEndPoint, this.IPMode);
                         if (!this.allConnections.TryAdd(remoteEndPoint, connection))
                         {
                             throw new HazelException("Failed to add a connection. This should never happen.");
@@ -253,10 +274,9 @@ namespace Hazel.Udp.FewerThreads
                 }
             }
 
-            //Inform the connection of the buffer (new connections need to send an ack back to client)
-            connection.HandleReceive(message, bytesReceived);
-            
-            //If it's a new connection invoke the NewConnection event.
+            // If it's a new connection invoke the NewConnection event.
+            // This needs to happen before handling the message because in localhost scenarios, the ACK and
+            // subsequent messages can happen before the NewConnection event sets up OnDataRecieved handlers
             if (!aware)
             {
                 // Skip header and hello byte;
@@ -265,7 +285,11 @@ namespace Hazel.Udp.FewerThreads
                 message.Position = 0;
                 this.NewConnection?.Invoke(new NewConnectionEventArgs(message, connection));
             }
-            else if (isHello)
+
+            // Inform the connection of the buffer (new connections need to send an ack back to client)
+            connection.HandleReceive(message, bytesReceived);
+
+            if (isHello && aware)
             {
                 message.Recycle();
             }
@@ -303,7 +327,8 @@ namespace Hazel.Udp.FewerThreads
             this.isActive = false;
 
             lock (this.sendQueue) Monitor.PulseAll(this.sendQueue);
-            lock (this.receiveQueue) Monitor.PulseAll(this.receiveQueue);
+
+            this.receiveQueue.CompleteAdding();
 
             this.reliablePacketThread.Join();
             this.sendThread.Join();

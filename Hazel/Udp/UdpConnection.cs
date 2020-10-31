@@ -73,7 +73,7 @@ namespace Hazel.Udp
 
                 default:
                     WriteBytesToConnection(buffer, buffer.Length);
-                    Statistics.LogUnreliableSend(buffer.Length - 1, buffer.Length);;
+                    Statistics.LogUnreliableSend(buffer.Length - 1, buffer.Length);
                     break;
             }
         }

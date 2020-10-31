@@ -61,9 +61,12 @@
     <Compile Include="StatisticsTests.cs" />
     <Compile Include="TestHelper.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="UdpConnectionTestHarness.cs" />
+    <Compile Include="ThreadLimitedUdpConnectionTests.cs" />
     <Compile Include="UdpConnectionTests.cs" />
     <Compile Include="MessageWriterTests.cs" />
     <Compile Include="StressTests.cs" />
+    <Compile Include="UdpReliabilityTests.cs" />
     <Compile Include="UPnPTests.cs" />
   </ItemGroup>
   <ItemGroup>

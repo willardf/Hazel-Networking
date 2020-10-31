@@ -23,6 +23,7 @@ namespace Hazel.Udp
             this.IPMode = ipMode;
 
             this.socket = CreateSocket(ipMode);
+            this.socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ExclusiveAddressUse, true);
         }
         
         ~UnityUdpClientConnection()
@@ -135,7 +136,8 @@ namespace Hazel.Udp
             var msg = MessageReader.GetSized(ushort.MaxValue);
             try
             {
-                socket.BeginReceive(msg.Buffer, 0, msg.Buffer.Length, SocketFlags.None, ReadCallback, msg);
+                var ep = this.RemoteEndPoint;
+                socket.BeginReceiveFrom(msg.Buffer, 0, msg.Buffer.Length, SocketFlags.None, ref ep, ReadCallback, msg);
             }
             catch
             {
@@ -154,7 +156,8 @@ namespace Hazel.Udp
 
             try
             {
-                msg.Length = socket.EndReceive(result);
+                var ep = this.RemoteEndPoint;
+                msg.Length = socket.EndReceiveFrom(result, ref ep);
             }
             catch (SocketException e)
             {

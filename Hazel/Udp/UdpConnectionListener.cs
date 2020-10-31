@@ -42,7 +42,7 @@ namespace Hazel.Udp
             this.IPMode = ipMode;
 
             this.socket = UdpConnection.CreateSocket(this.IPMode);
-
+            
             socket.ReceiveBufferSize = SendReceiveBufferSize;
             socket.SendBufferSize = SendReceiveBufferSize;
             
@@ -119,7 +119,7 @@ namespace Hazel.Udp
         {
             var message = (MessageReader)result.AsyncState;
             int bytesReceived;
-            EndPoint remoteEndPoint = new IPEndPoint(IPMode == IPMode.IPv4 ? IPAddress.Any : IPAddress.IPv6Any, 0);
+            EndPoint remoteEndPoint = new IPEndPoint(this.EndPoint.Address, this.EndPoint.Port);
 
             //End the receive operation
             try
@@ -225,7 +225,7 @@ namespace Hazel.Udp
                 InvokeNewConnection(message, connection);
             }
 
-            //Inform the connection of the buffer (new connections need to send an ack back to client)
+            // Inform the connection of the buffer (new connections need to send an ack back to client)
             connection.HandleReceive(message, bytesReceived);
 
             if (aware && isHello)
@@ -271,7 +271,7 @@ namespace Hazel.Udp
             }
             catch (SocketException e)
             {
-                throw new HazelException("Could not send data as a SocketException occurred.", e);
+                this.Logger?.Invoke("Could not send data as a SocketException occurred: " + e);
             }
             catch (ObjectDisposedException)
             {

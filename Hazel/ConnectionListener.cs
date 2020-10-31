@@ -71,7 +71,11 @@ namespace Hazel
             Action<NewConnectionEventArgs> handler = NewConnection;
             if (handler != null)
             {
-                handler(new NewConnectionEventArgs(msg, connection));
+                try
+                {
+                    handler(new NewConnectionEventArgs(msg, connection));
+                }
+                catch { }
             }
             else
             {

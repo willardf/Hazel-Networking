@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Threading;
 
 namespace Hazel
@@ -18,8 +19,11 @@ namespace Hazel
         public int NumberNotInUse { get { return this.pool.Count; } }
         public int Size { get { return this.NumberInUse + this.NumberNotInUse; } }
 
-        // Available objects
+#if HAZEL_BAG
         private readonly ConcurrentBag<T> pool = new ConcurrentBag<T>();
+#else
+        private readonly List<T> pool = new List<T>();
+#endif
 
         // Unavailable objects
         private readonly ConcurrentDictionary<T, bool> inuse = new ConcurrentDictionary<T, bool>();
@@ -44,11 +48,29 @@ namespace Hazel
         /// <returns>An instance of T.</returns>
         internal T GetObject()
         {
+#if HAZEL_BAG
             if (!pool.TryTake(out T item))
             {
                 Interlocked.Increment(ref numberCreated);
                 item = objectFactory.Invoke();
             }
+#else
+            T item;
+            lock (this.pool)
+            {
+                if (this.pool.Count > 0)
+                {
+                    var idx = this.pool.Count - 1;
+                    item = this.pool[idx];
+                    this.pool.RemoveAt(idx);
+                }
+                else
+                {
+                    Interlocked.Increment(ref numberCreated);
+                    item = objectFactory.Invoke();
+                }
+            }
+#endif
 
             if (!inuse.TryAdd(item, true))
             {
@@ -66,11 +88,20 @@ namespace Hazel
         {
             if (inuse.TryRemove(item, out bool b))
             {
+#if HAZEL_BAG
                 pool.Add(item);
+#else
+                lock (this.pool)
+                {
+                    pool.Add(item);
+                }
+#endif
             }
             else
             {
+#if DEBUG
                 throw new Exception("Duplicate add " + typeof(T).Name);
+#endif
             }
         }
     }
