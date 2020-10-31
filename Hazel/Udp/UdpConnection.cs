@@ -66,7 +66,7 @@ namespace Hazel.Udp
                 case SendOption.Reliable:
                     ResetKeepAliveTimer();
 
-                    AttachReliableID(buffer, 1, buffer.Length);
+                    AttachReliableID(buffer, 1);
                     WriteBytesToConnection(buffer, buffer.Length);
                     Statistics.LogReliableSend(buffer.Length - 3, buffer.Length);
                     break;

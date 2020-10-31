@@ -221,7 +221,7 @@ namespace Hazel.Udp
         /// <param name="buffer">The buffer to attach to.</param>
         /// <param name="offset">The offset to attach at.</param>
         /// <param name="ackCallback">The callback to make once the packet has been acknowledged.</param>
-        protected void AttachReliableID(byte[] buffer, int offset, int sendLength, Action ackCallback = null)
+        protected void AttachReliableID(byte[] buffer, int offset, Action ackCallback = null)
         {
             ushort id = (ushort)Interlocked.Increment(ref lastIDAllocated);
 
@@ -233,7 +233,7 @@ namespace Hazel.Udp
                 id,
                 this,
                 buffer,
-                sendLength,
+                buffer.Length,
                 ResendTimeout > 0 ? ResendTimeout : (int)Math.Min(AveragePingMs * this.ResendPingMultiplier, 300),
                 ackCallback);
 
@@ -267,7 +267,7 @@ namespace Hazel.Udp
             bytes[0] = sendOption;
 
             //Add reliable ID
-            AttachReliableID(bytes, 1, bytes.Length, ackCallback);
+            AttachReliableID(bytes, 1, ackCallback);
 
             //Copy data into new array
             Buffer.BlockCopy(data, 0, bytes, bytes.Length - data.Length, data.Length);
