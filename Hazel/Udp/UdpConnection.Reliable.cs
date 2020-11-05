@@ -67,7 +67,7 @@ namespace Hazel.Udp
         ///     This returns the average ping for a one-way trip as calculated from the reliable packets that have been sent 
         ///     and acknowledged by the endpoint.
         /// </remarks>
-        public float AveragePingMs = 500;
+        private float _pingMs = 500;
 
         /// <summary>
         ///     The maximum times a message should be resent before marking the endpoint as disconnected.
@@ -234,7 +234,7 @@ namespace Hazel.Udp
                 this,
                 buffer,
                 buffer.Length,
-                ResendTimeout > 0 ? ResendTimeout : (int)Math.Min(AveragePingMs * this.ResendPingMultiplier, 300),
+                ResendTimeout > 0 ? ResendTimeout : (int)Math.Min(_pingMs * this.ResendPingMultiplier, 300),
                 ackCallback);
 
             if (!reliableDataPacketsSent.TryAdd(id, packet))
@@ -429,7 +429,7 @@ namespace Hazel.Udp
 
                 lock (PingLock)
                 {
-                    this.AveragePingMs = Math.Max(50, this.AveragePingMs * .7f + rt * .3f);
+                    this._pingMs = Math.Max(50, this._pingMs * .7f + rt * .3f);
                 }
             }
             else if (this.activePingPackets.TryRemove(id, out PingPacket pingPkt))
@@ -440,7 +440,7 @@ namespace Hazel.Udp
 
                 lock (PingLock)
                 {
-                    this.AveragePingMs = Math.Max(50, this.AveragePingMs * .7f + rt * .3f);
+                    this._pingMs = Math.Max(50, this._pingMs * .7f + rt * .3f);
                 }
             }
         }

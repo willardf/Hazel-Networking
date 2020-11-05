@@ -206,10 +206,17 @@ namespace Hazel.Udp
 
         protected override void SetState(ConnectionState state)
         {
-            if (state == ConnectionState.Connected)
-                connectWaitLock.Set();
-            else
-                connectWaitLock.Reset();
+            try
+            {
+                if (state == ConnectionState.Connected)
+                    connectWaitLock.Set();
+                else
+                    connectWaitLock.Reset();
+            }
+            catch (ObjectDisposedException)
+            {
+
+            }
         }
 
         /// <summary>

@@ -237,6 +237,9 @@ namespace Hazel.UnitTests
             Assert.AreEqual(65534, reader.ReadInt32()); // Content
 
             var sub = reader.ReadMessageAsNewBuffer();
+            Assert.AreEqual(0, sub.Position);
+            Assert.AreEqual(0, sub.Offset);
+
             Assert.AreEqual(3, sub.Length);
             Assert.AreEqual(2, sub.Tag);
             Assert.AreEqual("HO", sub.ReadString());
@@ -244,6 +247,9 @@ namespace Hazel.UnitTests
             sub.Recycle();
 
             sub = reader.ReadMessageAsNewBuffer();
+            Assert.AreEqual(0, sub.Position);
+            Assert.AreEqual(0, sub.Offset);
+
             Assert.AreEqual(0, sub.Length);
             Assert.AreEqual(232, sub.Tag);
             sub.Recycle();

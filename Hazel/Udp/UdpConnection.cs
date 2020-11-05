@@ -9,6 +9,8 @@ namespace Hazel.Udp
     /// <inheritdoc />
     public abstract partial class UdpConnection : NetworkConnection
     {
+        public override float AveragePingMs => this._pingMs;
+
         private const int SioUdpConnectionReset = -1744830452;
 
         public static readonly byte[] EmptyDisconnectBytes = new byte[] { (byte)UdpSendOption.Disconnect };
@@ -34,7 +36,6 @@ namespace Hazel.Udp
                 socket.DontFragment = false;
             }
             catch { }
-
 
             try
             {

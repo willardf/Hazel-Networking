@@ -36,9 +36,14 @@ namespace Hazel
         public static MessageReader GetSized(int minSize)
         {
             var output = ReaderPool.GetObject();
+
             if (output.Buffer == null || output.Buffer.Length < minSize)
             {
                 output.Buffer = new byte[minSize];
+            }
+            else
+            {
+                Array.Clear(output.Buffer, 0, output.Buffer.Length);
             }
 
             output.Offset = 0;
@@ -74,7 +79,7 @@ namespace Hazel
 
         public static MessageReader Get(MessageReader source)
         {
-            var output = GetSized(source.Buffer.Length);
+            var output = MessageReader.GetSized(source.Buffer.Length);
             System.Buffer.BlockCopy(source.Buffer, 0, output.Buffer, 0, source.Buffer.Length);
 
             output.Offset = source.Offset;
@@ -129,7 +134,7 @@ namespace Hazel
             output.Offset += 3;
             output.Position = 0;
 
-            if (this.BytesRemaining < output.Length + 3) throw new InvalidDataException($"Message length is longer than message length: {output.Length + 3} of {this.BytesRemaining}");
+            if (this.BytesRemaining < output.Length + 3) throw new InvalidDataException($"Message Length at Position {this.readHead} is longer than message length: {output.Length + 3} of {this.BytesRemaining}");
 
             this.Position += output.Length + 3;
             return output;
@@ -145,7 +150,7 @@ namespace Hazel
             var len = this.ReadUInt16();
             var tag = this.ReadByte();
 
-            if (this.BytesRemaining < len) throw new InvalidDataException($"Message length is longer than message length: {len} of {this.BytesRemaining}");
+            if (this.BytesRemaining < len) throw new InvalidDataException($"Message Length at Position {this.readHead} is longer than message length: {len} of {this.BytesRemaining}");
 
             var output = MessageReader.GetSized(len);
 

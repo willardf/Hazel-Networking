@@ -37,6 +37,8 @@ namespace Hazel
         /// </remarks>
         public EndPoint RemoteEndPoint { get; protected set; }
 
+        public virtual float AveragePingMs { get; }
+
         public long GetIP4Address()
         {
             if (IPMode == IPMode.IPv4)

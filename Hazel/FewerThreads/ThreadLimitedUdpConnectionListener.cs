@@ -283,7 +283,7 @@ namespace Hazel.Udp.FewerThreads
 
         internal void SendDataRaw(byte[] response, EndPoint remoteEndPoint)
         {
-            this.sendQueue.Add(new SendMessageInfo() { Buffer = response, Recipient = remoteEndPoint });
+            this.sendQueue.TryAdd(new SendMessageInfo() { Buffer = response, Recipient = remoteEndPoint });
         }
 
         /// <summary>
@@ -315,6 +315,9 @@ namespace Hazel.Udp.FewerThreads
             this.sendThread.Join();
             this.receiveThread.Join();
             this.processThreads.Join();
+
+            this.receiveQueue.Dispose();
+            this.sendQueue.Dispose();
         }
 
         public void Dispose()

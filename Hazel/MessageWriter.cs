@@ -110,6 +110,7 @@ namespace Hazel
 
         public void Clear(SendOption sendOption)
         {
+            Array.Clear(this.Buffer, 0, this.Buffer.Length);
             this.messageStarts.Clear();
             this.SendOption = sendOption;
             this.Buffer[0] = (byte)sendOption;
