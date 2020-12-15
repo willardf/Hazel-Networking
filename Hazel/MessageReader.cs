@@ -164,6 +164,13 @@ namespace Hazel
             return output;
         }
 
+        public MessageWriter StartWriter()
+        {
+            var output = new MessageWriter(this.Buffer);
+            output.Position = this.readHead;
+            return output;
+        }
+
         public void RemoveMessage(MessageReader reader)
         {
             var temp = MessageReader.GetSized(reader.Buffer.Length);
