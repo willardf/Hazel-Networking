@@ -308,16 +308,19 @@ namespace Hazel.Udp.FewerThreads
 
             this.isActive = false;
 
-            this.receiveQueue.CompleteAdding();
-            this.sendQueue.CompleteAdding();
+            this.receiveQueue?.CompleteAdding();
+            this.sendQueue?.CompleteAdding();
 
             this.reliablePacketThread.Join();
             this.sendThread.Join();
             this.receiveThread.Join();
             this.processThreads.Join();
 
-            this.receiveQueue.Dispose();
-            this.sendQueue.Dispose();
+            this.receiveQueue?.Dispose();
+            this.receiveQueue = null;
+            this.sendQueue?.Dispose();
+            this.sendQueue = null;
+
         }
 
         public void Dispose()
