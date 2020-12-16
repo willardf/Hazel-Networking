@@ -43,6 +43,7 @@ namespace Hazel.Udp
             this.socket = CreateSocket(ipMode);
 
             reliablePacketTimer = new Timer(ManageReliablePacketsInternal, null, 100, Timeout.Infinite);
+            this.InitializeKeepAliveTimer();
         }
         
         ~UdpClientConnection()
