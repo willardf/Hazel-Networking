@@ -171,11 +171,10 @@ namespace Hazel.Udp.FewerThreads
                         return;
                     }
 
-                    this.receiveQueue.Add(new ReceiveMessageInfo() { Message = message, Sender = remoteEP });
+                    this.ProcessIncomingMessageFromOtherThread(message, remoteEP);
                 }
             }
         }
-
         private void ProcessingLoop()
         {
             while (this.isActive)
@@ -191,6 +190,10 @@ namespace Hazel.Udp.FewerThreads
 
                 }
             }
+        }
+        protected virtual void ProcessIncomingMessageFromOtherThread(MessageReader message, EndPoint peerAddress)
+        {
+            this.receiveQueue.Add(new ReceiveMessageInfo() { Message = message, Sender = peerAddress });
         }
 
         private void SendLoop()
@@ -286,7 +289,7 @@ namespace Hazel.Udp.FewerThreads
             QueueRawData(response, remoteEndPoint);
         }
 
-        protected void QueueRawData(ByteSpan span, EndPoint remoteEndPoint)
+        protected virtual void QueueRawData(ByteSpan span, EndPoint remoteEndPoint)
         {
             this.sendQueue.TryAdd(new SendMessageInfo() { Span = span, Recipient = remoteEndPoint });
         }
