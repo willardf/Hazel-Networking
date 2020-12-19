@@ -78,6 +78,7 @@
     <Compile Include="Crypto\X25519.cs" />
     <Compile Include="DataReceivedEventArgs.cs" />
     <Compile Include="DisconnectedEventArgs.cs" />
+    <Compile Include="Dtls\IHandshakeCipherSuite.cs" />
     <Compile Include="FewerThreads\HazelThreadPool.cs" />
     <Compile Include="FewerThreads\ThreadLimitedUdpConnectionListener.cs" />
     <Compile Include="FewerThreads\ThreadLimitedUdpServerConnection.cs" />
