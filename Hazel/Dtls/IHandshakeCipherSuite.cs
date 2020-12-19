@@ -17,8 +17,11 @@ namespace Hazel.Dtls
         /// <summary>
         /// Calculate the size of the ServerKeyExchnage message
         /// </summary>
+        /// <param name="privateKey">
+        /// Private key that will be used to sign the message
+        /// </param>
         /// <returns>Size of the message in bytes</returns>
-        int CalculateServerMessageSize();
+        int CalculateServerMessageSize(object privateKey);
 
         /// <summary>
         /// Encodes the ServerKeyExchange message
