@@ -57,6 +57,7 @@
   </Choose>
   <ItemGroup>
     <Compile Include="BroadcastTests.cs" />
+    <Compile Include="Crypto\AesGcmTest.cs" />
     <Compile Include="Crypto\X25519Tests.cs" />
     <Compile Include="MessageReaderTests.cs" />
     <Compile Include="StatisticsTests.cs" />
@@ -70,6 +71,7 @@
     <Compile Include="StressTests.cs" />
     <Compile Include="UdpReliabilityTests.cs" />
     <Compile Include="UPnPTests.cs" />
+    <Compile Include="Utils.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Hazel\Hazel.csproj">
