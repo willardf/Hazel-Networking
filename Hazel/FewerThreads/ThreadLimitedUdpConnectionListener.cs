@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
@@ -15,7 +15,7 @@ namespace Hazel.Udp.FewerThreads
     {
         private struct SendMessageInfo
         {
-            public byte[] Buffer;
+            public ByteSpan Span;
             public EndPoint Recipient;
         }
 
@@ -203,7 +203,7 @@ namespace Hazel.Udp.FewerThreads
                 {
                     if (this.socket.Poll(Timeout.Infinite, SelectMode.SelectWrite))
                     {
-                        this.socket.SendTo(msg.Buffer, 0, msg.Buffer.Length, SocketFlags.None, msg.Recipient);
+                        this.socket.SendTo(msg.Span.GetUnderlyingArray(), msg.Span.Offset, msg.Span.Length, SocketFlags.None, msg.Recipient);
                     }
                 }
                 catch (Exception e)
@@ -283,7 +283,12 @@ namespace Hazel.Udp.FewerThreads
 
         internal void SendDataRaw(byte[] response, EndPoint remoteEndPoint)
         {
-            this.sendQueue.TryAdd(new SendMessageInfo() { Buffer = response, Recipient = remoteEndPoint });
+            QueueRawData(response, remoteEndPoint);
+        }
+
+        protected void QueueRawData(ByteSpan span, EndPoint remoteEndPoint)
+        {
+            this.sendQueue.TryAdd(new SendMessageInfo() { Span = span, Recipient = remoteEndPoint });
         }
 
         /// <summary>
