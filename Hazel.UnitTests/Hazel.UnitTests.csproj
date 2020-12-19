@@ -57,6 +57,7 @@
   </Choose>
   <ItemGroup>
     <Compile Include="BroadcastTests.cs" />
+    <Compile Include="Crypto\X25519Tests.cs" />
     <Compile Include="MessageReaderTests.cs" />
     <Compile Include="StatisticsTests.cs" />
     <Compile Include="TestHelper.cs" />
