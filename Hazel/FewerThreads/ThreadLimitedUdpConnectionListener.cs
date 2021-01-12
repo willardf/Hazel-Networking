@@ -39,7 +39,7 @@ namespace Hazel.Udp.FewerThreads
         public delegate bool AcceptConnectionCheck(IPEndPoint endPoint, byte[] input, out byte[] response);
 
         private Socket socket;
-        private ILogger Logger;
+        protected ILogger Logger;
 
         public IPEndPoint EndPoint { get; }
         public IPMode IPMode { get; }
