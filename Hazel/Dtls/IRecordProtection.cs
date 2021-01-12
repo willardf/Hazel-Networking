@@ -63,4 +63,22 @@ namespace Hazel.Dtls
         /// <returns>True if the input was authenticated and decrypted. Otherwise false</returns>
         bool DecryptCiphertextFromClient(ByteSpan output, ByteSpan input, ref Record record);
     }
+
+    /// <summary>
+    /// Factory to create record protection from cipher suite identifiers
+    /// </summary>
+    public sealed class RecordProtectionFactory
+    {
+        public static IRecordProtection Create(CipherSuite cipherSuite, ByteSpan masterSecret, ByteSpan serverRandom, ByteSpan clientRandom)
+        {
+            switch (cipherSuite)
+            {
+            case CipherSuite.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:
+                return new Aes128GcmRecordProtection(masterSecret, serverRandom, clientRandom);
+
+            default:
+                return null;
+            }
+        }
+    }
 }
