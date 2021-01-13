@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
@@ -15,7 +15,7 @@ namespace Hazel.Udp.FewerThreads
     {
         private struct SendMessageInfo
         {
-            public byte[] Buffer;
+            public ByteSpan Span;
             public EndPoint Recipient;
         }
 
@@ -39,7 +39,7 @@ namespace Hazel.Udp.FewerThreads
         public delegate bool AcceptConnectionCheck(IPEndPoint endPoint, byte[] input, out byte[] response);
 
         private Socket socket;
-        private ILogger Logger;
+        protected ILogger Logger;
 
         public IPEndPoint EndPoint { get; }
         public IPMode IPMode { get; }
@@ -171,11 +171,10 @@ namespace Hazel.Udp.FewerThreads
                         return;
                     }
 
-                    this.receiveQueue.Add(new ReceiveMessageInfo() { Message = message, Sender = remoteEP });
+                    this.ProcessIncomingMessageFromOtherThread(message, remoteEP);
                 }
             }
         }
-
         private void ProcessingLoop()
         {
             while (this.isActive)
@@ -192,6 +191,10 @@ namespace Hazel.Udp.FewerThreads
                 }
             }
         }
+        protected virtual void ProcessIncomingMessageFromOtherThread(MessageReader message, EndPoint peerAddress)
+        {
+            this.receiveQueue.Add(new ReceiveMessageInfo() { Message = message, Sender = peerAddress });
+        }
 
         private void SendLoop()
         {
@@ -203,7 +206,7 @@ namespace Hazel.Udp.FewerThreads
                 {
                     if (this.socket.Poll(Timeout.Infinite, SelectMode.SelectWrite))
                     {
-                        this.socket.SendTo(msg.Buffer, 0, msg.Buffer.Length, SocketFlags.None, msg.Recipient);
+                        this.socket.SendTo(msg.Span.GetUnderlyingArray(), msg.Span.Offset, msg.Span.Length, SocketFlags.None, msg.Recipient);
                     }
                 }
                 catch (Exception e)
@@ -283,7 +286,12 @@ namespace Hazel.Udp.FewerThreads
 
         internal void SendDataRaw(byte[] response, EndPoint remoteEndPoint)
         {
-            this.sendQueue.TryAdd(new SendMessageInfo() { Buffer = response, Recipient = remoteEndPoint });
+            QueueRawData(response, remoteEndPoint);
+        }
+
+        protected virtual void QueueRawData(ByteSpan span, EndPoint remoteEndPoint)
+        {
+            this.sendQueue.TryAdd(new SendMessageInfo() { Span = span, Recipient = remoteEndPoint });
         }
 
         /// <summary>
