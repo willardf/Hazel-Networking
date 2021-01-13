@@ -4,6 +4,25 @@ using System.Security.Cryptography;
 namespace Hazel.Dtls
 {
     /// <summary>
+    /// Common Psuedorandom Function labels for TLS
+    /// </summary>
+    public struct PrfLabel
+    {
+        public static readonly ByteSpan MASTER_SECRET = LabelToBytes("master secert");
+        public static readonly ByteSpan KEY_EXPANSION = LabelToBytes("key expansion");
+        public static readonly ByteSpan CLIENT_FINISHED = LabelToBytes("client finished");
+        public static readonly ByteSpan SERVER_FINISHED = LabelToBytes("server finished");
+
+        /// <summary>
+        /// Convert a text label to a byte sequence
+        /// </summary>
+        public static ByteSpan LabelToBytes(string label)
+        {
+            return Encoding.ASCII.GetBytes(label);
+        }
+    }
+
+    /// <summary>
     /// The P_SHA256 Psuedorandom Function
     /// </summary>
     public struct PrfSha256
@@ -17,8 +36,7 @@ namespace Hazel.Dtls
         /// <param name="initialSeed">Seed for expansion (treated as a salt)</param>
         public static void ExpandSecret(ByteSpan output, ByteSpan key, string label, ByteSpan initialSeed)
         {
-            ByteSpan labelAsBytes = Encoding.ASCII.GetBytes(label);
-            ExpandSecret(output, key, labelAsBytes, initialSeed);
+            ExpandSecret(output, key, PrfLabel.LabelToBytes(label), initialSeed);
         }
 
         /// <summary>
@@ -34,7 +52,7 @@ namespace Hazel.Dtls
 
             byte[] roundSeed = new byte[label.Length + initialSeed.Length];
             label.CopyTo(roundSeed);
-            initialSeed.CopyTo(roundSeed, label.Length));
+            initialSeed.CopyTo(roundSeed, label.Length);
 
             byte[] hashA = roundSeed;
 
