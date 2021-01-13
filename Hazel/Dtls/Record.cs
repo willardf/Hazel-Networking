@@ -67,7 +67,7 @@ namespace Hazel.Dtls
         public void Encode(ByteSpan span)
         {
             span[0] = (byte)this.ContentType;
-            span.WriteBigEndian16((ushort)ProtocolVersion.DTLS1_2);
+            span.WriteBigEndian16((ushort)ProtocolVersion.DTLS1_2, 1);
             span.WriteBigEndian16(this.Epoch, 3);
             span.WriteBigEndian48(this.SequenceNumber, 5);
             span.WriteBigEndian16(this.Length, 11);

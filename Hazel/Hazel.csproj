@@ -78,6 +78,7 @@
     <Compile Include="Crypto\X25519.cs" />
     <Compile Include="DataReceivedEventArgs.cs" />
     <Compile Include="DisconnectedEventArgs.cs" />
+    <Compile Include="Dtls\AesGcmRecordProtection.cs" />
     <Compile Include="Dtls\Handshake.cs" />
     <Compile Include="Dtls\IHandshakeCipherSuite.cs" />
     <Compile Include="Dtls\IRecordProtection.cs" />
