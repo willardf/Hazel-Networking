@@ -59,6 +59,7 @@
     <Compile Include="BroadcastTests.cs" />
     <Compile Include="Crypto\AesGcmTest.cs" />
     <Compile Include="Crypto\X25519Tests.cs" />
+    <Compile Include="Dtls\AesGcmRecordProtectedTests.cs" />
     <Compile Include="Dtls\X25519EcdheRsaSha256Tests.cs" />
     <Compile Include="MessageReaderTests.cs" />
     <Compile Include="StatisticsTests.cs" />
