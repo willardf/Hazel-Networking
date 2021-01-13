@@ -17,14 +17,24 @@ namespace Hazel.Dtls
         /// <param name="initialSeed">Seed for expansion (treated as a salt)</param>
         public static void ExpandSecret(ByteSpan output, ByteSpan key, string label, ByteSpan initialSeed)
         {
+            ByteSpan labelAsBytes = Encoding.ASCII.GetBytes(label);
+            ExpandSecret(output, key, labelAsBytes, initialSeed);
+        }
+
+        /// <summary>
+        /// Expand a secret key
+        /// </summary>
+        /// <param name="output">Output span. Length determines how much data to generate</param>
+        /// <param name="key">Original key to expand</param>
+        /// <param name="label">Label (treated as a salt)</param>
+        /// <param name="initialSeed">Seed for expansion (treated as a salt)</param>
+        public static void ExpandSecret(ByteSpan output, ByteSpan key, ByteSpan label, ByteSpan initialSeed)
+        {
             ByteSpan writer = output;
 
-            ///TODO(mendsley): Look into pre-calculating all of these
-            ByteSpan labelAsBytes = Encoding.ASCII.GetBytes(label);
-
-            byte[] roundSeed = new byte[labelAsBytes.Length + initialSeed.Length];
-            labelAsBytes.CopyTo(roundSeed);
-            initialSeed.CopyTo(roundSeed, labelAsBytes.Length));
+            byte[] roundSeed = new byte[label.Length + initialSeed.Length];
+            label.CopyTo(roundSeed);
+            initialSeed.CopyTo(roundSeed, label.Length));
 
             byte[] hashA = roundSeed;
 
