@@ -82,6 +82,7 @@
     <Compile Include="Dtls\Handshake.cs" />
     <Compile Include="Dtls\IHandshakeCipherSuite.cs" />
     <Compile Include="Dtls\IRecordProtection.cs" />
+    <Compile Include="Dtls\NullRecordProtection.cs" />
     <Compile Include="Dtls\PrfSha256.cs" />
     <Compile Include="Dtls\Record.cs" />
     <Compile Include="Dtls\X25519EcdheRsaSha256.cs" />
