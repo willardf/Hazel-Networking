@@ -160,7 +160,7 @@ namespace Hazel.Dtls
         public void EncodeClientKeyExchangeMessage(ByteSpan output)
         {
             output[0] = (byte)X25519.KeySize;
-            X25519.Func(output.Slice(1), this.privateAgreementKey);
+            X25519.Func(output.Slice(1, X25519.KeySize), this.privateAgreementKey);
         }
 
         /// <inheritdoc />
