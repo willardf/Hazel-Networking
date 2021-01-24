@@ -75,6 +75,7 @@ namespace Hazel.Udp.FewerThreads
         }
 
         private ConcurrentDictionary<ulong, ThreadLimitedUdpServerConnection> allConnections = new ConcurrentDictionary<ulong, ThreadLimitedUdpServerConnection>();
+        private ConcurrentStack<ConnectionId> staleConnections = new ConcurrentStack<ConnectionId>();
 
         private BlockingCollection<ReceiveMessageInfo> receiveQueue;
         private BlockingCollection<SendMessageInfo> sendQueue = new BlockingCollection<SendMessageInfo>();
@@ -127,6 +128,14 @@ namespace Hazel.Udp.FewerThreads
             this.Dispose(false);
         }
 
+        protected void MarkConnectionAsStale(ConnectionId connectionId)
+        {
+            if (this.allConnections.ContainsKey(connectionId.Id))
+            {
+                this.staleConnections.Push(connectionId);
+            }
+        }
+
         public void DisconnectOldConnections(TimeSpan maxAge, MessageWriter disconnectMessage)
         {
             var now = DateTime.UtcNow;
@@ -135,6 +144,16 @@ namespace Hazel.Udp.FewerThreads
                 if (now - conn.CreationTime > maxAge)
                 {
                     conn.Disconnect("Stale Connection", disconnectMessage);
+                }
+            }
+
+            ConnectionId connectionId;
+            while (this.staleConnections.TryPop(out connectionId))
+            {
+                ThreadLimitedUdpServerConnection connection;
+                if (this.allConnections.TryGetValue(connectionId.Id, out connection))
+                {
+                    connection.Disconnect("Stale Connection", disconnectMessage);
                 }
             }
         }
