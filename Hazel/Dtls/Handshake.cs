@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net;
@@ -373,6 +374,42 @@ namespace Hazel.Dtls
             + CookieSize // cookie (data)
             ;
 
+        public ByteSpan Cookie;
+
+        /// <summary>
+        /// Parse a Handshake HelloVerifyRequest payload from wire
+        /// format
+        /// </summary>
+        /// <returns>
+        /// True if we successfully decode the HelloVerifyRequest
+        /// message. Otherwise false.
+        /// </returns>
+        public static bool Parse(out HelloVerifyRequest result, ByteSpan span)
+        {
+            result = new HelloVerifyRequest();
+            if (span.Length < 3)
+            {
+                return false;
+            }
+
+            ProtocolVersion serverVersion = (ProtocolVersion)span.ReadBigEndian16(0);
+            if (serverVersion != ProtocolVersion.DTLS1_2)
+            {
+                return false;
+            }
+
+            byte cookieSize = span[2];
+            span = span.Slice(3);
+
+            if (span.Length < cookieSize)
+            {
+                return false;
+            }
+
+            result.Cookie = span;
+            return true;
+        }
+
         /// <summary>
         /// Encode a HelloVerifyRequest payload to wire format
         /// </summary>
@@ -443,6 +480,42 @@ namespace Hazel.Dtls
             ;
 
         /// <summary>
+        /// Parse a Handshake ServerHello payload from wire format
+        /// </summary>
+        /// <returns>
+        /// True if we successfully decode the ServerHello
+        /// message. Otherwise false.
+        /// </returns>
+        public static bool Parse(out ServerHello result, ByteSpan span)
+        {
+            result = new ServerHello();
+            if (span.Length < Size)
+            {
+                return false;
+            }
+
+            ProtocolVersion serverVersion = (ProtocolVersion)span.ReadBigEndian16();
+            span = span.Slice(2);
+
+            result.Random = span.Slice(0, Dtls.Random.Size);
+            span = span.Slice(Dtls.Random.Size);
+
+            byte sessionKeySize = span[0];
+            span = span.Slice(1 + sessionKeySize);
+
+            result.CipherSuite = (CipherSuite)span.ReadBigEndian16();
+            span = span.Slice(2);
+
+            CompressionMethod compressionMethod = (CompressionMethod)span[0];
+            if (compressionMethod != CompressionMethod.Null)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
         /// Encode Handshake ServerHello to wire format
         /// </summary>
         public void Encode(ByteSpan span)
@@ -486,6 +559,40 @@ namespace Hazel.Dtls
 
             certData.CopyTo(writer);
             return result;
+        }
+
+        /// <summary>
+        /// Parse a Handshake Certificate payload from wire format
+        /// </summary>
+        /// <returns>True if we successfully decode the Certificate message. Otherwise false</returns>
+        public static bool Parse(out X509Certificate2 certificate, ByteSpan span)
+        {
+            certificate = null;
+            if (span.Length < 3)
+            {
+                return false;
+            }
+
+            uint totalSize = span.ReadBigEndian24();
+            span = span.Slice(3);
+
+            if (span.Length < totalSize)
+            {
+                return false;
+            }
+
+            byte[] rawData = new byte[totalSize];
+            span.CopyTo(rawData, 0);
+            try
+            {
+                certificate = new X509Certificate2(rawData);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+
+            return true;
         }
     }
 
