@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net.Sockets;
 
 namespace Hazel.Udp
@@ -122,7 +122,7 @@ namespace Hazel.Udp
         ///     Handles the receiving of data.
         /// </summary>
         /// <param name="message">The buffer containing the bytes received.</param>
-        protected internal void HandleReceive(MessageReader message, int bytesReceived)
+        protected internal virtual void HandleReceive(MessageReader message, int bytesReceived)
         {
             ushort id;
             switch (message.Buffer[0])

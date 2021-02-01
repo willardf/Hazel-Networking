@@ -108,7 +108,6 @@ namespace Hazel.Dtls
                 this.CanHandleApplicationData = false;
                 this.QueuedApplicationDataMessage.Clear();
 
-                this.CurrentEpoch = new CurrentEpoch();
                 this.CurrentEpoch.NextOutgoingSequence = 2; // Account for our ClientHelloVerify
                 this.CurrentEpoch.NextExpectedSequence = nextExpectedSequenceNumber;
                 this.CurrentEpoch.PreviousSequenceWindowBitmask = 0;
@@ -116,7 +115,6 @@ namespace Hazel.Dtls
                 this.CurrentEpoch.ServerFinishedVerification.SecureClear();
                 this.CurrentEpoch.ExpectedClientFinishedVerification.SecureClear();
 
-                this.NextEpoch = new NextEpoch();
                 this.NextEpoch.State = HandshakeState.ExpectingHello;
                 this.NextEpoch.RecordProtection = null;
                 this.NextEpoch.ClientRandom = new byte[Random.Size];
