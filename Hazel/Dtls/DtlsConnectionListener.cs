@@ -108,7 +108,6 @@ namespace Hazel.Dtls
                 this.CanHandleApplicationData = false;
                 this.QueuedApplicationDataMessage.Clear();
 
-                this.CurrentEpoch = new CurrentEpoch();
                 this.CurrentEpoch.NextOutgoingSequence = 2; // Account for our ClientHelloVerify
                 this.CurrentEpoch.NextExpectedSequence = nextExpectedSequenceNumber;
                 this.CurrentEpoch.PreviousSequenceWindowBitmask = 0;
@@ -116,7 +115,6 @@ namespace Hazel.Dtls
                 this.CurrentEpoch.ServerFinishedVerification.SecureClear();
                 this.CurrentEpoch.ExpectedClientFinishedVerification.SecureClear();
 
-                this.NextEpoch = new NextEpoch();
                 this.NextEpoch.State = HandshakeState.ExpectingHello;
                 this.NextEpoch.RecordProtection = null;
                 this.NextEpoch.ClientRandom = new byte[Random.Size];
@@ -348,7 +346,7 @@ namespace Hazel.Dtls
 
                     // Validate record authenticity
                     int decryptedSize = peer.CurrentEpoch.RecordProtection.GetDecryptedSize(recordPayload.Length);
-                    ByteSpan decryptedPayload = ReuseSpanIfPossible(recordPayload, decryptedSize);
+                    ByteSpan decryptedPayload = recordPayload.ReuseSpanIfPossible(decryptedSize);
 
                     if (!peer.CurrentEpoch.RecordProtection.DecryptCiphertextFromClient(decryptedPayload, recordPayload, ref record))
                     {
@@ -431,24 +429,6 @@ namespace Hazel.Dtls
                     }
                 }
             }
-        }
-
-        /// <summary>
-        /// Reuse an existing span if there is enough space,
-        /// otherwise allocate new storage
-        /// </summary>
-        /// <param name="source">
-        /// Source span we should attempt to reuse
-        /// </param>
-        /// <param name="requiredSize">Required size (bytes)</param>
-        private static ByteSpan ReuseSpanIfPossible(ByteSpan source, int requiredSize)
-        {
-            if (source.Length >= requiredSize)
-            {
-                return source.Slice(0, requiredSize);
-            }
-
-            return new byte[requiredSize];
         }
 
         /// <summary>

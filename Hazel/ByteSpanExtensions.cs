@@ -108,5 +108,24 @@ namespace Hazel
             value |= (uint)input[offset + 3] << 24;
             return value;
         }
+
+        /// <summary>
+        /// Reuse an existing span if there is enough space,
+        /// otherwise allocate new storage
+        /// </summary>
+        /// <param name="source">
+        /// Source span we should attempt to reuse
+        /// </param>
+        /// <param name="requiredSize">Required size (bytes)</param>
+        public static ByteSpan ReuseSpanIfPossible(this ByteSpan source, int requiredSize)
+        {
+            if (source.Length >= requiredSize)
+            {
+                return source.Slice(0, requiredSize);
+            }
+
+            return new byte[requiredSize];
+        }
+
     }
 }

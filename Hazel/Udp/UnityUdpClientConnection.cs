@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -32,6 +32,15 @@ namespace Hazel.Udp
         }
 
         public void FixedUpdate()
+        {
+            this.ResendPacketsIfNeeded();
+        }
+
+        protected virtual void RestartConnection()
+        {
+        }
+
+        protected virtual void ResendPacketsIfNeeded()
         {
             base.ManageReliablePackets();
         }
@@ -105,6 +114,8 @@ namespace Hazel.Udp
                 this.State = ConnectionState.NotConnected;
                 throw new HazelException("A SocketException occurred while binding to the port.", e);
             }
+
+            this.RestartConnection();
 
             try
             {
