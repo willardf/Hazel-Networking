@@ -10,7 +10,10 @@ namespace Hazel.Crypto
         /// </summary>
         public static void SecureClear(this ByteSpan span)
         {
-            Array.Clear(span.GetUnderlyingArray(), span.Offset, span.Length);
+            if (span.Length > 0)
+            {
+                Array.Clear(span.GetUnderlyingArray(), span.Offset, span.Length);
+            }
         }
 
         /// <summary>
