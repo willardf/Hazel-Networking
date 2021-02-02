@@ -359,15 +359,19 @@ namespace Hazel.Udp.FewerThreads
             try { this.socket.Close(); } catch { }
             try { this.socket.Dispose(); } catch { }
 
+            bool wasActive = this.isActive;
             this.isActive = false;
 
             this.receiveQueue?.CompleteAdding();
             this.sendQueue?.CompleteAdding();
 
-            this.reliablePacketThread.Join();
-            this.sendThread.Join();
-            this.receiveThread.Join();
-            this.processThreads.Join();
+            if (wasActive)
+            {
+                this.reliablePacketThread.Join();
+                this.sendThread.Join();
+                this.receiveThread.Join();
+                this.processThreads.Join();
+            }
 
             this.receiveQueue?.Dispose();
             this.receiveQueue = null;
