@@ -1,5 +1,13 @@
-﻿using System.Linq;
+using Org.BouncyCastle.Crypto;
+using Org.BouncyCastle.Crypto.Parameters;
+using Org.BouncyCastle.OpenSsl;
+using Org.BouncyCastle.Security;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
+using System.IO;
+using System.Security.Cryptography;
 
 namespace Hazel.UnitTests
 {
@@ -57,6 +65,33 @@ namespace Hazel.UnitTests
             }
 
             return output;
+        }
+
+        public static byte[] DecodePEM(string pemData)
+        {
+            List<byte> result = new List<byte>();
+
+            pemData = pemData.Replace("\r", "");
+            string[] lines = pemData.Split('\n');
+            foreach (string line in lines)
+            {
+                if (line.StartsWith("-----"))
+                {
+                    continue;
+                }
+
+                byte[] lineData = Convert.FromBase64String(line);
+                result.AddRange(lineData);
+            }
+
+            return result.ToArray();
+        }
+
+        public static RSA DecodeRSAKeyFromPEM(string pemData)
+        {
+            PemReader pemReader = new PemReader(new StringReader(pemData));
+            RsaPrivateCrtKeyParameters keyParameters = (RsaPrivateCrtKeyParameters)pemReader.ReadObject();
+            return DotNetUtilities.ToRSA(keyParameters);
         }
     }
 }

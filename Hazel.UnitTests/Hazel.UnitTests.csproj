@@ -39,6 +39,9 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="BouncyCastle.Crypto, Version=1.8.9.0, Culture=neutral, PublicKeyToken=0e99375e54769942">
+      <HintPath>..\packages\BouncyCastle.1.8.9\lib\BouncyCastle.Crypto.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
   </ItemGroup>
   <Choose>
@@ -60,11 +63,13 @@
     <Compile Include="Crypto\AesGcmTest.cs" />
     <Compile Include="Crypto\X25519Tests.cs" />
     <Compile Include="Dtls\AesGcmRecordProtectedTests.cs" />
+    <Compile Include="Dtls\ConnectionTests.cs" />
     <Compile Include="Dtls\X25519EcdheRsaSha256Tests.cs" />
     <Compile Include="MessageReaderTests.cs" />
     <Compile Include="StatisticsTests.cs" />
     <Compile Include="TestHelper.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="TestLogger.cs" />
     <Compile Include="UdpConnectionTestHarness.cs" />
     <Compile Include="ThreadLimitedUdpConnectionTests.cs" />
     <Compile Include="UnityUdpConnectionTests.cs" />
@@ -80,6 +85,9 @@
       <Project>{02cfbd30-d77d-400f-94b2-700f60efdd7f}</Project>
       <Name>Hazel</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
   <Choose>
     <When Condition="'$(VisualStudioVersion)' == '10.0' And '$(IsCodedUITest)' == 'True'">
