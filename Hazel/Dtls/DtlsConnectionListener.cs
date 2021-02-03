@@ -97,7 +97,7 @@ namespace Hazel.Dtls
                 this.CurrentEpoch.ServerFinishedVerification = block.Slice(0, Finished.Size);
                 this.CurrentEpoch.ExpectedClientFinishedVerification = block.Slice(Finished.Size, Finished.Size);
 
-                ResetPeer(ConnectionId.Create(0), 1);
+                ResetPeer(ConnectionId.Create(new IPEndPoint(0,0), 0), 1);
             }
 
             public void ResetPeer(ConnectionId connectionId, ulong nextExpectedSequenceNumber)
@@ -145,9 +145,9 @@ namespace Hazel.Dtls
         // HMAC key to validate ClientHello cookie
         private HMAC currentCookieHmac;
 
-        private readonly ConcurrentDictionary<EndPoint, PeerData> existingPeers = new ConcurrentDictionary<EndPoint, PeerData>();
+        private readonly ConcurrentDictionary<IPEndPoint, PeerData> existingPeers = new ConcurrentDictionary<IPEndPoint, PeerData>();
 
-        private long connectionId_unsafe =  0;
+        private int connectionSerial_unsafe =  0;
 
         /// <summary>
         /// Create a new instance of the DTLS listener
@@ -234,7 +234,7 @@ namespace Hazel.Dtls
         /// This is primarily a wrapper around ProcessIncomingMessage
         /// to ensure `reader.Recycle()` is always called
         /// </summary>
-        protected override void ProcessIncomingMessageFromOtherThread(MessageReader reader, EndPoint peerAddress, ConnectionId connectionId)
+        protected override void ProcessIncomingMessageFromOtherThread(MessageReader reader, IPEndPoint peerAddress, ConnectionId connectionId)
         {
             ByteSpan message = new ByteSpan(reader.Buffer, reader.Offset + reader.Position, reader.BytesRemaining);
             this.ProcessIncomingMessage(message, peerAddress);
@@ -244,7 +244,7 @@ namespace Hazel.Dtls
         /// <summary>
         /// Handle an incoming datagram from the network
         /// </summary>
-        private void ProcessIncomingMessage(ByteSpan message, EndPoint peerAddress)
+        private void ProcessIncomingMessage(ByteSpan message, IPEndPoint peerAddress)
         {
             PeerData peer = null;
             if (!this.existingPeers.TryGetValue(peerAddress, out peer))
@@ -442,7 +442,7 @@ namespace Hazel.Dtls
         /// True if further processing of the underlying datagram
         /// should be continues. Otherwise, false.
         /// </returns>
-        private bool ProcessHandshake(PeerData peer, EndPoint peerAddress, ref Record record, ByteSpan message)
+        private bool ProcessHandshake(PeerData peer, IPEndPoint peerAddress, ref Record record, ByteSpan message)
         {
             // Each record may have multiple handshake payloads
             while (message.Length > 0)
@@ -706,7 +706,7 @@ namespace Hazel.Dtls
         /// <param name="record">Parent record</param>
         /// <param name="handshake">Parent Handshake header</param>
         /// <param name="payload">Handshake payload</param>
-        private bool HandleClientHello(PeerData peer, EndPoint peerAddress, ref Record record, ref Handshake handshake, ByteSpan originalMessage, ByteSpan payload)
+        private bool HandleClientHello(PeerData peer, IPEndPoint peerAddress, ref Record record, ref Handshake handshake, ByteSpan originalMessage, ByteSpan payload)
         {
             // Verify message sequence
             if (handshake.MessageSequence != 0)
@@ -765,7 +765,7 @@ namespace Hazel.Dtls
             if (record.Epoch == 0 && peer.Epoch != 0)
             {
                 ConnectionId oldConnectionId = peer.ConnectionId;
-                peer.ResetPeer(this.AllocateConnectionId(), record.SequenceNumber + 1);
+                peer.ResetPeer(this.AllocateConnectionId(peerAddress), record.SequenceNumber + 1);
 
                 // Inform the parent layer that the existing
                 // connection should be abandoned.
@@ -1023,7 +1023,7 @@ namespace Hazel.Dtls
         /// </summary>
         /// <param name="message">Incoming datagram</param>
         /// <param name="peerAddress">Originating address</param>
-        private void HandleNonPeerRecord(ByteSpan message, EndPoint peerAddress)
+        private void HandleNonPeerRecord(ByteSpan message, IPEndPoint peerAddress)
         {
             Record record;
             if (!Record.Parse(out record, message))
@@ -1102,7 +1102,7 @@ namespace Hazel.Dtls
 
             // Allocate state for the new peer and register it
             PeerData peer = new PeerData();
-            peer.ResetPeer(this.AllocateConnectionId(), record.SequenceNumber + 1);
+            peer.ResetPeer(this.AllocateConnectionId(peerAddress), record.SequenceNumber + 1);
 
             this.existingPeers[peerAddress] = peer;
 
@@ -1113,7 +1113,7 @@ namespace Hazel.Dtls
         }
 
         //Send a HelloVerifyRequest handshake message to a peer
-        private void SendHelloVerifyRequest(EndPoint peerAddress, ulong recordSequence, ushort epoch, IRecordProtection recordProtection)
+        private void SendHelloVerifyRequest(IPEndPoint peerAddress, ulong recordSequence, ushort epoch, IRecordProtection recordProtection)
         {
             Handshake handshake = new Handshake();
             handshake.MessageType = HandshakeType.HelloVerifyRequest;
@@ -1152,7 +1152,7 @@ namespace Hazel.Dtls
         /// <summary>
         /// Handle a requrest to send a datagram to the network
         /// </summary>
-        protected override void QueueRawData(ByteSpan span, EndPoint remoteEndPoint)
+        protected override void QueueRawData(ByteSpan span, IPEndPoint remoteEndPoint)
         {
             PeerData peer;
             if (!this.existingPeers.TryGetValue(remoteEndPoint, out peer))
@@ -1232,10 +1232,10 @@ namespace Hazel.Dtls
         /// <summary>
         /// Allocate a new connection id
         /// </summary>
-        private ConnectionId AllocateConnectionId()
+        private ConnectionId AllocateConnectionId(IPEndPoint endPoint)
         {
-            ulong rawConnectionId = (ulong)Interlocked.Increment(ref this.connectionId_unsafe);
-            return ConnectionId.Create(rawConnectionId);
+            int rawSerialId = Interlocked.Increment(ref this.connectionSerial_unsafe);
+            return ConnectionId.Create(endPoint, rawSerialId);
         }
     }
 }

@@ -16,13 +16,13 @@ namespace Hazel.Udp.FewerThreads
         private struct SendMessageInfo
         {
             public ByteSpan Span;
-            public EndPoint Recipient;
+            public IPEndPoint Recipient;
         }
 
         private struct ReceiveMessageInfo
         {
             public MessageReader Message;
-            public EndPoint Sender;
+            public IPEndPoint Sender;
             public ConnectionId ConnectionId;
         }
 
@@ -50,31 +50,46 @@ namespace Hazel.Udp.FewerThreads
         private Thread sendThread;
         private HazelThreadPool processThreads;
 
-        public struct ConnectionId
+        public struct ConnectionId : IEquatable<ConnectionId>
         {
-            public ulong Id;
+            public IPEndPoint EndPoint;
+            public int Serial;
 
-            public static ConnectionId Create(ulong id)
+            public static ConnectionId Create(IPEndPoint endPoint, int serial)
             {
-                ConnectionId result = new ConnectionId();
-                result.Id = id;
-                return result;
+                return new ConnectionId{
+                    EndPoint = endPoint,
+                    Serial = serial,
+                };
             }
 
-            public static ConnectionId CreateFromEndPoint(IPEndPoint endPoint)
+            public bool Equals(ConnectionId other)
             {
-                if (endPoint.AddressFamily != AddressFamily.InterNetwork)
+                return this.Serial == other.Serial
+                    && this.EndPoint.Equals(other.EndPoint)
+                    ;
+            }
+
+            public override bool Equals(object obj)
+            {
+                if (obj is ConnectionId)
                 {
-                    throw new ArgumentException("ConnectionId only supports IPv4");
+                    return this.Equals((ConnectionId)obj);
                 }
 
-                ulong port = (ulong)endPoint.Port;
-                ulong address = (ulong)endPoint.Address.Address;
-                return Create((address << 32) | port);
+                return false;
+            }
+
+            public override int GetHashCode()
+            {
+                ///NOTE(mendsley): We're only hashing the endpoint
+                /// here, as the common case will have one
+                /// connection per address+port tuple.
+                return this.EndPoint.GetHashCode();
             }
         }
 
-        private ConcurrentDictionary<ulong, ThreadLimitedUdpServerConnection> allConnections = new ConcurrentDictionary<ulong, ThreadLimitedUdpServerConnection>();
+        private ConcurrentDictionary<ConnectionId, ThreadLimitedUdpServerConnection> allConnections = new ConcurrentDictionary<ConnectionId, ThreadLimitedUdpServerConnection>();
         private ConcurrentStack<ConnectionId> staleConnections = new ConcurrentStack<ConnectionId>();
 
         private BlockingCollection<ReceiveMessageInfo> receiveQueue;
@@ -130,7 +145,7 @@ namespace Hazel.Udp.FewerThreads
 
         protected void MarkConnectionAsStale(ConnectionId connectionId)
         {
-            if (this.allConnections.ContainsKey(connectionId.Id))
+            if (this.allConnections.ContainsKey(connectionId))
             {
                 this.staleConnections.Push(connectionId);
             }
@@ -151,7 +166,7 @@ namespace Hazel.Udp.FewerThreads
             while (this.staleConnections.TryPop(out connectionId))
             {
                 ThreadLimitedUdpServerConnection connection;
-                if (this.allConnections.TryGetValue(connectionId.Id, out connection))
+                if (this.allConnections.TryGetValue(connectionId, out connection))
                 {
                     connection.Disconnect("Stale Connection", disconnectMessage);
                 }
@@ -215,8 +230,8 @@ namespace Hazel.Udp.FewerThreads
                         return;
                     }
 
-                    ConnectionId connectionId = ConnectionId.CreateFromEndPoint((IPEndPoint)remoteEP);
-                    this.ProcessIncomingMessageFromOtherThread(message, remoteEP, connectionId);
+                    ConnectionId connectionId = ConnectionId.Create((IPEndPoint)remoteEP, 0);
+                    this.ProcessIncomingMessageFromOtherThread(message, (IPEndPoint)remoteEP, connectionId);
                 }
             }
         }
@@ -234,7 +249,7 @@ namespace Hazel.Udp.FewerThreads
                 }
             }
         }
-        protected virtual void ProcessIncomingMessageFromOtherThread(MessageReader message, EndPoint remoteEndPoint, ConnectionId connectionId)
+        protected virtual void ProcessIncomingMessageFromOtherThread(MessageReader message, IPEndPoint remoteEndPoint, ConnectionId connectionId)
         {
             this.receiveQueue.Add(new ReceiveMessageInfo() { Message = message, Sender = remoteEndPoint, ConnectionId = connectionId });
         }
@@ -258,7 +273,7 @@ namespace Hazel.Udp.FewerThreads
             }
         }
 
-        void ReadCallback(MessageReader message, EndPoint remoteEndPoint, ConnectionId connectionId)
+        void ReadCallback(MessageReader message, IPEndPoint remoteEndPoint, ConnectionId connectionId)
         {
             int bytesReceived = message.Length;
             bool aware = true;
@@ -267,11 +282,11 @@ namespace Hazel.Udp.FewerThreads
             // If we're aware of this connection use the one already
             // If this is a new client then connect with them!
             ThreadLimitedUdpServerConnection connection;
-            if (!this.allConnections.TryGetValue(connectionId.Id, out connection))
+            if (!this.allConnections.TryGetValue(connectionId, out connection))
             {
                 lock (this.allConnections)
                 {
-                    if (!this.allConnections.TryGetValue(connectionId.Id, out connection))
+                    if (!this.allConnections.TryGetValue(connectionId, out connection))
                     {
                         // Check for malformed connection attempts
                         if (!isHello)
@@ -296,7 +311,7 @@ namespace Hazel.Udp.FewerThreads
 
                         aware = false;
                         connection = new ThreadLimitedUdpServerConnection(this, connectionId, (IPEndPoint)remoteEndPoint, this.IPMode);
-                        if (!this.allConnections.TryAdd(connectionId.Id, connection))
+                        if (!this.allConnections.TryAdd(connectionId, connection))
                         {
                             throw new HazelException("Failed to add a connection. This should never happen.");
                         }
@@ -325,12 +340,12 @@ namespace Hazel.Udp.FewerThreads
             }
         }
 
-        internal void SendDataRaw(byte[] response, EndPoint remoteEndPoint)
+        internal void SendDataRaw(byte[] response, IPEndPoint remoteEndPoint)
         {
             QueueRawData(response, remoteEndPoint);
         }
 
-        protected virtual void QueueRawData(ByteSpan span, EndPoint remoteEndPoint)
+        protected virtual void QueueRawData(ByteSpan span, IPEndPoint remoteEndPoint)
         {
             this.sendQueue.TryAdd(new SendMessageInfo() { Span = span, Recipient = remoteEndPoint });
         }
@@ -341,7 +356,7 @@ namespace Hazel.Udp.FewerThreads
         /// <param name="endPoint">Connection key of the virtual connection.</param>
         internal bool RemoveConnectionTo(ConnectionId connectionId)
         {
-            return this.allConnections.TryRemove(connectionId.Id, out var conn);
+            return this.allConnections.TryRemove(connectionId, out var conn);
         }
 
         protected virtual void Dispose(bool disposing)

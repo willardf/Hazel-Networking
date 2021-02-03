@@ -33,7 +33,6 @@ namespace Hazel.Udp.FewerThreads
         {
             this.Listener = listener;
             this.ConnectionId = connectionId;
-            this.RemoteEndPoint = endPoint;
             this.EndPoint = endPoint;
             this.IPMode = IPMode;
 
@@ -46,7 +45,7 @@ namespace Hazel.Udp.FewerThreads
         {
             if (bytes.Length != length) throw new ArgumentException("I made an assumption here. I hope you see this error.");
 
-            Listener.SendDataRaw(bytes, RemoteEndPoint);
+            Listener.SendDataRaw(bytes, EndPoint);
         }
 
         /// <inheritdoc />
@@ -86,7 +85,7 @@ namespace Hazel.Udp.FewerThreads
 
             try
             {
-                Listener.SendDataRaw(bytes, RemoteEndPoint);
+                Listener.SendDataRaw(bytes, EndPoint);
             }
             catch { }
 
