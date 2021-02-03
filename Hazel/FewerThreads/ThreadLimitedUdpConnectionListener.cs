@@ -16,13 +16,13 @@ namespace Hazel.Udp.FewerThreads
         private struct SendMessageInfo
         {
             public ByteSpan Span;
-            public EndPoint Recipient;
+            public IPEndPoint Recipient;
         }
 
         private struct ReceiveMessageInfo
         {
             public MessageReader Message;
-            public EndPoint Sender;
+            public IPEndPoint Sender;
             public ConnectionId ConnectionId;
         }
 
@@ -236,7 +236,7 @@ namespace Hazel.Udp.FewerThreads
                     }
 
                     ConnectionId connectionId = ConnectionId.CreateFromEndPoint((IPEndPoint)remoteEP);
-                    this.ProcessIncomingMessageFromOtherThread(message, remoteEP, connectionId);
+                    this.ProcessIncomingMessageFromOtherThread(message, (IPEndPoint)remoteEP, connectionId);
                 }
             }
         }
@@ -254,7 +254,7 @@ namespace Hazel.Udp.FewerThreads
                 }
             }
         }
-        protected virtual void ProcessIncomingMessageFromOtherThread(MessageReader message, EndPoint remoteEndPoint, ConnectionId connectionId)
+        protected virtual void ProcessIncomingMessageFromOtherThread(MessageReader message, IPEndPoint remoteEndPoint, ConnectionId connectionId)
         {
             this.receiveQueue.Add(new ReceiveMessageInfo() { Message = message, Sender = remoteEndPoint, ConnectionId = connectionId });
         }
@@ -278,7 +278,7 @@ namespace Hazel.Udp.FewerThreads
             }
         }
 
-        void ReadCallback(MessageReader message, EndPoint remoteEndPoint, ConnectionId connectionId)
+        void ReadCallback(MessageReader message, IPEndPoint remoteEndPoint, ConnectionId connectionId)
         {
             int bytesReceived = message.Length;
             bool aware = true;
@@ -345,12 +345,12 @@ namespace Hazel.Udp.FewerThreads
             }
         }
 
-        internal void SendDataRaw(byte[] response, EndPoint remoteEndPoint)
+        internal void SendDataRaw(byte[] response, IPEndPoint remoteEndPoint)
         {
             QueueRawData(response, remoteEndPoint);
         }
 
-        protected virtual void QueueRawData(ByteSpan span, EndPoint remoteEndPoint)
+        protected virtual void QueueRawData(ByteSpan span, IPEndPoint remoteEndPoint)
         {
             this.sendQueue.TryAdd(new SendMessageInfo() { Span = span, Recipient = remoteEndPoint });
         }
