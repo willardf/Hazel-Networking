@@ -146,6 +146,8 @@ namespace Hazel.Dtls
             + 1 // compression_methods (size)
             + 1 // compression_method[0] (NULL)
 
+            + 2 // extensions size
+
             + 0 // NamedCurveList extensions[0]
             + 2 // extensions[0].extension_type
             + 2 // extensions[0].extension_data (length)
@@ -233,24 +235,34 @@ namespace Hazel.Dtls
             }
 
             // Parse extensions
-            while (span.Length > 0)
+            if (span.Length > 0)
             {
-                // Parse extension header
-                if (span.Length < 4)
+                ushort extensionsSize = span.ReadBigEndian16();
+                span = span.Slice(2);
+                if (span.Length != extensionsSize)
                 {
                     return false;
                 }
 
-                ExtensionType extensionType = (ExtensionType)span.ReadBigEndian16(0);
-                ushort extensionLength = span.ReadBigEndian16(2);
-                ByteSpan extensionData = span.Slice(4, extensionLength);
-                if (extensionData.Length < extensionLength)
+                while (span.Length > 0)
                 {
-                    return false;
-                }
+                    // Parse extension header
+                    if (span.Length < 4)
+                    {
+                        return false;
+                    }
 
-                span = span.Slice(4 + extensionLength);
-                result.ParseExtension(extensionType, extensionData);
+                    ExtensionType extensionType = (ExtensionType)span.ReadBigEndian16(0);
+                    ushort extensionLength = span.ReadBigEndian16(2);
+                    ByteSpan extensionData = span.Slice(4, extensionLength);
+                    if (extensionData.Length < extensionLength)
+                    {
+                        return false;
+                    }
+
+                    span = span.Slice(4 + extensionLength);
+                    result.ParseExtension(extensionType, extensionData);
+                }
             }
 
             return true;
@@ -352,6 +364,10 @@ namespace Hazel.Dtls
 
             span[0] = 1;
             span[1] = (byte)CompressionMethod.Null;
+            span = span.Slice(2);
+
+            // Extensions size
+            span.WriteBigEndian16((ushort)(6 + this.SupportedCurves.Length));
             span = span.Slice(2);
 
             // Supported curves extension
