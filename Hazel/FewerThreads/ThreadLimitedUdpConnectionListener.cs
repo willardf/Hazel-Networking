@@ -205,7 +205,7 @@ namespace Hazel.Udp.FewerThreads
                     catch (SocketException sx)
                     {
                         message.Recycle();
-                        this.Logger.WriteError("Socket Ex in StartListening: " + sx.Message);
+                        this.Logger.WriteError("Socket Ex in ReceiveLoop: " + sx.Message);
                         continue;
                     }
                     catch (Exception ex)
