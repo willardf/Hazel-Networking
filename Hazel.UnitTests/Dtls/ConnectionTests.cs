@@ -1,4 +1,6 @@
 using Hazel.Dtls;
+using Hazel.Udp;
+using Hazel.Udp.FewerThreads;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Net;
 using System.Security.Cryptography;
@@ -8,7 +10,7 @@ using System.Threading;
 namespace Hazel.UnitTests.Dtls
 {
     [TestClass]
-    public class ConnectionTests
+    public class ConnectionTests : BaseThreadLimitedUdpConnectionTests
     {
         // Created with command line
         // openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 100000 -out certificate.pem
@@ -83,6 +85,21 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             X509Certificate2Collection clientCertificates = new X509Certificate2Collection();
             clientCertificates.Add(publicCertificate);
             return clientCertificates;
+        }
+
+        protected override ThreadLimitedUdpConnectionListener CreateListener(int numWorkers, IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
+        {
+            DtlsConnectionListener listener = new DtlsConnectionListener(2, endPoint, logger, ipMode);
+            listener.SetCertificate(GetCertificateForServer());
+            return listener;
+
+        }
+
+        protected override UdpConnection CreateConnection(IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
+        {
+            DtlsUnityConnection connection = new DtlsUnityConnection(logger, endPoint, ipMode);
+            connection.SetValidServerCertificates(GetCertificateForClient());
+            return connection;
         }
 
         [TestMethod]
