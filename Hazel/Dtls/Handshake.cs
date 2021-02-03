@@ -452,6 +452,11 @@ namespace Hazel.Dtls
         /// <returns>True if the cookie is valid. Otherwise false</returns>
         public static bool VerifyCookie(ByteSpan cookie, EndPoint peerAddress, HMAC hmac)
         {
+            if (cookie.Length != CookieSize)
+            {
+                return false;
+            }
+
             ByteSpan expectedHash = ComputeAddressMac(peerAddress, hmac);
             if (expectedHash.Length != cookie.Length)
             {
