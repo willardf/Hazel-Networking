@@ -36,8 +36,8 @@ namespace Hazel.UnitTests
             bool serverDisconnected = false;
             bool clientDisconnected = false;
 
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new NullLogger()))
-            using (UdpConnection connection = this.CreateConnection(ep, new NullLogger()))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (UdpConnection connection = this.CreateConnection(ep, new TestLogger()))
             {
                 listener.NewConnection += (evt) =>
                 {
@@ -68,8 +68,8 @@ namespace Hazel.UnitTests
             bool serverDisconnected = false;
             bool clientDisconnected = false;
 
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new NullLogger()))
-            using (UdpConnection connection = this.CreateConnection(ep, new NullLogger()))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (UdpConnection connection = this.CreateConnection(ep, new TestLogger()))
             {
                 listener.NewConnection += (evt) =>
                 {
@@ -101,8 +101,8 @@ namespace Hazel.UnitTests
         {
             IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 4296);
 
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new NullLogger()))
-            using (UdpConnection connection = this.CreateConnection(ep, new NullLogger()))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (UdpConnection connection = this.CreateConnection(ep, new TestLogger()))
             {
                 listener.Start();
 
@@ -122,8 +122,8 @@ namespace Hazel.UnitTests
         public void UdpHandshakeTest()
         {
             byte[] TestData = new byte[] { 1, 2, 3, 4, 5, 6 };
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new NullLogger()))
-            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new NullLogger()))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
                 listener.Start();
 
@@ -147,8 +147,8 @@ namespace Hazel.UnitTests
         public void UdpUnreliableMessageSendTest()
         {
             byte[] TestData = new byte[] { 1, 2, 3, 4, 5, 6 };
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new NullLogger()))
-            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new NullLogger()))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
                 MessageReader output = null;
                 listener.NewConnection += delegate (NewConnectionEventArgs e)
@@ -184,8 +184,8 @@ namespace Hazel.UnitTests
         [TestMethod]
         public void UdpIPv4ConnectionTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new NullLogger()))
-            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new NullLogger()))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
                 listener.Start();
 
@@ -199,7 +199,7 @@ namespace Hazel.UnitTests
         [TestMethod]
         public void ConnectLikeAJerkTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new NullLogger()))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
             using (Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
             {
                 int connects = 0;
@@ -242,13 +242,13 @@ namespace Hazel.UnitTests
                     Console.WriteLine($"Connection: {evt.Connection.EndPoint}");
                 };
 
-                using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 4296), new NullLogger()))
+                using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 4296), new TestLogger()))
                 {
                     connection.Connect();
                     Assert.AreEqual(ConnectionState.Connected, connection.State);
                 }
 
-                using (UdpConnection connection2 = this.CreateConnection(new IPEndPoint(IPAddress.IPv6Loopback, 4296), new NullLogger(), IPMode.IPv6))
+                using (UdpConnection connection2 = this.CreateConnection(new IPEndPoint(IPAddress.IPv6Loopback, 4296), new TestLogger(), IPMode.IPv6))
                 {
                     connection2.Connect();
                     Assert.AreEqual(ConnectionState.Connected, connection2.State);
@@ -262,11 +262,11 @@ namespace Hazel.UnitTests
         [TestMethod]
         public void UdpIPv6ConnectionTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new NullLogger(), IPMode.IPv6))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger(), IPMode.IPv6))
             {
                 listener.Start();
 
-                using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 4296), new NullLogger(), IPMode.IPv6))
+                using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 4296), new TestLogger(), IPMode.IPv6))
                 {
                     connection.Connect();
                 }
@@ -279,8 +279,8 @@ namespace Hazel.UnitTests
         [TestMethod]
         public void UdpUnreliableServerToClientTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new NullLogger()))
-            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new NullLogger()))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
                 TestHelper.RunServerToClientTest(listener, connection, 10, SendOption.None);
             }
@@ -292,8 +292,8 @@ namespace Hazel.UnitTests
         [TestMethod]
         public void UdpReliableServerToClientTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new NullLogger()))
-            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new NullLogger()))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
                 TestHelper.RunServerToClientTest(listener, connection, 10, SendOption.Reliable);
             }
@@ -305,8 +305,8 @@ namespace Hazel.UnitTests
         [TestMethod]
         public void UdpUnreliableClientToServerTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new NullLogger()))
-            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new NullLogger()))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
                 TestHelper.RunClientToServerTest(listener, connection, 10, SendOption.None);
             }
@@ -318,8 +318,8 @@ namespace Hazel.UnitTests
         [TestMethod]
         public void UdpReliableClientToServerTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new NullLogger()))
-            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new NullLogger()))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
                 TestHelper.RunClientToServerTest(listener, connection, 10, SendOption.Reliable);
             }
@@ -331,8 +331,8 @@ namespace Hazel.UnitTests
         [TestMethod]
         public void KeepAliveClientTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new NullLogger()))
-            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new NullLogger()))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
                 listener.Start();
 
@@ -358,8 +358,8 @@ namespace Hazel.UnitTests
         {
             ManualResetEvent mutex = new ManualResetEvent(false);
 
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new NullLogger()))
-            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new NullLogger()))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
                 UdpConnection client = null;
                 listener.NewConnection += delegate (NewConnectionEventArgs args)
@@ -394,8 +394,8 @@ namespace Hazel.UnitTests
         [TestMethod]
         public void ClientDisconnectTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new NullLogger()))
-            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new NullLogger()))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
                 ManualResetEvent mutex = new ManualResetEvent(false);
                 ManualResetEvent mutex2 = new ManualResetEvent(false);
@@ -428,8 +428,8 @@ namespace Hazel.UnitTests
         [TestMethod]
         public void ServerDisconnectTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new NullLogger()))
-            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new NullLogger()))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
 
                 ManualResetEvent mutex = new ManualResetEvent(false);
@@ -458,8 +458,8 @@ namespace Hazel.UnitTests
         [TestMethod]
         public void ServerExtraDataDisconnectTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new NullLogger()))
-            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new NullLogger()))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
                 MessageReader received = null;
                 ManualResetEvent mutex = new ManualResetEvent(false);
