@@ -9,7 +9,11 @@ using System.Net.Sockets;
 namespace Hazel.UnitTests
 {
     [TestClass]
-    public class ThreadLimitedUdpConnectionTests
+    public class ThreadLimitedUdpConnectionTests : BaseThreadLimitedUdpConnectionTests
+    {
+    }
+
+    public abstract class BaseThreadLimitedUdpConnectionTests
     {
         [TestMethod]
         public void ServerDisposeDisconnectsTest()
