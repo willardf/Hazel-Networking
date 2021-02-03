@@ -237,12 +237,7 @@ namespace Hazel.Udp
 
             try
             {
-                socket.SendTo(
-                    bytes,
-                    0,
-                    bytes.Length,
-                    SocketFlags.None,
-                    RemoteEndPoint);
+                this.WriteBytesToConnection(bytes, bytes.Length);
             }
             catch { }
 
