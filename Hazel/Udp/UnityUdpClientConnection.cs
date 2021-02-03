@@ -19,7 +19,6 @@ namespace Hazel.Udp
             : base()
         {
             this.EndPoint = remoteEndPoint;
-            this.RemoteEndPoint = remoteEndPoint;
             this.IPMode = ipMode;
 
             this.socket = CreateSocket(ipMode);
@@ -55,7 +54,7 @@ namespace Hazel.Udp
                     0,
                     length,
                     SocketFlags.None,
-                    RemoteEndPoint,
+                    EndPoint,
                     HandleSendTo,
                     null);
             }
@@ -153,7 +152,7 @@ namespace Hazel.Udp
             var msg = MessageReader.GetSized(ushort.MaxValue);
             try
             {
-                var ep = this.RemoteEndPoint;
+                EndPoint ep = this.EndPoint;
                 socket.BeginReceiveFrom(msg.Buffer, 0, msg.Buffer.Length, SocketFlags.None, ref ep, ReadCallback, msg);
             }
             catch
@@ -173,7 +172,7 @@ namespace Hazel.Udp
 
             try
             {
-                var ep = this.RemoteEndPoint;
+                EndPoint ep = this.EndPoint;
                 msg.Length = socket.EndReceiveFrom(result, ref ep);
             }
             catch (SocketException e)

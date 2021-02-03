@@ -33,7 +33,6 @@ namespace Hazel.Udp.FewerThreads
         {
             this.Listener = listener;
             this.ConnectionId = connectionId;
-            this.RemoteEndPoint = endPoint;
             this.EndPoint = endPoint;
             this.IPMode = IPMode;
 
