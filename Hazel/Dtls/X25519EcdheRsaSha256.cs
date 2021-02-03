@@ -54,7 +54,10 @@ namespace Hazel.Dtls
                 + 1 // ECCurveType ServerKeyExchange.params.curve_params.curve_type
                 + 2 // NamedCurve ServerKeyExchange.params.curve_params.namedcurve
                 + 1 + X25519.KeySize // ECPoint ServerKeyExchange.params.public
-                + signatureSize // ServerKeyExchange.signed_params
+                + 1 // HashAlgorithm ServerKeyExchange.algorithm.hash
+                + 1 // SignatureAlgorithm ServerKeyExchange.signed_params.algorithm.signature
+                + 2 // ServerKeyExchange.signed_params.size
+                + signatureSize // ServerKeyExchange.signed_params.opaque
                 ;
         }
 
@@ -93,7 +96,10 @@ namespace Hazel.Dtls
             ByteSpan signature = signer.CreateSignature(paramterDigest);
 
             Debug.Assert(signature.Length == rsaPrivateKey.KeySize/8);
-            signature.CopyTo(output.Slice(4+X25519.KeySize));
+            output[4 + X25519.KeySize] = (byte)HashAlgorithm.Sha256;
+            output[5 + X25519.KeySize] = (byte)SignatureAlgorithm.RSA;
+            output.Slice(6+X25519.KeySize).WriteBigEndian16((ushort)signature.Length);
+            signature.CopyTo(output.Slice(8+X25519.KeySize));
         }
 
         /// <inheritdoc />
@@ -126,10 +132,24 @@ namespace Hazel.Dtls
             {
                 return false;
             }
+            else if (serverKeyExchangeMessage[4 + X25519.KeySize] != (byte)HashAlgorithm.Sha256)
+            {
+                return false;
+            }
+            else if (serverKeyExchangeMessage[5 + X25519.KeySize] != (byte)SignatureAlgorithm.RSA)
+            {
+                return false;
+            }
 
             ByteSpan keyParameters = serverKeyExchangeMessage.Slice(0, 4+X25519.KeySize);
             ByteSpan othersPublicKey = keyParameters.Slice(4);
-            ByteSpan signature = serverKeyExchangeMessage.Slice(keyParameters.Length);
+            ushort signatureSize = serverKeyExchangeMessage.ReadBigEndian16(6 + X25519.KeySize);
+            ByteSpan signature = serverKeyExchangeMessage.Slice(4+keyParameters.Length);
+
+            if (signatureSize != signature.Length)
+            {
+                return false;
+            }
 
             // Hash the key parameters
             byte[] parameterDigest = this.sha256.ComputeHash(keyParameters.GetUnderlyingArray(), keyParameters.Offset, keyParameters.Length);

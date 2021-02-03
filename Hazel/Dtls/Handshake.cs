@@ -69,6 +69,25 @@ namespace Hazel.Dtls
     }
 
     /// <summary>
+    /// Hash algorithms
+    /// </summary>
+    public enum HashAlgorithm : byte
+    {
+        None = 0,
+        Sha256 = 4,
+    }
+
+    /// <summary>
+    /// Signature algorithms
+    /// </summary>
+    public enum SignatureAlgorithm : byte
+    {
+        Anonymous = 0,
+        RSA = 1,
+        ECDSA = 3,
+    }
+
+    /// <summary>
     /// Random state for entropy
     /// </summary>
     public struct Random
