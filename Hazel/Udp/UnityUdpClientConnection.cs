@@ -94,6 +94,7 @@ namespace Hazel.Udp
             {
                 if (this.State != ConnectionState.Connecting) return;
                 Thread.Sleep(100);
+                this.ResendPacketsIfNeeded();
             }
         }
 
