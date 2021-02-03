@@ -135,14 +135,14 @@ namespace Hazel.Udp
                 throw new HazelException("A SocketException occurred while initiating a receive operation.", e);
             }
 
+            this.InitializeKeepAliveTimer();
+
             // Write bytes to the server to tell it hi (and to punch a hole in our NAT, if present)
             // When acknowledged set the state to connected
             SendHello(bytes, () =>
             {
                 this.State = ConnectionState.Connected;
             });
-
-            this.InitializeKeepAliveTimer();
         }
 
         /// <summary>
