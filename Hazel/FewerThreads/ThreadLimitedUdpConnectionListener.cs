@@ -222,10 +222,8 @@ namespace Hazel.Udp.FewerThreads
         }
         private void ProcessingLoop()
         {
-            while (this.isActive)
+            foreach (ReceiveMessageInfo msg in this.receiveQueue.GetConsumingEnumerable())
             {
-                ReceiveMessageInfo msg = this.receiveQueue.Take();
-                
                 try
                 {
                     this.ReadCallback(msg.Message, msg.Sender, msg.ConnectionId);
@@ -243,10 +241,8 @@ namespace Hazel.Udp.FewerThreads
 
         private void SendLoop()
         {
-            while (this.isActive)
+            foreach (SendMessageInfo msg in this.sendQueue.GetConsumingEnumerable())
             {
-                SendMessageInfo msg = this.sendQueue.Take();
-
                 try
                 {
                     if (this.socket.Poll(Timeout.Infinite, SelectMode.SelectWrite))
