@@ -50,7 +50,7 @@ namespace Hazel.Udp.FewerThreads
         private Thread sendThread;
         private HazelThreadPool processThreads;
 
-        public struct ConnectionId
+        public struct ConnectionId : IEquatable<ConnectionId>
         {
             public ulong Id;
 
@@ -72,9 +72,29 @@ namespace Hazel.Udp.FewerThreads
                 ulong address = (ulong)endPoint.Address.Address;
                 return Create((address << 32) | port);
             }
+
+            public bool Equals(ConnectionId other)
+            {
+                return this.Id == other.Id;
+            }
+
+            public override bool Equals(object obj)
+            {
+                if (obj is ConnectionId)
+                {
+                    return this.Equals((ConnectionId)obj);
+                }
+
+                return false;
+            }
+
+            public override int GetHashCode()
+            {
+                return this.Id.GetHashCode();
+            }
         }
 
-        private ConcurrentDictionary<ulong, ThreadLimitedUdpServerConnection> allConnections = new ConcurrentDictionary<ulong, ThreadLimitedUdpServerConnection>();
+        private ConcurrentDictionary<ConnectionId, ThreadLimitedUdpServerConnection> allConnections = new ConcurrentDictionary<ConnectionId, ThreadLimitedUdpServerConnection>();
         private ConcurrentStack<ConnectionId> staleConnections = new ConcurrentStack<ConnectionId>();
 
         private BlockingCollection<ReceiveMessageInfo> receiveQueue;
@@ -130,7 +150,7 @@ namespace Hazel.Udp.FewerThreads
 
         protected void MarkConnectionAsStale(ConnectionId connectionId)
         {
-            if (this.allConnections.ContainsKey(connectionId.Id))
+            if (this.allConnections.ContainsKey(connectionId))
             {
                 this.staleConnections.Push(connectionId);
             }
@@ -151,7 +171,7 @@ namespace Hazel.Udp.FewerThreads
             while (this.staleConnections.TryPop(out connectionId))
             {
                 ThreadLimitedUdpServerConnection connection;
-                if (this.allConnections.TryGetValue(connectionId.Id, out connection))
+                if (this.allConnections.TryGetValue(connectionId, out connection))
                 {
                     connection.Disconnect("Stale Connection", disconnectMessage);
                 }
@@ -267,11 +287,11 @@ namespace Hazel.Udp.FewerThreads
             // If we're aware of this connection use the one already
             // If this is a new client then connect with them!
             ThreadLimitedUdpServerConnection connection;
-            if (!this.allConnections.TryGetValue(connectionId.Id, out connection))
+            if (!this.allConnections.TryGetValue(connectionId, out connection))
             {
                 lock (this.allConnections)
                 {
-                    if (!this.allConnections.TryGetValue(connectionId.Id, out connection))
+                    if (!this.allConnections.TryGetValue(connectionId, out connection))
                     {
                         // Check for malformed connection attempts
                         if (!isHello)
@@ -296,7 +316,7 @@ namespace Hazel.Udp.FewerThreads
 
                         aware = false;
                         connection = new ThreadLimitedUdpServerConnection(this, connectionId, (IPEndPoint)remoteEndPoint, this.IPMode);
-                        if (!this.allConnections.TryAdd(connectionId.Id, connection))
+                        if (!this.allConnections.TryAdd(connectionId, connection))
                         {
                             throw new HazelException("Failed to add a connection. This should never happen.");
                         }
@@ -341,7 +361,7 @@ namespace Hazel.Udp.FewerThreads
         /// <param name="endPoint">Connection key of the virtual connection.</param>
         internal bool RemoveConnectionTo(ConnectionId connectionId)
         {
-            return this.allConnections.TryRemove(connectionId.Id, out var conn);
+            return this.allConnections.TryRemove(connectionId, out var conn);
         }
 
         protected virtual void Dispose(bool disposing)
