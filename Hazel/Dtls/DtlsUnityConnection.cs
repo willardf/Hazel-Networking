@@ -208,29 +208,32 @@ namespace Hazel.Dtls
         /// <inheritdoc />
         protected override void ResendPacketsIfNeeded()
         {
-            // Check if we need to resend handshake message
-            if (this.nextEpoch.State != HandshakeState.Established)
+            lock (this.syncRoot)
             {
-                DateTime now = DateTime.UtcNow;
-                if (now >= this.nextEpoch.NextPacketResendTime)
+                // Check if we need to resend handshake message
+                if (this.nextEpoch.State != HandshakeState.Established)
                 {
-                    switch (this.nextEpoch.State)
+                    DateTime now = DateTime.UtcNow;
+                    if (now >= this.nextEpoch.NextPacketResendTime)
                     {
-                        case HandshakeState.ExpectingServerHello:
-                        case HandshakeState.ExpectingCertificate:
-                        case HandshakeState.ExpectingServerKeyExchange:
-                        case HandshakeState.ExpectingServerHelloDone:
-                            this.SendClientHello();
-                            break;
+                        switch (this.nextEpoch.State)
+                        {
+                            case HandshakeState.ExpectingServerHello:
+                            case HandshakeState.ExpectingCertificate:
+                            case HandshakeState.ExpectingServerKeyExchange:
+                            case HandshakeState.ExpectingServerHelloDone:
+                                this.SendClientHello();
+                                break;
 
-                        case HandshakeState.ExpectingChangeCipherSpec:
-                        case HandshakeState.ExpectingFinished:
-                            this.SendClientKeyExchangeFlight(true);
-                            break;
+                            case HandshakeState.ExpectingChangeCipherSpec:
+                            case HandshakeState.ExpectingFinished:
+                                this.SendClientKeyExchangeFlight(true);
+                                break;
 
-                        case HandshakeState.Established:
-                        default:
-                            break;
+                            case HandshakeState.Established:
+                            default:
+                                break;
+                        }
                     }
                 }
             }
