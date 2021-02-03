@@ -73,4 +73,45 @@ namespace Hazel.Dtls
             span.WriteBigEndian16(this.Length, 11);
         }
     }
+
+    public struct ChangeCipherSpec
+    {
+        public const int Size = 1;
+
+        enum Value : byte
+        {
+            ChangeCipherSpec = 1,
+        }
+
+        /// <summary>
+        /// Parse a ChangeCipherSpec record from wire format
+        /// </summary>
+        /// <returns>
+        /// True if we successfully parse the ChangeCipherSpec
+        /// record. Otherwise, false.
+        /// </returns>
+        public static bool Parse(ByteSpan span)
+        {
+            if (span.Length != 1)
+            {
+                return false;
+            }
+
+            Value value = (Value)span[0];
+            if (value != Value.ChangeCipherSpec)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Encode a ChangeCipherSpec record to wire format
+        /// </summary>
+        public static void Encode(ByteSpan span)
+        {
+            span[0] = (byte)Value.ChangeCipherSpec;
+        }
+    }
 }

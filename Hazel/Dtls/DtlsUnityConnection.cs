@@ -429,6 +429,12 @@ namespace Hazel.Dtls
                             break;
                         }
 
+                        if (!ChangeCipherSpec.Parse(recordPayload))
+                        {
+                            this.logger.WriteError("Dropping malformed ChangeCipherSpec message");
+                            break;
+                        }
+
                         // Migrate to the next epoch
                         this.epoch = this.nextEpoch.Epoch;
                         this.currentEpoch.RecordProtection = this.nextEpoch.RecordProtection;
@@ -927,7 +933,7 @@ namespace Hazel.Dtls
             changeCipherSpecRecord.ContentType = ContentType.ChangeCipherSpec;
             changeCipherSpecRecord.Epoch = this.epoch;
             changeCipherSpecRecord.SequenceNumber = this.currentEpoch.NextOutgoingSequence;
-            changeCipherSpecRecord.Length = 0;
+            changeCipherSpecRecord.Length = (ushort)this.currentEpoch.RecordProtection.GetEncryptedSize(ChangeCipherSpec.Size);
             ++this.currentEpoch.NextOutgoingSequence;
 
             Handshake finishedHandshake = new Handshake();
@@ -947,7 +953,7 @@ namespace Hazel.Dtls
             // Encode flight to wire format
             int packetLength = 0
                 + Record.Size + keyExchangeRecord.Length
-                + Record.Size
+                + Record.Size + changeCipherSpecRecord.Length
                 + Record.Size + finishedRecord.Length;
                 ;
             ByteSpan packet = new byte[packetLength];
@@ -958,12 +964,16 @@ namespace Hazel.Dtls
             keyExchangeHandshake.Encode(writer);
             writer = writer.Slice(Handshake.Size);
             this.nextEpoch.Handshake.EncodeClientKeyExchangeMessage(writer);
-            writer = writer.Slice((int)keyExchangeHandshake.Length);
 
+            ByteSpan startOfChangeCipherSpecRecord = packet.Slice(Record.Size + keyExchangeRecord.Length);
+            writer = startOfChangeCipherSpecRecord;
             changeCipherSpecRecord.Encode(writer);
             writer = writer.Slice(Record.Size);
+            ChangeCipherSpec.Encode(writer);
+            writer = writer.Slice(ChangeCipherSpec.Size);
 
-            ByteSpan startOfFinishedRecord = writer;
+            ByteSpan startOfFinishedRecord = startOfChangeCipherSpecRecord.Slice(Record.Size + changeCipherSpecRecord.Length);
+            writer = startOfFinishedRecord;
             finishedRecord.Encode(writer);
             writer = writer.Slice(Record.Size);
             finishedHandshake.Encode(writer);
@@ -1009,6 +1019,13 @@ namespace Hazel.Dtls
                   packet.Slice(Record.Size, keyExchangeRecord.Length)
                 , packet.Slice(Record.Size, Handshake.Size + (int)keyExchangeHandshake.Length)
                 , ref keyExchangeRecord
+            );
+
+            // Protect the ChangeCipherSpec record
+            this.currentEpoch.RecordProtection.EncryptClientPlaintext(
+                  startOfChangeCipherSpecRecord.Slice(Record.Size, changeCipherSpecRecord.Length)
+                , startOfChangeCipherSpecRecord.Slice(Record.Size, ChangeCipherSpec.Size)
+                , ref changeCipherSpecRecord
             );
 
             // Protect the Finished record

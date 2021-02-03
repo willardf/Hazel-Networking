@@ -42,6 +42,7 @@ namespace Hazel.Dtls
             public ulong PreviousSequenceWindowBitmask;
 
             public IRecordProtection RecordProtection;
+            public IRecordProtection PreviousRecordProtection;
 
             // Need to keep these around so we can re-transmit our
             // last handshake record flight
@@ -112,6 +113,7 @@ namespace Hazel.Dtls
                 this.CurrentEpoch.NextExpectedSequence = nextExpectedSequenceNumber;
                 this.CurrentEpoch.PreviousSequenceWindowBitmask = 0;
                 this.CurrentEpoch.RecordProtection = NullRecordProtection.Instance;
+                this.CurrentEpoch.PreviousRecordProtection = null;
                 this.CurrentEpoch.ServerFinishedVerification.SecureClear();
                 this.CurrentEpoch.ExpectedClientFinishedVerification.SecureClear();
 
@@ -129,6 +131,7 @@ namespace Hazel.Dtls
             public void Dispose()
             {
                 this.CurrentEpoch.RecordProtection?.Dispose();
+                this.CurrentEpoch.PreviousRecordProtection?.Dispose();
                 this.NextEpoch.RecordProtection?.Dispose();
                 this.NextEpoch.Handshake?.Dispose();
                 this.NextEpoch.VerificationStream?.Dispose();
@@ -386,10 +389,18 @@ namespace Hazel.Dtls
                                 break;
                             }
 
+                            if (!ChangeCipherSpec.Parse(recordPayload))
+                            {
+                                this.Logger.WriteError($"Dropping malformed ChangeCipherSpec message from `{peerAddress}`");
+                                break;
+                            }
+
                             // Migrate to the next epoch
                             peer.Epoch = peer.NextEpoch.Epoch;
                             peer.CanHandleApplicationData = false; // Need a Finished message
                             peer.CurrentEpoch.NextOutgoingSequenceForPreviousEpoch = peer.CurrentEpoch.NextOutgoingSequence;
+                            peer.CurrentEpoch.PreviousRecordProtection?.Dispose();
+                            peer.CurrentEpoch.PreviousRecordProtection = peer.CurrentEpoch.RecordProtection;
                             peer.CurrentEpoch.RecordProtection = peer.NextEpoch.RecordProtection;
                             peer.CurrentEpoch.NextOutgoingSequence = 1;
                             peer.CurrentEpoch.NextExpectedSequence = 1;
@@ -594,9 +605,20 @@ namespace Hazel.Dtls
                         {
                             ///NOTE(mendsley): This _should_ not
                             /// happen on a well-formed server.
-                            Debug.Assert(false, "How do we have an established non-zero epoch without verify data");
+                            Debug.Assert(false, "How do we have an established non-zero epoch without verify data?");
 
                             this.Logger.WriteError($"Dropping Finished message (no verify data) from `{peerAddress}`");
+                            return false;
+                        }
+                        // Cannot process a Finished message without
+                        // record protection for the previous epoch
+                        else if (peer.CurrentEpoch.PreviousRecordProtection == null)
+                        {
+                            ///NOTE(mendsley): This _should_ not
+                            /// happen on a well-formed server.
+                            Debug.Assert(false, "How do we have an established non-zero epoch with record protection for the previous epoch?");
+
+                            this.Logger.WriteError($"Dropping Finished message from `{peerAddress}`: No previous epoch record protection");
                             return false;
                         }
 
@@ -642,7 +664,7 @@ namespace Hazel.Dtls
                         changeCipherSpecRecord.ContentType = ContentType.ChangeCipherSpec;
                         changeCipherSpecRecord.Epoch = (ushort)(peer.Epoch - 1);
                         changeCipherSpecRecord.SequenceNumber = peer.CurrentEpoch.NextOutgoingSequenceForPreviousEpoch;
-                        changeCipherSpecRecord.Length = 0;
+                        changeCipherSpecRecord.Length = (ushort)peer.CurrentEpoch.PreviousRecordProtection.GetEncryptedSize(ChangeCipherSpec.Size);
                         ++peer.CurrentEpoch.NextOutgoingSequenceForPreviousEpoch;
 
                         int plaintextFinishedPayloadSize = Handshake.Size + (int)outgoingHandshake.Length;
@@ -654,20 +676,31 @@ namespace Hazel.Dtls
                         ++peer.CurrentEpoch.NextOutgoingSequence;
 
                         // Encode the flight into wire format
-                        packet = new byte[Record.Size + Record.Size + finishedRecord.Length];
+                        packet = new byte[Record.Size + changeCipherSpecRecord.Length + Record.Size + finishedRecord.Length];
                         writer = packet;
                         changeCipherSpecRecord.Encode(writer);
                         writer = writer.Slice(Record.Size);
+                        ChangeCipherSpec.Encode(writer);
+
+                        ByteSpan startOfFinishedRecord = packet.Slice(Record.Size + changeCipherSpecRecord.Length);
+                        writer = startOfFinishedRecord;
                         finishedRecord.Encode(writer);
                         writer = writer.Slice(Record.Size);
                         outgoingHandshake.Encode(writer);
                         writer = writer.Slice(Handshake.Size);
                         peer.CurrentEpoch.ServerFinishedVerification.CopyTo(writer);
 
+                        // Protect the ChangeChipherSpec record
+                        peer.CurrentEpoch.PreviousRecordProtection.EncryptServerPlaintext(
+                              packet.Slice(Record.Size, changeCipherSpecRecord.Length)
+                            , packet.Slice(Record.Size, ChangeCipherSpec.Size)
+                            , ref changeCipherSpecRecord
+                        );
+
                         // Protect the Finished Handshake record
                         peer.CurrentEpoch.RecordProtection.EncryptServerPlaintext(
-                            packet.Slice(Record.Size + Record.Size, finishedRecord.Length)
-                            , packet.Slice(Record.Size + Record.Size, plaintextFinishedPayloadSize)
+                            startOfFinishedRecord.Slice(Record.Size, finishedRecord.Length)
+                            , startOfFinishedRecord.Slice(Record.Size, plaintextFinishedPayloadSize)
                             , ref finishedRecord
                         );
 
