@@ -589,11 +589,13 @@ namespace Hazel.Dtls
         public static ByteSpan Encode(X509Certificate2 certificate)
         {
             ByteSpan certData = certificate.GetRawCertData();
-            int totalSize = certData.Length + 3;
+            int totalSize = certData.Length + 3 + 3;
 
             ByteSpan result = new byte[totalSize];
 
             ByteSpan writer = result;
+            writer.WriteBigEndian24((uint)certData.Length + 3);
+            writer = writer.Slice(3);
             writer.WriteBigEndian24((uint)certData.Length);
             writer = writer.Slice(3);
 
@@ -608,7 +610,7 @@ namespace Hazel.Dtls
         public static bool Parse(out X509Certificate2 certificate, ByteSpan span)
         {
             certificate = null;
-            if (span.Length < 3)
+            if (span.Length < 6)
             {
                 return false;
             }
@@ -621,7 +623,14 @@ namespace Hazel.Dtls
                 return false;
             }
 
-            byte[] rawData = new byte[totalSize];
+            uint certificateSize = span.ReadBigEndian24();
+            span = span.Slice(3);
+            if (span.Length < certificateSize)
+            {
+                return false;
+            }
+
+            byte[] rawData = new byte[certificateSize];
             span.CopyTo(rawData, 0);
             try
             {
