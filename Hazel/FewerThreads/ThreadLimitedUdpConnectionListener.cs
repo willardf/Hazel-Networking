@@ -52,30 +52,22 @@ namespace Hazel.Udp.FewerThreads
 
         public struct ConnectionId : IEquatable<ConnectionId>
         {
-            public ulong Id;
+            public IPEndPoint EndPoint;
+            public int Serial;
 
-            public static ConnectionId Create(ulong id)
+            public static ConnectionId Create(IPEndPoint endPoint, int serial)
             {
-                ConnectionId result = new ConnectionId();
-                result.Id = id;
-                return result;
-            }
-
-            public static ConnectionId CreateFromEndPoint(IPEndPoint endPoint)
-            {
-                if (endPoint.AddressFamily != AddressFamily.InterNetwork)
-                {
-                    throw new ArgumentException("ConnectionId only supports IPv4");
-                }
-
-                ulong port = (ulong)endPoint.Port;
-                ulong address = (ulong)endPoint.Address.Address;
-                return Create((address << 32) | port);
+                return new ConnectionId{
+                    EndPoint = endPoint,
+                    Serial = serial,
+                };
             }
 
             public bool Equals(ConnectionId other)
             {
-                return this.Id == other.Id;
+                return this.Serial == other.Serial
+                    && this.EndPoint.Equals(other.EndPoint)
+                    ;
             }
 
             public override bool Equals(object obj)
@@ -90,7 +82,10 @@ namespace Hazel.Udp.FewerThreads
 
             public override int GetHashCode()
             {
-                return this.Id.GetHashCode();
+                ///NOTE(mendsley): We're only hashing the endpoint
+                /// here, as the common case will have one
+                /// connection per address+port tuple.
+                return this.EndPoint.GetHashCode();
             }
         }
 
@@ -235,7 +230,7 @@ namespace Hazel.Udp.FewerThreads
                         return;
                     }
 
-                    ConnectionId connectionId = ConnectionId.CreateFromEndPoint((IPEndPoint)remoteEP);
+                    ConnectionId connectionId = ConnectionId.Create((IPEndPoint)remoteEP, 0);
                     this.ProcessIncomingMessageFromOtherThread(message, (IPEndPoint)remoteEP, connectionId);
                 }
             }

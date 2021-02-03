@@ -97,7 +97,7 @@ namespace Hazel.Dtls
                 this.CurrentEpoch.ServerFinishedVerification = block.Slice(0, Finished.Size);
                 this.CurrentEpoch.ExpectedClientFinishedVerification = block.Slice(Finished.Size, Finished.Size);
 
-                ResetPeer(ConnectionId.Create(0), 1);
+                ResetPeer(ConnectionId.Create(new IPEndPoint(0,0), 0), 1);
             }
 
             public void ResetPeer(ConnectionId connectionId, ulong nextExpectedSequenceNumber)
@@ -147,7 +147,7 @@ namespace Hazel.Dtls
 
         private readonly ConcurrentDictionary<IPEndPoint, PeerData> existingPeers = new ConcurrentDictionary<IPEndPoint, PeerData>();
 
-        private long connectionId_unsafe =  0;
+        private int connectionSerial_unsafe =  0;
 
         /// <summary>
         /// Create a new instance of the DTLS listener
@@ -765,7 +765,7 @@ namespace Hazel.Dtls
             if (record.Epoch == 0 && peer.Epoch != 0)
             {
                 ConnectionId oldConnectionId = peer.ConnectionId;
-                peer.ResetPeer(this.AllocateConnectionId(), record.SequenceNumber + 1);
+                peer.ResetPeer(this.AllocateConnectionId(peerAddress), record.SequenceNumber + 1);
 
                 // Inform the parent layer that the existing
                 // connection should be abandoned.
@@ -1102,7 +1102,7 @@ namespace Hazel.Dtls
 
             // Allocate state for the new peer and register it
             PeerData peer = new PeerData();
-            peer.ResetPeer(this.AllocateConnectionId(), record.SequenceNumber + 1);
+            peer.ResetPeer(this.AllocateConnectionId(peerAddress), record.SequenceNumber + 1);
 
             this.existingPeers[peerAddress] = peer;
 
@@ -1232,10 +1232,10 @@ namespace Hazel.Dtls
         /// <summary>
         /// Allocate a new connection id
         /// </summary>
-        private ConnectionId AllocateConnectionId()
+        private ConnectionId AllocateConnectionId(IPEndPoint endPoint)
         {
-            ulong rawConnectionId = (ulong)Interlocked.Increment(ref this.connectionId_unsafe);
-            return ConnectionId.Create(rawConnectionId);
+            int rawSerialId = Interlocked.Increment(ref this.connectionSerial_unsafe);
+            return ConnectionId.Create(endPoint, rawSerialId);
         }
     }
 }
