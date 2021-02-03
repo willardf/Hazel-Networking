@@ -1206,7 +1206,7 @@ namespace Hazel.Dtls
                     Record outgoingRecord = new Record();
                     outgoingRecord.ContentType = ContentType.ApplicationData;
                     outgoingRecord.Epoch = peer.Epoch;
-                    outgoingRecord.SequenceNumber = peer.CurrentEpoch.NextExpectedSequence;
+                    outgoingRecord.SequenceNumber = peer.CurrentEpoch.NextOutgoingSequence;
                     outgoingRecord.Length = (ushort)peer.CurrentEpoch.RecordProtection.GetEncryptedSize(span.Length);
                     ++peer.CurrentEpoch.NextOutgoingSequence;
 
