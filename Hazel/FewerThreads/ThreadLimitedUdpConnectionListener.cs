@@ -366,20 +366,25 @@ namespace Hazel.Udp.FewerThreads
                 kvp.Value.Dispose();
             }
 
+            bool wasActive = this.isActive;
+            this.isActive = false;
+
+            // Flush outgoing packets
+            this.sendQueue?.CompleteAdding();
+            if (wasActive)
+            {
+                this.sendThread.Join();
+            }
+
             try { this.socket.Shutdown(SocketShutdown.Both); } catch { }
             try { this.socket.Close(); } catch { }
             try { this.socket.Dispose(); } catch { }
 
-            bool wasActive = this.isActive;
-            this.isActive = false;
-
             this.receiveQueue?.CompleteAdding();
-            this.sendQueue?.CompleteAdding();
 
             if (wasActive)
             {
                 this.reliablePacketThread.Join();
-                this.sendThread.Join();
                 this.receiveThread.Join();
                 this.processThreads.Join();
             }
@@ -388,7 +393,6 @@ namespace Hazel.Udp.FewerThreads
             this.receiveQueue = null;
             this.sendQueue?.Dispose();
             this.sendQueue = null;
-
         }
 
         public void Dispose()
