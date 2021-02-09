@@ -36,8 +36,8 @@ namespace Hazel.UnitTests
             bool serverDisconnected = false;
             bool clientDisconnected = false;
 
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
-            using (UdpConnection connection = this.CreateConnection(ep, new TestLogger()))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger("SERVER")))
+            using (UdpConnection connection = this.CreateConnection(ep, new TestLogger("CLIENT")))
             {
                 listener.NewConnection += (evt) =>
                 {

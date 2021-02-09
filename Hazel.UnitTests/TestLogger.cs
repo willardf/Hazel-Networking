@@ -8,14 +8,35 @@ namespace Hazel.UnitTests
 {
     public class TestLogger : ILogger
     {
+        private readonly string prefix;
+
+        public TestLogger(string prefix = "")
+        {
+            this.prefix = prefix;
+        }
+
         public void WriteError(string msg)
         {
-            Console.WriteLine($"[ERROR] {msg}");
+            if (string.IsNullOrEmpty(this.prefix))
+            {
+                Console.WriteLine($"[ERROR] {msg}");
+            }
+            else
+            {
+                Console.WriteLine($"[{this.prefix}][ERROR] {msg}");
+            }
         }
 
         public void WriteInfo(string msg)
         {
-            Console.WriteLine($"[INFO] {msg}");
+            if (string.IsNullOrEmpty(this.prefix))
+            {
+                Console.WriteLine($"[INFO] {msg}");
+            }
+            else
+            {
+                Console.WriteLine($"[{this.prefix}][INFO] {msg}");
+            }
         }
     }
 }
