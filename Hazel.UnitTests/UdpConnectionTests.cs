@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Net;
 using System.Threading;
@@ -95,7 +95,7 @@ namespace Hazel.UnitTests
                 Assert.AreEqual(ep, connection.EndPoint);
 
                 //UdpConnection fields
-                Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 4296), connection.RemoteEndPoint);
+                Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 4296), connection.EndPoint);
                 Assert.AreEqual(1, connection.Statistics.DataBytesSent);
                 Assert.AreEqual(0, connection.Statistics.DataBytesReceived);
             }

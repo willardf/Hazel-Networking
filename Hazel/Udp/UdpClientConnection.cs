@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -37,12 +37,12 @@ namespace Hazel.Udp
             : base()
         {
             this.EndPoint = remoteEndPoint;
-            this.RemoteEndPoint = remoteEndPoint;
             this.IPMode = ipMode;
 
             this.socket = CreateSocket(ipMode);
 
             reliablePacketTimer = new Timer(ManageReliablePacketsInternal, null, 100, Timeout.Infinite);
+            this.InitializeKeepAliveTimer();
         }
         
         ~UdpClientConnection()
@@ -88,7 +88,7 @@ namespace Hazel.Udp
                     0,
                     length,
                     SocketFlags.None,
-                    RemoteEndPoint,
+                    EndPoint,
                     HandleSendTo,
                     null);
             }
@@ -317,7 +317,7 @@ namespace Hazel.Udp
                     0,
                     bytes.Length,
                     SocketFlags.None,
-                    RemoteEndPoint);
+                    EndPoint);
             }
             catch { }
 

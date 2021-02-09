@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net;
 
 namespace Hazel.Udp
@@ -28,7 +28,6 @@ namespace Hazel.Udp
             : base()
         {
             this.Listener = listener;
-            this.RemoteEndPoint = endPoint;
             this.EndPoint = endPoint;
             this.IPMode = IPMode;
 
@@ -39,7 +38,7 @@ namespace Hazel.Udp
         /// <inheritdoc />
         protected override void WriteBytesToConnection(byte[] bytes, int length)
         {
-            Listener.SendData(bytes, length, RemoteEndPoint);
+            Listener.SendData(bytes, length, EndPoint);
         }
 
         /// <inheritdoc />
@@ -82,7 +81,7 @@ namespace Hazel.Udp
 
             try
             {
-                Listener.SendDataSync(bytes, bytes.Length, RemoteEndPoint);
+                Listener.SendDataSync(bytes, bytes.Length, EndPoint);
             }
             catch { }
 
@@ -91,7 +90,7 @@ namespace Hazel.Udp
 
         protected override void Dispose(bool disposing)
         {
-            Listener.RemoveConnectionTo(RemoteEndPoint);
+            Listener.RemoveConnectionTo(EndPoint);
 
             if (disposing)
             {

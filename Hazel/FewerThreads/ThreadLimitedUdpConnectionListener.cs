@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
@@ -15,14 +15,15 @@ namespace Hazel.Udp.FewerThreads
     {
         private struct SendMessageInfo
         {
-            public byte[] Buffer;
-            public EndPoint Recipient;
+            public ByteSpan Span;
+            public IPEndPoint Recipient;
         }
 
         private struct ReceiveMessageInfo
         {
             public MessageReader Message;
-            public EndPoint Sender;
+            public IPEndPoint Sender;
+            public ConnectionId ConnectionId;
         }
 
         private const int SendReceiveBufferSize = 1024 * 1024;
@@ -39,7 +40,7 @@ namespace Hazel.Udp.FewerThreads
         public delegate bool AcceptConnectionCheck(IPEndPoint endPoint, byte[] input, out byte[] response);
 
         private Socket socket;
-        private ILogger Logger;
+        protected ILogger Logger;
 
         public IPEndPoint EndPoint { get; }
         public IPMode IPMode { get; }
@@ -49,7 +50,47 @@ namespace Hazel.Udp.FewerThreads
         private Thread sendThread;
         private HazelThreadPool processThreads;
 
-        private ConcurrentDictionary<EndPoint, ThreadLimitedUdpServerConnection> allConnections = new ConcurrentDictionary<EndPoint, ThreadLimitedUdpServerConnection>();
+        public struct ConnectionId : IEquatable<ConnectionId>
+        {
+            public IPEndPoint EndPoint;
+            public int Serial;
+
+            public static ConnectionId Create(IPEndPoint endPoint, int serial)
+            {
+                return new ConnectionId{
+                    EndPoint = endPoint,
+                    Serial = serial,
+                };
+            }
+
+            public bool Equals(ConnectionId other)
+            {
+                return this.Serial == other.Serial
+                    && this.EndPoint.Equals(other.EndPoint)
+                    ;
+            }
+
+            public override bool Equals(object obj)
+            {
+                if (obj is ConnectionId)
+                {
+                    return this.Equals((ConnectionId)obj);
+                }
+
+                return false;
+            }
+
+            public override int GetHashCode()
+            {
+                ///NOTE(mendsley): We're only hashing the endpoint
+                /// here, as the common case will have one
+                /// connection per address+port tuple.
+                return this.EndPoint.GetHashCode();
+            }
+        }
+
+        private ConcurrentDictionary<ConnectionId, ThreadLimitedUdpServerConnection> allConnections = new ConcurrentDictionary<ConnectionId, ThreadLimitedUdpServerConnection>();
+        private ConcurrentStack<ConnectionId> staleConnections = new ConcurrentStack<ConnectionId>();
 
         private BlockingCollection<ReceiveMessageInfo> receiveQueue;
         private BlockingCollection<SendMessageInfo> sendQueue = new BlockingCollection<SendMessageInfo>();
@@ -102,6 +143,14 @@ namespace Hazel.Udp.FewerThreads
             this.Dispose(false);
         }
 
+        protected void MarkConnectionAsStale(ConnectionId connectionId)
+        {
+            if (this.allConnections.ContainsKey(connectionId))
+            {
+                this.staleConnections.Push(connectionId);
+            }
+        }
+
         public void DisconnectOldConnections(TimeSpan maxAge, MessageWriter disconnectMessage)
         {
             var now = DateTime.UtcNow;
@@ -110,6 +159,16 @@ namespace Hazel.Udp.FewerThreads
                 if (now - conn.CreationTime > maxAge)
                 {
                     conn.Disconnect("Stale Connection", disconnectMessage);
+                }
+            }
+
+            ConnectionId connectionId;
+            while (this.staleConnections.TryPop(out connectionId))
+            {
+                ThreadLimitedUdpServerConnection connection;
+                if (this.allConnections.TryGetValue(connectionId, out connection))
+                {
+                    connection.Disconnect("Stale Connection", disconnectMessage);
                 }
             }
         }
@@ -161,7 +220,7 @@ namespace Hazel.Udp.FewerThreads
                     catch (SocketException sx)
                     {
                         message.Recycle();
-                        this.Logger.WriteError("Socket Ex in StartListening: " + sx.Message);
+                        this.Logger.WriteError("Socket Ex in ReceiveLoop: " + sx.Message);
                         continue;
                     }
                     catch (Exception ex)
@@ -171,20 +230,18 @@ namespace Hazel.Udp.FewerThreads
                         return;
                     }
 
-                    this.receiveQueue.Add(new ReceiveMessageInfo() { Message = message, Sender = remoteEP });
+                    ConnectionId connectionId = ConnectionId.Create((IPEndPoint)remoteEP, 0);
+                    this.ProcessIncomingMessageFromOtherThread(message, (IPEndPoint)remoteEP, connectionId);
                 }
             }
         }
-
         private void ProcessingLoop()
         {
-            while (this.isActive)
+            foreach (ReceiveMessageInfo msg in this.receiveQueue.GetConsumingEnumerable())
             {
-                ReceiveMessageInfo msg = this.receiveQueue.Take();
-                
                 try
                 {
-                    this.ReadCallback(msg.Message, msg.Sender);
+                    this.ReadCallback(msg.Message, msg.Sender, msg.ConnectionId);
                 }
                 catch
                 {
@@ -192,18 +249,20 @@ namespace Hazel.Udp.FewerThreads
                 }
             }
         }
+        protected virtual void ProcessIncomingMessageFromOtherThread(MessageReader message, IPEndPoint remoteEndPoint, ConnectionId connectionId)
+        {
+            this.receiveQueue.Add(new ReceiveMessageInfo() { Message = message, Sender = remoteEndPoint, ConnectionId = connectionId });
+        }
 
         private void SendLoop()
         {
-            while (this.isActive)
+            foreach (SendMessageInfo msg in this.sendQueue.GetConsumingEnumerable())
             {
-                SendMessageInfo msg = this.sendQueue.Take();
-
                 try
                 {
                     if (this.socket.Poll(Timeout.Infinite, SelectMode.SelectWrite))
                     {
-                        this.socket.SendTo(msg.Buffer, 0, msg.Buffer.Length, SocketFlags.None, msg.Recipient);
+                        this.socket.SendTo(msg.Span.GetUnderlyingArray(), msg.Span.Offset, msg.Span.Length, SocketFlags.None, msg.Recipient);
                     }
                 }
                 catch (Exception e)
@@ -214,7 +273,7 @@ namespace Hazel.Udp.FewerThreads
             }
         }
 
-        void ReadCallback(MessageReader message, EndPoint remoteEndPoint)
+        void ReadCallback(MessageReader message, IPEndPoint remoteEndPoint, ConnectionId connectionId)
         {
             int bytesReceived = message.Length;
             bool aware = true;
@@ -223,11 +282,11 @@ namespace Hazel.Udp.FewerThreads
             // If we're aware of this connection use the one already
             // If this is a new client then connect with them!
             ThreadLimitedUdpServerConnection connection;
-            if (!this.allConnections.TryGetValue(remoteEndPoint, out connection))
+            if (!this.allConnections.TryGetValue(connectionId, out connection))
             {
                 lock (this.allConnections)
                 {
-                    if (!this.allConnections.TryGetValue(remoteEndPoint, out connection))
+                    if (!this.allConnections.TryGetValue(connectionId, out connection))
                     {
                         // Check for malformed connection attempts
                         if (!isHello)
@@ -251,8 +310,8 @@ namespace Hazel.Udp.FewerThreads
                         }
 
                         aware = false;
-                        connection = new ThreadLimitedUdpServerConnection(this, (IPEndPoint)remoteEndPoint, this.IPMode);
-                        if (!this.allConnections.TryAdd(remoteEndPoint, connection))
+                        connection = new ThreadLimitedUdpServerConnection(this, connectionId, (IPEndPoint)remoteEndPoint, this.IPMode);
+                        if (!this.allConnections.TryAdd(connectionId, connection))
                         {
                             throw new HazelException("Failed to add a connection. This should never happen.");
                         }
@@ -281,18 +340,23 @@ namespace Hazel.Udp.FewerThreads
             }
         }
 
-        internal void SendDataRaw(byte[] response, EndPoint remoteEndPoint)
+        internal void SendDataRaw(byte[] response, IPEndPoint remoteEndPoint)
         {
-            this.sendQueue.TryAdd(new SendMessageInfo() { Buffer = response, Recipient = remoteEndPoint });
+            QueueRawData(response, remoteEndPoint);
+        }
+
+        protected virtual void QueueRawData(ByteSpan span, IPEndPoint remoteEndPoint)
+        {
+            this.sendQueue.TryAdd(new SendMessageInfo() { Span = span, Recipient = remoteEndPoint });
         }
 
         /// <summary>
         ///     Removes a virtual connection from the list.
         /// </summary>
-        /// <param name="endPoint">The endpoint of the virtual connection.</param>
-        internal bool RemoveConnectionTo(EndPoint endPoint)
+        /// <param name="endPoint">Connection key of the virtual connection.</param>
+        internal bool RemoveConnectionTo(ConnectionId connectionId)
         {
-            return this.allConnections.TryRemove(endPoint, out var conn);
+            return this.allConnections.TryRemove(connectionId, out var conn);
         }
 
         protected virtual void Dispose(bool disposing)
@@ -302,22 +366,33 @@ namespace Hazel.Udp.FewerThreads
                 kvp.Value.Dispose();
             }
 
+            bool wasActive = this.isActive;
+            this.isActive = false;
+
+            // Flush outgoing packets
+            this.sendQueue?.CompleteAdding();
+            if (wasActive)
+            {
+                this.sendThread.Join();
+            }
+
             try { this.socket.Shutdown(SocketShutdown.Both); } catch { }
             try { this.socket.Close(); } catch { }
             try { this.socket.Dispose(); } catch { }
 
-            this.isActive = false;
+            this.receiveQueue?.CompleteAdding();
 
-            this.receiveQueue.CompleteAdding();
-            this.sendQueue.CompleteAdding();
+            if (wasActive)
+            {
+                this.reliablePacketThread.Join();
+                this.receiveThread.Join();
+                this.processThreads.Join();
+            }
 
-            this.reliablePacketThread.Join();
-            this.sendThread.Join();
-            this.receiveThread.Join();
-            this.processThreads.Join();
-
-            this.receiveQueue.Dispose();
-            this.sendQueue.Dispose();
+            this.receiveQueue?.Dispose();
+            this.receiveQueue = null;
+            this.sendQueue?.Dispose();
+            this.sendQueue = null;
         }
 
         public void Dispose()
