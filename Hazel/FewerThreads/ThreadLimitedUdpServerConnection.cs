@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net;
 
 namespace Hazel.Udp.FewerThreads
@@ -20,17 +20,19 @@ namespace Hazel.Udp.FewerThreads
         /// </remarks>
         public ThreadLimitedUdpConnectionListener Listener { get; private set; }
 
+        private ThreadLimitedUdpConnectionListener.ConnectionId ConnectionId;
+
         /// <summary>
         ///     Creates a UdpConnection for the virtual connection to the endpoint.
         /// </summary>
         /// <param name="listener">The listener that created this connection.</param>
         /// <param name="endPoint">The endpoint that we are connected to.</param>
         /// <param name="IPMode">The IPMode we are connected using.</param>
-        internal ThreadLimitedUdpServerConnection(ThreadLimitedUdpConnectionListener listener, IPEndPoint endPoint, IPMode IPMode)
+        internal ThreadLimitedUdpServerConnection(ThreadLimitedUdpConnectionListener listener, ThreadLimitedUdpConnectionListener.ConnectionId connectionId, IPEndPoint endPoint, IPMode IPMode)
             : base()
         {
             this.Listener = listener;
-            this.RemoteEndPoint = endPoint;
+            this.ConnectionId = connectionId;
             this.EndPoint = endPoint;
             this.IPMode = IPMode;
 
@@ -43,7 +45,7 @@ namespace Hazel.Udp.FewerThreads
         {
             if (bytes.Length != length) throw new ArgumentException("I made an assumption here. I hope you see this error.");
 
-            Listener.SendDataRaw(bytes, RemoteEndPoint);
+            Listener.SendDataRaw(bytes, EndPoint);
         }
 
         /// <inheritdoc />
@@ -69,7 +71,7 @@ namespace Hazel.Udp.FewerThreads
         /// </summary>
         protected override bool SendDisconnect(MessageWriter data = null)
         {
-            if (!Listener.RemoveConnectionTo(RemoteEndPoint)) return false;
+            if (!Listener.RemoveConnectionTo(this.ConnectionId)) return false;
             this._state = ConnectionState.NotConnected;
             
             var bytes = EmptyDisconnectBytes;
@@ -83,7 +85,7 @@ namespace Hazel.Udp.FewerThreads
 
             try
             {
-                Listener.SendDataRaw(bytes, RemoteEndPoint);
+                Listener.SendDataRaw(bytes, EndPoint);
             }
             catch { }
 

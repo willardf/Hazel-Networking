@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -19,7 +19,6 @@ namespace Hazel.Udp
             : base()
         {
             this.EndPoint = remoteEndPoint;
-            this.RemoteEndPoint = remoteEndPoint;
             this.IPMode = ipMode;
 
             this.socket = CreateSocket(ipMode);
@@ -32,6 +31,15 @@ namespace Hazel.Udp
         }
 
         public void FixedUpdate()
+        {
+            this.ResendPacketsIfNeeded();
+        }
+
+        protected virtual void RestartConnection()
+        {
+        }
+
+        protected virtual void ResendPacketsIfNeeded()
         {
             base.ManageReliablePackets();
         }
@@ -46,7 +54,7 @@ namespace Hazel.Udp
                     0,
                     length,
                     SocketFlags.None,
-                    RemoteEndPoint,
+                    EndPoint,
                     HandleSendTo,
                     null);
             }
@@ -85,6 +93,7 @@ namespace Hazel.Udp
             {
                 if (this.State != ConnectionState.Connecting) return;
                 Thread.Sleep(100);
+                this.ResendPacketsIfNeeded();
             }
         }
 
@@ -106,6 +115,8 @@ namespace Hazel.Udp
                 throw new HazelException("A SocketException occurred while binding to the port.", e);
             }
 
+            this.RestartConnection();
+
             try
             {
                 StartListeningForData();
@@ -123,14 +134,14 @@ namespace Hazel.Udp
                 throw new HazelException("A SocketException occurred while initiating a receive operation.", e);
             }
 
+            this.InitializeKeepAliveTimer();
+
             // Write bytes to the server to tell it hi (and to punch a hole in our NAT, if present)
             // When acknowledged set the state to connected
             SendHello(bytes, () =>
             {
                 this.State = ConnectionState.Connected;
             });
-
-            this.InitializeKeepAliveTimer();
         }
 
         /// <summary>
@@ -141,7 +152,7 @@ namespace Hazel.Udp
             var msg = MessageReader.GetSized(ushort.MaxValue);
             try
             {
-                var ep = this.RemoteEndPoint;
+                EndPoint ep = this.EndPoint;
                 socket.BeginReceiveFrom(msg.Buffer, 0, msg.Buffer.Length, SocketFlags.None, ref ep, ReadCallback, msg);
             }
             catch
@@ -161,7 +172,7 @@ namespace Hazel.Udp
 
             try
             {
-                var ep = this.RemoteEndPoint;
+                EndPoint ep = this.EndPoint;
                 msg.Length = socket.EndReceiveFrom(result, ref ep);
             }
             catch (SocketException e)
@@ -225,12 +236,7 @@ namespace Hazel.Udp
 
             try
             {
-                socket.SendTo(
-                    bytes,
-                    0,
-                    bytes.Length,
-                    SocketFlags.None,
-                    RemoteEndPoint);
+                this.WriteBytesToConnection(bytes, bytes.Length);
             }
             catch { }
 
