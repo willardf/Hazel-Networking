@@ -445,6 +445,18 @@ namespace Hazel.UnitTests
         }
 
         /// <summary>
+        ///     Test that a disconnect is sent when the client is disposed.
+        /// </summary>
+        public void ClientDisconnectOnDisposeTest()
+        {
+            using (UdpConnectionListener listener = new UdpConnectionListener(new IPEndPoint(IPAddress.Any, 4296)))
+            using (UdpConnection connection = new UdpClientConnection(new IPEndPoint(IPAddress.Loopback, 4296)))
+            {
+                TestHelper.RunClientDisconnectOnDisposeTest(listener, connection);
+            }
+        }
+
+        /// <summary>
         ///     Tests disconnection from the server.
         /// </summary>
         [TestMethod]

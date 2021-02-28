@@ -14,6 +14,7 @@ namespace Hazel.Udp
     public class UnityUdpClientConnection : UdpConnection
     {
         private Socket socket;
+        private bool sendSynchronously = false;
 
         public UnityUdpClientConnection(IPEndPoint remoteEndPoint, IPMode ipMode = IPMode.IPv4)
             : base()
@@ -49,14 +50,26 @@ namespace Hazel.Udp
         {
             try
             {
-                socket.BeginSendTo(
-                    bytes,
-                    0,
-                    length,
-                    SocketFlags.None,
-                    EndPoint,
-                    HandleSendTo,
-                    null);
+                if (this.sendSynchronously)
+                {
+                    socket.SendTo(
+                        bytes,
+                        0,
+                        length,
+                        SocketFlags.None,
+                        EndPoint);
+                }
+                else
+                {
+                    socket.BeginSendTo(
+                        bytes,
+                        0,
+                        length,
+                        SocketFlags.None,
+                        EndPoint,
+                        HandleSendTo,
+                        null);
+                }
             }
             catch (NullReferenceException) { }
             catch (ObjectDisposedException)
@@ -246,6 +259,8 @@ namespace Hazel.Udp
         /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
+            this.sendSynchronously = true;
+
             if (disposing)
             {
                 SendDisconnect();

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 using Hazel;
@@ -268,6 +268,43 @@ namespace Hazel.UnitTests
             connection.Disconnect("Testing");
 
             mutex2.WaitOne();
+        }
+
+        /// <summary>
+        ///     Ensures a client sends a disconnect packet to the server on Dispose.
+        /// </summary>
+        /// <param name="listener">The listener to test.</param>
+        /// <param name="connection">The connection to test.</param>
+        internal static void RunClientDisconnectOnDisposeTest(NetworkConnectionListener listener, Connection connection)
+        {
+            ManualResetEvent mutex = new ManualResetEvent(false);
+            ManualResetEvent mutex2 = new ManualResetEvent(false);
+
+            listener.NewConnection += delegate (NewConnectionEventArgs args)
+            {
+                args.Connection.Disconnected += delegate (object sender2, DisconnectedEventArgs args2)
+                {
+                    mutex2.Set();
+                };
+
+                mutex.Set();
+            };
+
+            listener.Start();
+
+            connection.Connect();
+
+            if (!mutex.WaitOne(TimeSpan.FromSeconds(1)))
+            {
+                Assert.Fail("Timeout waiting for client connection");
+            }
+
+            connection.Dispose();
+
+            if (!mutex2.WaitOne(TimeSpan.FromSeconds(1)))
+            {
+                Assert.Fail("Timeout waiting for client disconnect packet");
+            }
         }
 
         /// <summary>
