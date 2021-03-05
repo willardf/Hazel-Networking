@@ -14,7 +14,6 @@ namespace Hazel.Udp
     public class UnityUdpClientConnection : UdpConnection
     {
         private Socket socket;
-        private bool sendSynchronously = false;
 
         public UnityUdpClientConnection(IPEndPoint remoteEndPoint, IPMode ipMode = IPMode.IPv4)
             : base()
@@ -50,26 +49,40 @@ namespace Hazel.Udp
         {
             try
             {
-                if (this.sendSynchronously)
-                {
-                    socket.SendTo(
-                        bytes,
-                        0,
-                        length,
-                        SocketFlags.None,
-                        EndPoint);
-                }
-                else
-                {
-                    socket.BeginSendTo(
-                        bytes,
-                        0,
-                        length,
-                        SocketFlags.None,
-                        EndPoint,
-                        HandleSendTo,
-                        null);
-                }
+                socket.BeginSendTo(
+                    bytes,
+                    0,
+                    length,
+                    SocketFlags.None,
+                    EndPoint,
+                    HandleSendTo,
+                    null);
+            }
+            catch (NullReferenceException) { }
+            catch (ObjectDisposedException)
+            {
+                // Already disposed and disconnected...
+            }
+            catch (SocketException ex)
+            {
+                DisconnectInternal(HazelInternalErrors.SocketExceptionSend, "Could not send data as a SocketException occurred: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        ///     Synchronously writes the given bytes to the connection.
+        /// </summary>
+        /// <param name="bytes">The bytes to write.</param>
+        protected virtual void WriteBytesToConnectionSync(byte[] bytes, int length)
+        {
+            try
+            {
+                socket.SendTo(
+                    bytes,
+                    0,
+                    length,
+                    SocketFlags.None,
+                    EndPoint);
             }
             catch (NullReferenceException) { }
             catch (ObjectDisposedException)
@@ -249,7 +262,7 @@ namespace Hazel.Udp
 
             try
             {
-                this.WriteBytesToConnection(bytes, bytes.Length);
+                this.WriteBytesToConnectionSync(bytes, bytes.Length);
             }
             catch { }
 
@@ -259,8 +272,6 @@ namespace Hazel.Udp
         /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
-            this.sendSynchronously = true;
-
             if (disposing)
             {
                 SendDisconnect();

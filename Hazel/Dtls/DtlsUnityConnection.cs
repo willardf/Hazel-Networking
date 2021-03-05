@@ -274,8 +274,18 @@ namespace Hazel.Dtls
             this.queuedApplicationData.Clear();
         }
 
-        /// <inheritdoc />
-        protected override void WriteBytesToConnection(byte[] bytes, int length)
+        /// <summary>
+        /// Request from the application to write data to the DTLS
+        /// stream. If appropriate, returns a byte span to send to
+        /// the wire.
+        /// </summary>
+        /// <param name="bytes">Plaintext bytes to write</param>
+        /// <param name="length">Length of the bytes to write</param>
+        /// <returns>
+        /// Encrypted data to put on the wire if appropriate,
+        /// otherwise an empty span
+        /// </returns>
+        private ByteSpan WriteBytesToConnectionInternal(byte[] bytes, int length)
         {
             lock (this.syncRoot)
             {
@@ -286,7 +296,7 @@ namespace Hazel.Dtls
                     new ByteSpan(bytes, 0, length).CopyTo(copyOfSpan);
 
                     this.queuedApplicationData.Add(copyOfSpan);
-                    return;
+                    return ByteSpan.Empty;
                 }
 
                 // Send any queued application data now
@@ -313,7 +323,29 @@ namespace Hazel.Dtls
                     , ref outgoinRecord
                 );
 
-                base.WriteBytesToConnection(packet.GetUnderlyingArray(), packet.Length);
+                return packet;
+            }
+        }
+
+        /// <inheritdoc />
+        protected override void WriteBytesToConnection(byte[] bytes, int length)
+        {
+            ByteSpan wireData = this.WriteBytesToConnectionInternal(bytes, length);
+            if (wireData.Length > 0)
+            {
+                Debug.Assert(wireData.Offset ==  0, "Got a non-zero write data offset");
+                base.WriteBytesToConnection(wireData.GetUnderlyingArray(), wireData.Length);
+            }
+        }
+
+        /// <inheritdoc />
+        protected override void WriteBytesToConnectionSync(byte[] bytes, int length)
+        {
+            ByteSpan wireData = this.WriteBytesToConnectionInternal(bytes, length);
+            if (wireData.Length > 0)
+            {
+                Debug.Assert(wireData.Offset == 0, "Got a non-zero write data offset");
+                base.WriteBytesToConnectionSync(wireData.GetUnderlyingArray(), wireData.Length);
             }
         }
 
