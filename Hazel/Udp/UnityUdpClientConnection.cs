@@ -69,6 +69,32 @@ namespace Hazel.Udp
             }
         }
 
+        /// <summary>
+        ///     Synchronously writes the given bytes to the connection.
+        /// </summary>
+        /// <param name="bytes">The bytes to write.</param>
+        protected virtual void WriteBytesToConnectionSync(byte[] bytes, int length)
+        {
+            try
+            {
+                socket.SendTo(
+                    bytes,
+                    0,
+                    length,
+                    SocketFlags.None,
+                    EndPoint);
+            }
+            catch (NullReferenceException) { }
+            catch (ObjectDisposedException)
+            {
+                // Already disposed and disconnected...
+            }
+            catch (SocketException ex)
+            {
+                DisconnectInternal(HazelInternalErrors.SocketExceptionSend, "Could not send data as a SocketException occurred: " + ex.Message);
+            }
+        }
+
         private void HandleSendTo(IAsyncResult result)
         {
             try
@@ -236,7 +262,7 @@ namespace Hazel.Udp
 
             try
             {
-                this.WriteBytesToConnection(bytes, bytes.Length);
+                this.WriteBytesToConnectionSync(bytes, bytes.Length);
             }
             catch { }
 
