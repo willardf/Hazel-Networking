@@ -92,6 +92,8 @@ namespace Hazel.Dtls
 
             public readonly List<ByteSpan> QueuedApplicationDataMessage = new List<ByteSpan>();
 
+            public DateTime StartOfNegotiation;
+
             public PeerData()
             {
                 ByteSpan block = new byte[2 * Finished.Size];
@@ -126,6 +128,8 @@ namespace Hazel.Dtls
                 this.NextEpoch.ServerVerification = new byte[Finished.Size];
 
                 this.ConnectionId = connectionId;
+
+                this.StartOfNegotiation = DateTime.UtcNow;
             }
 
             public void Dispose()
@@ -1281,6 +1285,29 @@ namespace Hazel.Dtls
                     base.QueueRawData(packet, remoteEndPoint);
                 }
             }
+        }
+
+        /// <inheritdoc />
+        public override void DisconnectOldConnections(TimeSpan maxAge, MessageWriter disconnectMessage)
+        {
+            DateTime now = DateTime.UtcNow;
+            foreach (KeyValuePair<IPEndPoint, PeerData> kvp in this.existingPeers)
+            {
+                PeerData peer = kvp.Value;
+                lock(peer)
+                {
+                    if (peer.Epoch == 0 || peer.NextEpoch.State != HandshakeState.ExpectingHello)
+                    {
+                        TimeSpan negotiationAge = now - peer.StartOfNegotiation;
+                        if (negotiationAge > maxAge)
+                        {
+                            base.MarkConnectionAsStale(peer.ConnectionId);
+                        }
+                    }
+                }
+            }
+
+            base.DisconnectOldConnections(maxAge, disconnectMessage);
         }
 
         /// <summary>

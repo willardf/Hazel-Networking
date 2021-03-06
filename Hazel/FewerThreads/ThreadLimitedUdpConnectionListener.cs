@@ -151,7 +151,7 @@ namespace Hazel.Udp.FewerThreads
             }
         }
 
-        public void DisconnectOldConnections(TimeSpan maxAge, MessageWriter disconnectMessage)
+        public virtual void DisconnectOldConnections(TimeSpan maxAge, MessageWriter disconnectMessage)
         {
             var now = DateTime.UtcNow;
             foreach (var conn in this.allConnections.Values)
