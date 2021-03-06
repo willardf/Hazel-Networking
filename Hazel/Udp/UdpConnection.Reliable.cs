@@ -311,9 +311,6 @@ namespace Hazel.Udp
             //Get the ID form the packet
             id = (ushort)((b1 << 8) + b2);
 
-            //Send an acknowledgement
-            SendAck(id);
-
             /*
              * It gets a little complicated here (note the fact I'm actually using a multiline comment for once...)
              * 
@@ -338,6 +335,8 @@ namespace Hazel.Udp
              * 
              * So...
              */
+
+            bool result = true;
             
             lock (reliableDataPacketsMissing)
             {
@@ -381,12 +380,15 @@ namespace Hazel.Udp
                     //See if we're missing it, else this packet is a duplicate as so we return false
                     if (!reliableDataPacketsMissing.Remove(id))
                     {
-                        return false;
+                        result = false;
                     }
                 }
             }
 
-            return true;
+            // Send an acknowledgement
+            SendAck(id);
+
+            return result;
         }
 
         /// <summary>

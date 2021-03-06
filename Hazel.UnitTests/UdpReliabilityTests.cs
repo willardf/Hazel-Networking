@@ -46,6 +46,36 @@ namespace Hazel.UnitTests
             }
         }
 
+        [TestMethod]
+        public void TestAcksForNotReceivedMessages()
+        {
+            List<MessageReader> messagesReceived = new List<MessageReader>();
+
+            UdpConnectionTestHarness dut = new UdpConnectionTestHarness();
+            dut.DataReceived += evt =>
+            {
+                messagesReceived.Add(evt.Message);
+            };
+
+            MessageWriter data = MessageWriter.Get(SendOption.Reliable);
+
+            SetReliableId(data, 1);
+            dut.Test_Receive(data);
+
+            SetReliableId(data, 3);
+            dut.Test_Receive(data);
+
+            MessageReader ackPacket = dut.BytesSent[1];
+            // Must be ack
+            Assert.AreEqual(4, ackPacket.Length);
+
+            byte recentPackets = ackPacket.Buffer[3];
+            // Last packet was not received
+            Assert.AreEqual(0, recentPackets & 1);
+            // The packet before that was.
+            Assert.AreEqual(1, (recentPackets >> 1) & 1);
+        }
+
         private static void SetReliableId(MessageWriter data, int i)
         {
             ushort id = (ushort)i;
