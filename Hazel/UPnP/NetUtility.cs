@@ -95,12 +95,12 @@ namespace Hazel.UPnP
         /// <returns>An <see cref="IPAddress"/> for broadcasting.</returns>
         public static IPAddress GetBroadcastAddress()
         {
-            var properties = GetValidNetworkInterfaces().FirstOrDefault()?.GetIPProperties();
+            IPInterfaceProperties properties = GetValidNetworkInterfaces().FirstOrDefault()?.GetIPProperties();
             if (properties != null)
             {
                 foreach (UnicastIPAddressInformation unicastAddress in properties.UnicastAddresses)
                 {
-                    var ipAddress = GetBroadcastAddress(unicastAddress);
+                    IPAddress ipAddress = GetBroadcastAddress(unicastAddress);
                     if (ipAddress != null)
                     {
                         return ipAddress;
@@ -115,7 +115,8 @@ namespace Hazel.UPnP
         /// Gets the broadcast address for the given <paramref name="unicastAddress"/>.
         /// </summary>
         /// <param name="unicastAddress">A <see cref="UnicastIPAddressInformation"/></param>
-        /// <returns>An <see cref="IPAddress"/> for broadcasting.</returns>
+        /// <returns>An <see cref="IPAddress"/> for broadcasting, null if the <paramref name="unicastAddress"/>
+        /// is not an IPv4 address.</returns>
         public static IPAddress GetBroadcastAddress(UnicastIPAddressInformation unicastAddress)
         {
             if (unicastAddress != null && unicastAddress.Address != null && unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork)

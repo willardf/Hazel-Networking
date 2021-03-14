@@ -21,17 +21,16 @@ namespace Hazel.Udp
 
             foreach (var addressInformation in NetUtility.GetAddressesFromNetworkInterfaces(AddressFamily.InterNetwork))
             {
-                var socket = CreateSocket(new IPEndPoint(addressInformation.Address, 0));
-                var broadcast = NetUtility.GetBroadcastAddress(addressInformation);
+                Socket socket = CreateSocket(new IPEndPoint(addressInformation.Address, 0));
+                IPAddress broadcast = NetUtility.GetBroadcastAddress(addressInformation);
 
                 this.socketBroadcasts.Add(new SocketBroadcast(socket, new IPEndPoint(broadcast, port)));
             }
             if (socketBroadcasts.Count == 0)
             {
-                var socket = CreateSocket(new IPEndPoint(IPAddress.Any, 0));
-                var broadcast = NetUtility.GetBroadcastAddress();
+                Socket socket = CreateSocket(new IPEndPoint(IPAddress.Any, 0));
 
-                this.socketBroadcasts.Add(new SocketBroadcast(socket, new IPEndPoint(broadcast, port)));
+                this.socketBroadcasts.Add(new SocketBroadcast(socket, new IPEndPoint(IPAddress.Broadcast, port)));
             }
         }
 
@@ -68,7 +67,7 @@ namespace Hazel.Udp
             {
                 try
                 {
-                    var socket = socketBroadcast.Socket;
+                    Socket socket = socketBroadcast.Socket;
                     socket.BeginSendTo(data, 0, data.Length, SocketFlags.None, socketBroadcast.Broadcast, this.FinishSendTo, socket);
                 }
                 catch (Exception e)
@@ -96,7 +95,7 @@ namespace Hazel.Udp
         {
             foreach (SocketBroadcast socketBroadcast in this.socketBroadcasts)
             {
-                var socket = socketBroadcast.Socket;
+                Socket socket = socketBroadcast.Socket;
                 if (socket != null)
                 {
                     try { socket.Shutdown(SocketShutdown.Both); } catch { }
