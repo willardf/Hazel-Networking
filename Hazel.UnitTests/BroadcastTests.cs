@@ -1,8 +1,6 @@
 ﻿using Hazel.Udp;
-using Hazel.UPnP;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
-using System.Net.NetworkInformation;
 using System.Threading;
 
 namespace Hazel.UnitTests

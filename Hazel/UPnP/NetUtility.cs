@@ -36,6 +36,7 @@ namespace Hazel.UPnP
                         // Yes it does, return this network interface.
                         yield return adapter;
                         best = null;
+                        break;
                     }
                 }
             }
