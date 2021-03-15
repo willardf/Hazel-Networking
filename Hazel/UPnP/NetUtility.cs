@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -9,11 +8,13 @@ namespace Hazel.UPnP
 {
     internal class NetUtility
     {
-        private static IEnumerable<NetworkInterface> GetValidNetworkInterfaces()
+        private static IList<NetworkInterface> GetValidNetworkInterfaces()
         {
             var nics = NetworkInterface.GetAllNetworkInterfaces();
             if (nics == null || nics.Length < 1)
-                yield break;
+                return new NetworkInterface[0];
+
+            var validInterfaces = new List<NetworkInterface>(nics.Length);
 
             NetworkInterface best = null;
             foreach (NetworkInterface adapter in nics)
@@ -33,25 +34,28 @@ namespace Hazel.UPnP
                 {
                     if (unicastAddress != null && unicastAddress.Address != null)
                     {
-                        // Yes it does, return this network interface.
-                        yield return adapter;
-                        best = null;
+                        // Yes it does, add this network interface.
+                        validInterfaces.Add(adapter);
                         break;
                     }
                 }
             }
 
-            if (best != null)
-                yield return best;
+            if (validInterfaces.Count == 0 && best != null)
+                validInterfaces.Add(best);
+
+            return validInterfaces;
         }
 
         /// <summary>
         /// Gets the addresses from all active network interfaces, but at most one per interface.
         /// </summary>
         /// <param name="addressFamily">The <see cref="AddressFamily"/> of the addresses to return</param>
-        /// <returns>An <see cref="IEnumerable{T}"/> of <see cref="UnicastIPAddressInformation"/>.</returns>
-        public static IEnumerable<UnicastIPAddressInformation> GetAddressesFromNetworkInterfaces(AddressFamily addressFamily)
+        /// <returns>An <see cref="ICollection{T}"/> of <see cref="UnicastIPAddressInformation"/>.</returns>
+        public static ICollection<UnicastIPAddressInformation> GetAddressesFromNetworkInterfaces(AddressFamily addressFamily)
         {
+            var unicastAddresses = new List<UnicastIPAddressInformation>();
+
             foreach (NetworkInterface adapter in GetValidNetworkInterfaces())
             {
                 IPInterfaceProperties properties = adapter.GetIPProperties();
@@ -59,11 +63,13 @@ namespace Hazel.UPnP
                 {
                     if (unicastAddress != null && unicastAddress.Address != null && unicastAddress.Address.AddressFamily == addressFamily)
                     {
-                        yield return unicastAddress;
+                        unicastAddresses.Add(unicastAddress);
                         break;
                     }
                 }
             }
+
+            return unicastAddresses;
         }
 
         /// <summary>
@@ -71,7 +77,12 @@ namespace Hazel.UPnP
         /// </summary>
         public static IPAddress GetMyAddress(out IPAddress mask)
         {
-            IPInterfaceProperties properties = GetValidNetworkInterfaces().FirstOrDefault()?.GetIPProperties();
+            var networkInterfaces = GetValidNetworkInterfaces();
+            IPInterfaceProperties properties = null;
+
+            if (networkInterfaces.Count > 0)
+                properties = networkInterfaces[0]?.GetIPProperties();
+
             if (properties != null)
             {
                 foreach (UnicastIPAddressInformation unicastAddress in properties.UnicastAddresses)
@@ -95,7 +106,12 @@ namespace Hazel.UPnP
         /// <returns>An <see cref="IPAddress"/> for broadcasting.</returns>
         public static IPAddress GetBroadcastAddress()
         {
-            IPInterfaceProperties properties = GetValidNetworkInterfaces().FirstOrDefault()?.GetIPProperties();
+            var networkInterfaces = GetValidNetworkInterfaces();
+            IPInterfaceProperties properties = null;
+
+            if (networkInterfaces.Count > 0)
+                properties = networkInterfaces[0]?.GetIPProperties();
+
             if (properties != null)
             {
                 foreach (UnicastIPAddressInformation unicastAddress in properties.UnicastAddresses)
