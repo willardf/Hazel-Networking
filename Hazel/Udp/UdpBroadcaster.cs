@@ -1,6 +1,5 @@
 ﻿using Hazel.UPnP;
 using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -9,7 +8,7 @@ namespace Hazel.Udp
 {
     public class UdpBroadcaster : IDisposable
     {
-        private List<SocketBroadcast> socketBroadcasts;
+        private SocketBroadcast[] socketBroadcasts;
         private byte[] data;
         private Action<string> logger;
 
@@ -17,20 +16,24 @@ namespace Hazel.Udp
         public UdpBroadcaster(int port, Action<string> logger = null)
         {
             this.logger = logger;
-            this.socketBroadcasts = new List<SocketBroadcast>();
 
-            foreach (var addressInformation in NetUtility.GetAddressesFromNetworkInterfaces(AddressFamily.InterNetwork))
+            var addresses = NetUtility.GetAddressesFromNetworkInterfaces(AddressFamily.InterNetwork);
+            this.socketBroadcasts = new SocketBroadcast[addresses.Count > 0 ? addresses.Count : 1];
+
+            int count = 0;
+            foreach (var addressInformation in addresses)
             {
                 Socket socket = CreateSocket(new IPEndPoint(addressInformation.Address, 0));
                 IPAddress broadcast = NetUtility.GetBroadcastAddress(addressInformation);
 
-                this.socketBroadcasts.Add(new SocketBroadcast(socket, new IPEndPoint(broadcast, port)));
+                this.socketBroadcasts[count] = new SocketBroadcast(socket, new IPEndPoint(broadcast, port));
+                count++;
             }
-            if (socketBroadcasts.Count == 0)
+            if (count == 0)
             {
                 Socket socket = CreateSocket(new IPEndPoint(IPAddress.Any, 0));
 
-                this.socketBroadcasts.Add(new SocketBroadcast(socket, new IPEndPoint(IPAddress.Broadcast, port)));
+                this.socketBroadcasts[0] = new SocketBroadcast(socket, new IPEndPoint(IPAddress.Broadcast, port));
             }
         }
 
@@ -93,17 +96,20 @@ namespace Hazel.Udp
         ///
         public void Dispose()
         {
-            foreach (SocketBroadcast socketBroadcast in this.socketBroadcasts)
+            if (this.socketBroadcasts != null)
             {
-                Socket socket = socketBroadcast.Socket;
-                if (socket != null)
+                foreach (SocketBroadcast socketBroadcast in this.socketBroadcasts)
                 {
-                    try { socket.Shutdown(SocketShutdown.Both); } catch { }
-                    try { socket.Close(); } catch { }
-                    try { socket.Dispose(); } catch { }
+                    Socket socket = socketBroadcast.Socket;
+                    if (socket != null)
+                    {
+                        try { socket.Shutdown(SocketShutdown.Both); } catch { }
+                        try { socket.Close(); } catch { }
+                        try { socket.Dispose(); } catch { }
+                    }
                 }
+                Array.Clear(this.socketBroadcasts, 0, this.socketBroadcasts.Length);
             }
-            this.socketBroadcasts.Clear();
         }
 
         private struct SocketBroadcast
