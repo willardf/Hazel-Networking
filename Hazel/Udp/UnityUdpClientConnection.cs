@@ -44,8 +44,23 @@ namespace Hazel.Udp
             base.ManageReliablePackets();
         }
 
+
         /// <inheritdoc />
         protected override void WriteBytesToConnection(byte[] bytes, int length)
+        {
+#if DEBUG
+            if (TestLagMs > 0)
+            {
+                ThreadPool.QueueUserWorkItem(a => { Thread.Sleep(this.TestLagMs); WriteBytesToConnectionReal(bytes, length); });
+            }
+            else
+#endif
+            {
+                WriteBytesToConnectionReal(bytes, length);
+            }
+        }
+
+        private void WriteBytesToConnectionReal(byte[] bytes, int length)
         {
             try
             {
@@ -194,6 +209,13 @@ namespace Hazel.Udp
         /// <param name="result">The asyncronous operation's result.</param>
         void ReadCallback(IAsyncResult result)
         {
+#if DEBUG
+            if (this.TestLagMs > 0)
+            {
+                Thread.Sleep(this.TestLagMs);
+            }
+#endif
+
             var msg = (MessageReader)result.AsyncState;
 
             try
@@ -235,6 +257,16 @@ namespace Hazel.Udp
                 //If the socket's been disposed then we can just end there.
                 return;
             }
+
+#if DEBUG
+            if (this.TestDropRate > 0)
+            {
+                if ((this.testDropCount++ % this.TestDropRate) == 0)
+                {
+                    return;
+                }
+            }
+#endif
 
             HandleReceive(msg, msg.Length);
         }
