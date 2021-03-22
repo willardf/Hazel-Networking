@@ -9,6 +9,36 @@ namespace Hazel.UnitTests
     public class UdpReliabilityTests
     {
         [TestMethod]
+        public void TestReliableWrapOffByOne()
+        {
+            List<MessageReader> messagesReceived = new List<MessageReader>();
+
+            UdpConnectionTestHarness dut = new UdpConnectionTestHarness();
+            dut.DataReceived += evt =>
+            {
+                messagesReceived.Add(evt.Message);
+            };
+
+            MessageWriter data = MessageWriter.Get(SendOption.Reliable);
+
+            Assert.AreEqual(ushort.MaxValue, dut.ReliableReceiveLast);
+                        
+            SetReliableId(data, 10);
+            dut.Test_Receive(data);
+
+            // This message may not be received if there is an off-by-one error when marking missed pkts up to 10.
+            SetReliableId(data, 9); 
+            dut.Test_Receive(data);
+
+            // Both messages should be received.
+            Assert.AreEqual(2, messagesReceived.Count);
+            messagesReceived.Clear();
+
+            Assert.AreEqual(2, dut.BytesSent.Count);
+            dut.BytesSent.Clear();
+        }
+
+        [TestMethod]
         public void TestThatAllMessagesAreReceived()
         {
             List<MessageReader> messagesReceived = new List<MessageReader>();

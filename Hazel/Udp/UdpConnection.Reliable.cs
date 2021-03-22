@@ -56,7 +56,7 @@ namespace Hazel.Udp
         /// <summary>
         ///     The packet id that was received last.
         /// </summary>
-        private volatile ushort reliableReceiveLast = ushort.MaxValue;
+        protected volatile ushort reliableReceiveLast = ushort.MaxValue;
 
         private object PingLock = new object();
 
@@ -364,7 +364,7 @@ namespace Hazel.Udp
                     else
                     {
                         int cnt = (ushort.MaxValue - reliableReceiveLast) + id;
-                        for (ushort i = 1; i < cnt; ++i)
+                        for (ushort i = 1; i <= cnt; ++i)
                         {
                             reliableDataPacketsMissing.Add((ushort)(i + reliableReceiveLast));
                         }
