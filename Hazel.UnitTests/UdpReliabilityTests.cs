@@ -51,7 +51,7 @@ namespace Hazel.UnitTests
 
             MessageWriter data = MessageWriter.Get(SendOption.Reliable);
 
-            for (int i = 1; i < ushort.MaxValue * 2; ++i)
+            for (int i = 0; i < ushort.MaxValue * 2; ++i)
             {
                 // Send a new message, it should be received and ack'd
                 SetReliableId(data, i);
