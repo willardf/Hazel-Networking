@@ -229,6 +229,13 @@ namespace Hazel.Udp
                 DisconnectInternal(HazelInternalErrors.SocketExceptionReceive, "Socket exception while reading data: " + e.Message);
                 return;
             }
+            catch (ObjectDisposedException)
+            {
+                // Weirdly, it seems that this method can be called twice on the same AsyncState when object is disposed...
+                // So this just keeps us from hitting Duplicate Add errors at the risk of if this is a platform
+                // specific bug, we leak a MessageReader while the socket is disposing. Not a bad trade off.
+                return;
+            }
             catch (Exception)
             {
                 msg.Recycle();
