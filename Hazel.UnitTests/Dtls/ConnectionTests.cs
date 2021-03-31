@@ -2,6 +2,7 @@ using Hazel.Dtls;
 using Hazel.Udp;
 using Hazel.Udp.FewerThreads;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
 using System.Net;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
@@ -146,6 +147,83 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 Assert.IsTrue(serverConnected);
                 Assert.IsTrue(clientDisconnected);
                 Assert.IsFalse(serverDisconnected);
+            }
+        }
+
+        class MalformedDTLSListener : DtlsConnectionListener
+        {
+            public MalformedDTLSListener(int numWorkers, IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
+                : base(numWorkers, endPoint, logger, ipMode)
+            {
+            }
+
+            public void InjectPacket(ByteSpan packet, IPEndPoint peerAddress, ConnectionId connectionId)
+            {
+                MessageReader reader = MessageReader.GetSized(packet.Length);
+                reader.Length = packet.Length;
+                Array.Copy(packet.GetUnderlyingArray(), packet.Offset, reader.Buffer, reader.Offset, packet.Length);
+
+                this.ProcessIncomingMessageFromOtherThread(reader, peerAddress, connectionId);
+            }
+
+            protected override void ProcessIncomingMessageFromOtherThread(MessageReader reader, IPEndPoint peerAddress, ConnectionId connectionId)
+            {
+                base.ProcessIncomingMessageFromOtherThread(reader, peerAddress, connectionId);
+            }
+        }
+
+        [TestMethod]
+        public void TestMalformedApplicationData()
+        {
+            IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 27510);
+
+            IPEndPoint connectionEndPoint = ep;
+            DtlsConnectionListener.ConnectionId connectionId = new ThreadLimitedUdpConnectionListener.ConnectionId();
+
+            Semaphore signal = new Semaphore(0, int.MaxValue);
+
+            using (MalformedDTLSListener listener = new MalformedDTLSListener(2, new IPEndPoint(IPAddress.Any, ep.Port), new TestLogger()))
+            using (DtlsUnityConnection connection = new DtlsUnityConnection(new TestLogger(), ep))
+            {
+                listener.SetCertificate(GetCertificateForServer());
+                connection.SetValidServerCertificates(GetCertificateForClient());
+
+                listener.NewConnection += (evt) =>
+                {
+                    connectionEndPoint = evt.Connection.EndPoint;
+                    connectionId = ((ThreadLimitedUdpServerConnection)evt.Connection).ConnectionId;
+
+                    signal.Release();
+                    evt.Connection.Disconnected += (o, et) => {
+                    };
+                };
+                connection.Disconnected += (o, evt) => {
+                    signal.Release();
+                };
+
+                listener.Start();
+                connection.Connect();
+
+                // wait for the client to connect
+                signal.WaitOne(10);
+
+                ByteSpan data = new byte[5] { 0x01, 0x02, 0x03, 0x04, 0x05 };
+
+                Record record = new Record();
+                record.ContentType = ContentType.ApplicationData;
+                record.Epoch = 1;
+                record.SequenceNumber = 10;
+                record.Length = (ushort)data.Length;
+
+                ByteSpan encoded = new byte[Record.Size + data.Length];
+                record.Encode(encoded);
+                data.CopyTo(encoded.Slice(Record.Size));
+
+                listener.InjectPacket(encoded, connectionEndPoint, connectionId);
+
+                // wait for the client to disconnect
+                listener.Dispose();
+                signal.WaitOne(100);
             }
         }
     }
