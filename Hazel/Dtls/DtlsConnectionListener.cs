@@ -358,6 +358,12 @@ namespace Hazel.Dtls
 
                     // Validate record authenticity
                     int decryptedSize = peer.CurrentEpoch.RecordProtection.GetDecryptedSize(recordPayload.Length);
+                    if (decryptedSize < 0)
+                    {
+                        this.Logger.WriteInfo($"Dropping malformed record: Length {recordPayload.Length} Decrypted length: {decryptedSize}");
+                        continue;
+                    }
+
                     ByteSpan decryptedPayload = recordPayload.ReuseSpanIfPossible(decryptedSize);
 
                     if (!peer.CurrentEpoch.RecordProtection.DecryptCiphertextFromClient(decryptedPayload, recordPayload, ref record))
