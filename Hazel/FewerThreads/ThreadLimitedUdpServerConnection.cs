@@ -20,7 +20,7 @@ namespace Hazel.Udp.FewerThreads
         /// </remarks>
         public ThreadLimitedUdpConnectionListener Listener { get; private set; }
 
-        private ThreadLimitedUdpConnectionListener.ConnectionId ConnectionId;
+        public ThreadLimitedUdpConnectionListener.ConnectionId ConnectionId { get; private set; }
 
         /// <summary>
         ///     Creates a UdpConnection for the virtual connection to the endpoint.
