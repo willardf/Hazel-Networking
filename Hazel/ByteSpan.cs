@@ -54,9 +54,13 @@ namespace Hazel
                 {
                     throw new ArgumentException("Invalid offset", nameof(offset));
                 }
-                if (length < 0 || (offset + length) > array.Length)
+                if (length < 0)
                 {
-                    throw new ArgumentException("Invalid length", nameof(length));
+                    throw new ArgumentException($"Invalid length: {length}", nameof(length));
+                }
+                if ((offset + length) > array.Length)
+                {
+                    throw new ArgumentException($"Invalid length. Length: {length} Offset: {offset} Array size: {array.Length}", nameof(length));
                 }
 
                 this.array_ = array;
