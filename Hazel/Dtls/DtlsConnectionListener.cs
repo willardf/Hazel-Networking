@@ -318,7 +318,7 @@ namespace Hazel.Dtls
                             }
                             else if (handshake.MessageType != HandshakeType.ClientHello)
                             {
-                                this.Logger.WriteError($"Dropping non-ClientHello re-negotiation Handshake from `{peerAddress}`");
+                                this.Logger.WriteVerbose($"Dropping non-ClientHello re-negotiation Handshake from `{peerAddress}`");
                                 continue;
                             }
                             else if (handshakePayload.Length < handshake.Length)
@@ -333,7 +333,7 @@ namespace Hazel.Dtls
                             continue;
                         }
 
-                        this.Logger.WriteError($"Dropping bad-epoch record from `{peerAddress}` RecordEpoch({record.Epoch}) CurrentEpoch({peer.Epoch})");
+                        this.Logger.WriteVerbose($"Dropping bad-epoch record from `{peerAddress}` RecordEpoch({record.Epoch}) CurrentEpoch({peer.Epoch})");
                         continue;
                     }
 
@@ -368,7 +368,7 @@ namespace Hazel.Dtls
 
                     if (!peer.CurrentEpoch.RecordProtection.DecryptCiphertextFromClient(decryptedPayload, recordPayload, ref record))
                     {
-                        this.Logger.WriteError($"Dropping non-authentic record from `{peerAddress}`");
+                        this.Logger.WriteVerbose($"Dropping non-authentic record from `{peerAddress}`");
                         return;
                     }
 

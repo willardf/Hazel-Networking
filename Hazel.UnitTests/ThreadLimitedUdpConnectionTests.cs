@@ -233,7 +233,7 @@ namespace Hazel.UnitTests
         public void MixedConnectionTest()
         {
             
-            using (ThreadLimitedUdpConnectionListener listener2 = this.CreateListener(4, new IPEndPoint(IPAddress.IPv6Any, 4296), new ConsoleLogger(), IPMode.IPv6))
+            using (ThreadLimitedUdpConnectionListener listener2 = this.CreateListener(4, new IPEndPoint(IPAddress.IPv6Any, 4296), new ConsoleLogger(true), IPMode.IPv6))
             {
                 listener2.Start();
 

@@ -15,6 +15,18 @@ namespace Hazel.UnitTests
             this.prefix = prefix;
         }
 
+        public void WriteVerbose(string msg)
+        {
+            if (string.IsNullOrEmpty(this.prefix))
+            {
+                Console.WriteLine($"[VERBOSE] {msg}");
+            }
+            else
+            {
+                Console.WriteLine($"[{this.prefix}][VERBOSE] {msg}");
+            }
+        }
+
         public void WriteError(string msg)
         {
             if (string.IsNullOrEmpty(this.prefix))

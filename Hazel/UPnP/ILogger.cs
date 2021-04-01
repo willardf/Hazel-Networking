@@ -8,6 +8,7 @@ namespace Hazel
 {
     public interface ILogger
     {
+        void WriteVerbose(string msg);
         void WriteError(string msg);
         void WriteInfo(string msg);
     }
@@ -15,6 +16,10 @@ namespace Hazel
     public class NullLogger : ILogger
     {
         public static readonly NullLogger Instance = new NullLogger();
+
+        public void WriteVerbose(string msg)
+        {
+        }
 
         public void WriteError(string msg)
         {
@@ -27,6 +32,20 @@ namespace Hazel
 
     public class ConsoleLogger : ILogger
     {
+        private bool verbose;
+        public ConsoleLogger(bool verbose)
+        {
+            this.verbose = verbose;
+        }
+
+        public void WriteVerbose(string msg)
+        {
+            if (this.verbose)
+            {
+                Console.WriteLine($"{DateTime.Now} [VERBOSE] {msg}");
+            }
+        }
+
         public void WriteError(string msg)
         {
             Console.WriteLine($"{DateTime.Now} [ERROR] {msg}");
