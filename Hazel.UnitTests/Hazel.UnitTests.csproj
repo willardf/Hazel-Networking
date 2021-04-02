@@ -66,6 +66,7 @@
     <Compile Include="Dtls\ConnectionTests.cs" />
     <Compile Include="Dtls\X25519EcdheRsaSha256Tests.cs" />
     <Compile Include="MessageReaderTests.cs" />
+    <Compile Include="SocketCapture.cs" />
     <Compile Include="StatisticsTests.cs" />
     <Compile Include="TestHelper.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
