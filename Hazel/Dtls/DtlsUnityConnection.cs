@@ -199,6 +199,7 @@ namespace Hazel.Dtls
             lock (this.syncRoot)
             {
                 this.ResetConnectionState();
+                this.nextEpoch.ClientRandom.FillWithRandom(this.random);
                 this.SendClientHello();
             }
 
@@ -577,6 +578,7 @@ namespace Hazel.Dtls
                         helloVerifyRequest.Cookie.CopyTo(this.nextEpoch.Cookie);
 
                         // Restart the handshake
+                        this.nextEpoch.ClientRandom.FillWithRandom(this.random);
                         this.SendClientHello();
                         break;
 
@@ -882,7 +884,6 @@ namespace Hazel.Dtls
         {
             // Reset our verification stream
             this.nextEpoch.VerificationStream.SetLength(0);
-            this.nextEpoch.ClientRandom.FillWithRandom(this.random);
 
             // Describe our ClientHello flight
             ClientHello clientHello = new ClientHello();
