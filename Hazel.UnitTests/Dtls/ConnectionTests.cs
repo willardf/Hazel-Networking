@@ -226,5 +226,78 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 signal.WaitOne(100);
             }
         }
+
+        [TestMethod]
+        public void TestResentHandshakeConnects()
+        {
+            IPEndPoint captureEndPoint = new IPEndPoint(IPAddress.Loopback, 27511);
+            IPEndPoint listenerEndPoint = new IPEndPoint(IPAddress.Loopback, 27510);
+
+            bool serverConnected = false;
+            bool serverDisconnected = false;
+            bool clientDisconnected = false;
+
+            Semaphore signal = new Semaphore(0, int.MaxValue);
+
+            using (SocketCapture capture = new SocketCapture(captureEndPoint, listenerEndPoint))
+            using (DtlsConnectionListener listener = new DtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, listenerEndPoint.Port), new TestLogger()))
+            using (DtlsUnityConnection connection = new DtlsUnityConnection(new TestLogger(), captureEndPoint))
+            {
+                Semaphore listenerToConnectionThrottle = new Semaphore(0, int.MaxValue);
+                capture.SendToLocalSemaphore = listenerToConnectionThrottle;
+                Thread throttleThread = new Thread(() => {
+                    // HelloVerifyRequest
+                    listenerToConnectionThrottle.Release(1);
+                    // ServerHello, Server Certificate
+                    listenerToConnectionThrottle.Release(1);
+
+                    // Trigger a resend of ServerHello, ServerCertificate
+                    Thread.Sleep(1000);
+                    listenerToConnectionThrottle.Release(1);
+
+
+                    // ServerKeyExchange, ServerHelloDone
+                    listenerToConnectionThrottle.Release(1);
+
+                    // Trigger a resend of ServerKeyExchange, ServerHelloDone
+                    Thread.Sleep(1000);
+                    listenerToConnectionThrottle.Release(1);
+
+                    capture.SendToLocalSemaphore = null;
+                });
+                throttleThread.Start();
+
+                listener.SetCertificate(GetCertificateForServer());
+                connection.SetValidServerCertificates(GetCertificateForClient());
+
+                listener.NewConnection += (evt) =>
+                {
+                    serverConnected = true;
+                    signal.Release();
+                    evt.Connection.Disconnected += (o, et) => {
+                        serverDisconnected = true;
+                    };
+                };
+                connection.Disconnected += (o, evt) => {
+                    clientDisconnected = true;
+                    signal.Release();
+                };
+
+                listener.Start();
+                connection.Connect();
+
+                // wait for the client to connect
+                signal.WaitOne(10);
+
+                listener.Dispose();
+
+                // wait for the client to disconnect
+                signal.WaitOne(100);
+
+                Assert.IsTrue(serverConnected);
+                Assert.IsTrue(clientDisconnected);
+                Assert.IsFalse(serverDisconnected);
+            }
+        }
     }
 }
