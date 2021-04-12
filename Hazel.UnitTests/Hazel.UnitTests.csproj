@@ -61,6 +61,7 @@
   <ItemGroup>
     <Compile Include="BroadcastTests.cs" />
     <Compile Include="Crypto\AesGcmTest.cs" />
+    <Compile Include="Crypto\Sha256Tests.cs" />
     <Compile Include="Crypto\X25519Tests.cs" />
     <Compile Include="Dtls\AesGcmRecordProtectedTests.cs" />
     <Compile Include="Dtls\ConnectionTests.cs" />
