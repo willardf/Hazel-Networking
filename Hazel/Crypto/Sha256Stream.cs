@@ -1,5 +1,4 @@
 ﻿using System;
-using System.IO;
 using System.Security.Cryptography;
 
 namespace Hazel.Crypto
@@ -14,7 +13,12 @@ namespace Hazel.Crypto
         /// </summary>
         public const int DigestSize = 32;
 
-        private MemoryStream innerStream = new MemoryStream();
+        private SHA256 hash = SHA256.Create();
+
+        struct EmptyArray
+        {
+            public static readonly byte[] Value = new byte[0];
+        }
 
         /// <summary>
         /// Create a new instance of a SHA256 stream
@@ -28,12 +32,8 @@ namespace Hazel.Crypto
         /// </summary>
         public void Dispose()
         {
-            if  (this.innerStream != null)
-            {
-                this.Reset();
-                this.innerStream.Dispose();
-                this.innerStream = null;
-            }
+            this.hash?.Dispose();
+            this.hash = null;
 
             GC.SuppressFinalize(this);
         }
@@ -43,10 +43,8 @@ namespace Hazel.Crypto
         /// </summary>
         public void Reset()
         {
-            ByteSpan buffer = this.innerStream.GetBuffer();
-            buffer.SecureClear();
-
-            this.innerStream.SetLength(0);
+            this.hash?.Dispose();
+            this.hash = SHA256.Create();
         }
 
         /// <summary>
@@ -54,7 +52,11 @@ namespace Hazel.Crypto
         /// </summary>
         public void AddData(ByteSpan data)
         {
-            this.innerStream.Write(data.GetUnderlyingArray(), data.Offset, data.Length);
+            while (data.Length > 0)
+            {
+                int offset = this.hash.TransformBlock(data.GetUnderlyingArray(), data.Offset, data.Length, null, 0);
+                data = data.Slice(offset);
+            }
         }
 
         /// <summary>
@@ -70,12 +72,8 @@ namespace Hazel.Crypto
                 throw new ArgumentException($"Expected a span of {DigestSize} bytes. Got a span of {output.Length} bytes", nameof(output));
             }
 
-            using (SHA256 sha256 = SHA256.Create())
-            {
-                this.innerStream.Position = 0;
-                ByteSpan digest = sha256.ComputeHash(this.innerStream);
-                digest.CopyTo(output);
-            }
+            this.hash.TransformFinalBlock(EmptyArray.Value, 0, 0);
+            new ByteSpan(this.hash.Hash).CopyTo(output);
         }
     }
 }
