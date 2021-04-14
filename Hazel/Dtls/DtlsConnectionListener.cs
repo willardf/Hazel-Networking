@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Net;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
@@ -70,7 +69,7 @@ namespace Hazel.Dtls
             public ByteSpan ClientRandom;
             public ByteSpan ServerRandom;
 
-            public MemoryStream VerificationStream;
+            public Sha256Stream VerificationStream;
 
             public ByteSpan ClientVerification;
             public ByteSpan ServerVerification;
@@ -123,7 +122,7 @@ namespace Hazel.Dtls
                 this.NextEpoch.RecordProtection = null;
                 this.NextEpoch.ClientRandom = new byte[Random.Size];
                 this.NextEpoch.ServerRandom = new byte[Random.Size];
-                this.NextEpoch.VerificationStream = new MemoryStream();
+                this.NextEpoch.VerificationStream = new Sha256Stream();
                 this.NextEpoch.ClientVerification = new byte[Finished.Size];
                 this.NextEpoch.ServerVerification = new byte[Finished.Size];
 
@@ -428,7 +427,7 @@ namespace Hazel.Dtls
                             peer.NextEpoch.Handshake = null;
                             peer.NextEpoch.NextOutgoingSequence = 1;
                             peer.NextEpoch.RecordProtection = null;
-                            peer.NextEpoch.VerificationStream.SetLength(0);
+                            peer.NextEpoch.VerificationStream.Reset();
                             peer.NextEpoch.ClientVerification.SecureClear();
                             peer.NextEpoch.ServerVerification.SecureClear();
                             break;
@@ -534,11 +533,7 @@ namespace Hazel.Dtls
 
                         // Record incoming ClientKeyExchange message
                         // to verification stream
-                        peer.NextEpoch.VerificationStream.Write(
-                            originalMessage.GetUnderlyingArray()
-                            , originalMessage.Offset
-                            , originalMessage.Length
-                        );
+                        peer.NextEpoch.VerificationStream.AddData(originalMessage);
 
                         ByteSpan randomSeed = new byte[2 * Random.Size];
                         peer.NextEpoch.ClientRandom.CopyTo(randomSeed);
@@ -570,12 +565,8 @@ namespace Hazel.Dtls
                         }
 
                         // Generate verification signatures
-                        ByteSpan handshakeStreamHash;
-                        using (SHA256 sha256 = SHA256.Create())
-                        {
-                            peer.NextEpoch.VerificationStream.Position = 0;
-                            handshakeStreamHash = sha256.ComputeHash(peer.NextEpoch.VerificationStream);
-                        }
+                        ByteSpan handshakeStreamHash = new byte[Sha256Stream.DigestSize];
+                        peer.NextEpoch.VerificationStream.CalculateHash(handshakeStreamHash);
 
                         PrfSha256.ExpandSecret(
                             peer.NextEpoch.ClientVerification
@@ -860,10 +851,11 @@ namespace Hazel.Dtls
 
                 // Copy the original ClientHello
                 // handshake to our verification stream
-                peer.NextEpoch.VerificationStream.Write(
-                    originalMessage.GetUnderlyingArray()
-                    , originalMessage.Offset
-                    , Handshake.Size + (int)handshake.Length
+                peer.NextEpoch.VerificationStream.AddData(
+                    originalMessage.Slice(
+                        0
+                      , Handshake.Size + (int)handshake.Length
+                    )
                 );
             }
 
@@ -961,18 +953,10 @@ namespace Hazel.Dtls
                 certificateHandshake.Encode(writer);
                 writer = writer.Slice(Handshake.Size);
 
-                peer.NextEpoch.VerificationStream.Write(
-                    packet.GetUnderlyingArray()
-                    , packet.Offset
-                    , packet.Length
-                );
+                peer.NextEpoch.VerificationStream.AddData(packet);
                 foreach (ByteSpan span in this.encodedCertificates)
                 {
-                    peer.NextEpoch.VerificationStream.Write(
-                        span.GetUnderlyingArray()
-                        , span.Offset
-                        , span.Length
-                    );
+                    peer.NextEpoch.VerificationStream.AddData(span);
                 }
             }
 
@@ -1050,11 +1034,12 @@ namespace Hazel.Dtls
             // Record record payload for verification
             if (recordMessagesForVerifyData)
             {
-                peer.NextEpoch.VerificationStream.Write(
-                    packet.GetUnderlyingArray()
-                    , packet.Offset + Record.Size
-                    , finalRecordPayloadSize
-                 );
+                peer.NextEpoch.VerificationStream.AddData(
+                    packet.Slice(
+                          packet.Offset + Record.Size
+                        , finalRecordPayloadSize
+                    )
+                );
             }
 
             // Protect final record of the flight

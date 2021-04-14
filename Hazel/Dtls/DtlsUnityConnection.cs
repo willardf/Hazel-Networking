@@ -3,7 +3,6 @@ using Hazel.Udp;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Net;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
@@ -69,7 +68,7 @@ namespace Hazel.Dtls
             public IRecordProtection RecordProtection;
             public IHandshakeCipherSuite Handshake;
             public ByteSpan Cookie;
-            public MemoryStream VerificationStream;
+            public Sha256Stream VerificationStream;
             public RSA ServerPublicKey;
 
             public ByteSpan ClientRandom;
@@ -178,7 +177,7 @@ namespace Hazel.Dtls
             this.nextEpoch.Handshake = null;
             this.nextEpoch.Cookie = ByteSpan.Empty;
             this.nextEpoch.VerificationStream?.Dispose();
-            this.nextEpoch.VerificationStream = new MemoryStream();
+            this.nextEpoch.VerificationStream = new Sha256Stream();
             this.nextEpoch.ServerPublicKey = null;
             this.nextEpoch.ServerRandom.SecureClear();
             this.nextEpoch.ClientRandom.SecureClear();
@@ -480,7 +479,7 @@ namespace Hazel.Dtls
                         this.nextEpoch.RecordProtection = null;
                         this.nextEpoch.Handshake?.Dispose();
                         this.nextEpoch.Cookie = ByteSpan.Empty;
-                        this.nextEpoch.VerificationStream.SetLength(0);
+                        this.nextEpoch.VerificationStream.Reset();
                         this.nextEpoch.ServerPublicKey = null;
                         this.nextEpoch.ServerRandom.SecureClear();
                         this.nextEpoch.ClientRandom.SecureClear();
@@ -620,11 +619,7 @@ namespace Hazel.Dtls
                         this.nextEpoch.CertificatePayload = ByteSpan.Empty;
 
                         // Append ServerHelllo message to the verification stream
-                        this.nextEpoch.VerificationStream.Write(
-                              originalPayload.GetUnderlyingArray()
-                            , originalPayload.Offset
-                            , originalPayload.Length
-                        );
+                        this.nextEpoch.VerificationStream.AddData(originalPayload);
                         break;
 
                     case HandshakeType.Certificate:
@@ -713,8 +708,8 @@ namespace Hazel.Dtls
 
                         byte[] serializedCertificateHandshake = new byte[Handshake.Size];
                         fullCertificateHandhake.Encode(serializedCertificateHandshake);
-                        this.nextEpoch.VerificationStream.Write(serializedCertificateHandshake, 0, serializedCertificateHandshake.Length);
-                        this.nextEpoch.VerificationStream.Write(payload.GetUnderlyingArray(), payload.Offset, payload.Length);
+                        this.nextEpoch.VerificationStream.AddData(serializedCertificateHandshake);
+                        this.nextEpoch.VerificationStream.AddData(payload);
 
                         this.nextEpoch.ServerPublicKey = publicKey;
                         this.nextEpoch.State = HandshakeState.ExpectingServerKeyExchange;
@@ -795,11 +790,7 @@ namespace Hazel.Dtls
                         this.nextEpoch.MasterSecret = masterSecret;
 
                         // Append ServerKeyExchange to the verification stream
-                        this.nextEpoch.VerificationStream.Write(
-                              originalPayload.GetUnderlyingArray()
-                            , originalPayload.Offset
-                            , originalPayload.Length
-                        );
+                        this.nextEpoch.VerificationStream.AddData(originalPayload);
                         break;
 
                     case HandshakeType.ServerHelloDone:
@@ -817,11 +808,7 @@ namespace Hazel.Dtls
                         this.nextEpoch.State = HandshakeState.ExpectingChangeCipherSpec;
 
                         // Append ServerHelloDone to the verification stream
-                        this.nextEpoch.VerificationStream.Write(
-                              originalPayload.GetUnderlyingArray()
-                            , originalPayload.Offset
-                            , originalPayload.Length
-                        );
+                        this.nextEpoch.VerificationStream.AddData(originalPayload);
 
                         this.SendClientKeyExchangeFlight(false);
                         break;
@@ -883,7 +870,7 @@ namespace Hazel.Dtls
         private void SendClientHello()
         {
             // Reset our verification stream
-            this.nextEpoch.VerificationStream.SetLength(0);
+            this.nextEpoch.VerificationStream.Reset();
 
             // Describe our ClientHello flight
             ClientHello clientHello = new ClientHello();
@@ -920,10 +907,11 @@ namespace Hazel.Dtls
             clientHello.Encode(writer);
 
             // Write ClientHello to the verification stream
-            this.nextEpoch.VerificationStream.Write(
-                  packet.GetUnderlyingArray()
-                , Record.Size
-                , Handshake.Size + (int)handshake.Length
+            this.nextEpoch.VerificationStream.AddData(
+                packet.Slice(
+                      Record.Size
+                    , Handshake.Size + (int)handshake.Length
+                )
             );
 
             // Protect the record
@@ -1016,20 +1004,17 @@ namespace Hazel.Dtls
             // message into the verification stream
             if (!isRetransmit)
             {
-                this.nextEpoch.VerificationStream.Write(
-                      packet.GetUnderlyingArray()
-                    , Record.Size
-                    , Handshake.Size + (int)keyExchangeHandshake.Length
+                this.nextEpoch.VerificationStream.AddData(
+                    packet.Slice(
+                          Record.Size
+                        , Handshake.Size + (int)keyExchangeHandshake.Length
+                    )
                 );
             }
 
             // Calculate the hash of the verification stream
-            ByteSpan handshakeHash;
-            using (SHA256 sha256 = SHA256.Create())
-            {
-                this.nextEpoch.VerificationStream.Position = 0;
-                handshakeHash = sha256.ComputeHash(this.nextEpoch.VerificationStream);
-            }
+            ByteSpan handshakeHash = new byte[Sha256Stream.DigestSize];
+            this.nextEpoch.VerificationStream.CalculateHash(handshakeHash);
 
             // Expand our master secret into Finished digests for the client and server
             PrfSha256.ExpandSecret(
