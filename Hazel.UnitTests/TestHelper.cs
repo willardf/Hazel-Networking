@@ -13,6 +13,7 @@ namespace Hazel.UnitTests
     public static class TestHelper
     {
         public static ObjectPool<MessageReader> ReaderPool = MessageReader.CreatePool();
+        public static ObjectPool<MessageWriter> WriterPool = MessageWriter.CreatePool();
 
         /// <summary>
         ///     Runs a general test on the given listener and connection.

@@ -19,7 +19,7 @@ namespace Hazel.UnitTests
                 messagesReceived.Add(evt.Message);
             };
 
-            MessageWriter data = MessageWriter.Get(SendOption.Reliable);
+            MessageWriter data = MessageWriter.Get(TestHelper.WriterPool, SendOption.Reliable);
 
             Assert.AreEqual(ushort.MaxValue, dut.ReliableReceiveLast);
                         
@@ -29,6 +29,7 @@ namespace Hazel.UnitTests
             // This message may not be received if there is an off-by-one error when marking missed pkts up to 10.
             SetReliableId(data, 9); 
             dut.Test_Receive(data);
+            data.Recycle();
 
             // Both messages should be received.
             Assert.AreEqual(2, messagesReceived.Count);
@@ -49,7 +50,7 @@ namespace Hazel.UnitTests
                 messagesReceived.Add(evt.Message);
             };
 
-            MessageWriter data = MessageWriter.Get(SendOption.Reliable);
+            MessageWriter data = MessageWriter.Get(TestHelper.WriterPool, SendOption.Reliable);
 
             for (int i = 0; i < ushort.MaxValue * 2; ++i)
             {
@@ -74,6 +75,8 @@ namespace Hazel.UnitTests
                 Assert.AreEqual(1, dut.BytesSent.Count);
                 dut.BytesSent.Clear();
             }
+
+            data.Recycle();
         }
 
         [TestMethod]
@@ -87,13 +90,15 @@ namespace Hazel.UnitTests
                 messagesReceived.Add(evt.Message);
             };
 
-            MessageWriter data = MessageWriter.Get(SendOption.Reliable);
+            MessageWriter data = MessageWriter.Get(TestHelper.WriterPool, SendOption.Reliable);
 
             SetReliableId(data, 1);
             dut.Test_Receive(data);
 
             SetReliableId(data, 3);
             dut.Test_Receive(data);
+
+            data.Recycle();
 
             MessageReader ackPacket = dut.BytesSent[1];
             // Must be ack

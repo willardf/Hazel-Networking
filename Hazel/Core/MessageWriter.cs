@@ -8,8 +8,8 @@ namespace Hazel
     ///
     public class MessageWriter : IRecyclable
     {
-        public static int BufferSize = 64000;
-        public static readonly ObjectPool<MessageWriter> WriterPool = new ObjectPool<MessageWriter>(() => new MessageWriter(BufferSize));
+        private const int DefaultBufferSize = 64000;
+        private readonly ObjectPool<MessageWriter> parentPool;
 
         public byte[] Buffer;
         public int Length;
@@ -19,16 +19,37 @@ namespace Hazel
 
         private Stack<int> messageStarts = new Stack<int>();
         
+        /// <summary>
+        /// Creates a new unpooled MessageWriter. You shouldn't attempt to recycle this.
+        /// </summary>
         public MessageWriter(byte[] buffer)
         {
             this.Buffer = buffer;
             this.Length = this.Buffer.Length;
         }
 
-        ///
+        /// <summary>
+        /// Creates a new pooled MessageWriter. You shouldn't directly call this, the pool should.
+        /// </summary>
+        public MessageWriter(ObjectPool<MessageWriter> pool, int bufferSize)
+        {
+            this.parentPool = pool;
+            this.Buffer = new byte[bufferSize];
+        }
+
+        /// <summary>
+        /// Creates a new unpooled MessageWriter. You shouldn't attempt to recycle this.
+        /// </summary>
         public MessageWriter(int bufferSize)
         {
             this.Buffer = new byte[bufferSize];
+        }
+
+        public static ObjectPool<MessageWriter> CreatePool()
+        {
+            ObjectPool<MessageWriter> output = null;
+            output = new ObjectPool<MessageWriter>(() => new MessageWriter(output, DefaultBufferSize));
+            return output;
         }
 
         public byte[] ToByteArray(bool includeHeader)
@@ -63,9 +84,9 @@ namespace Hazel
 
         ///
         /// <param name="sendOption">The option specifying how the message should be sent.</param>
-        public static MessageWriter Get(SendOption sendOption = SendOption.None)
+        public static MessageWriter Get(ObjectPool<MessageWriter> pool, SendOption sendOption = SendOption.None)
         {
-            var output = WriterPool.GetObject();
+            var output = pool.GetObject();
             output.Clear(sendOption);
 
             return output;
@@ -126,11 +147,11 @@ namespace Hazel
             }
         }
 
-        ///
+        /// <exception cref="NullReferenceException">Thrown when called on an unpooled MessageWriter</exception>
         public void Recycle()
         {
             this.Position = this.Length = 0;
-            WriterPool.PutObject(this);
+            this.parentPool.PutObject(this);
         }
 
         #region WriteMethods

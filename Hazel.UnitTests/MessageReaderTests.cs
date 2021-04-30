@@ -271,7 +271,7 @@ namespace Hazel.UnitTests
             // it without any bound checks. This can be chained with something
             // else to create an infoleak.
 
-            MessageWriter writer = MessageWriter.Get(SendOption.None);
+            MessageWriter writer = MessageWriter.Get(TestHelper.WriterPool, SendOption.None);
 
             // This will be our malicious "string length"
             writer.WritePacked(DataLength);
@@ -280,6 +280,7 @@ namespace Hazel.UnitTests
             writer.Write(TestDataFromAPreviousPacket);
 
             byte[] testData = writer.ToByteArray(includeHeader: false);
+            writer.Recycle();
 
             // One extra byte for the MessageWriter header, one more for the malicious data
             Assert.AreEqual(DataLength + 1, testData.Length);
@@ -312,7 +313,7 @@ namespace Hazel.UnitTests
             // reads the uint16 at that offset, treats it as a length without any bound checks.
             // This can be allow a later ReadString or ReadBytes to create an infoleak.
 
-            MessageWriter writer = MessageWriter.Get(SendOption.None);
+            MessageWriter writer = MessageWriter.Get(TestHelper.WriterPool, SendOption.None);
 
             // This is the malicious length. No data in this message, so it should be zero.
             writer.Write((ushort)1); 
@@ -322,6 +323,7 @@ namespace Hazel.UnitTests
             writer.Write(TestDataFromAPreviousPacket);
 
             byte[] testData = writer.ToByteArray(includeHeader: false);
+            writer.Recycle();
 
             Assert.AreEqual(DataLength, testData.Length);
 

@@ -164,7 +164,7 @@ namespace Hazel.UnitTests
 
                 for (int i = 0; i < 4; ++i)
                 {
-                    var msg = MessageWriter.Get(SendOption.None);
+                    var msg = MessageWriter.Get(TestHelper.WriterPool, SendOption.None);
                     msg.Write(TestData);
                     connection.Send(msg);
                     msg.Recycle();
@@ -472,9 +472,10 @@ namespace Hazel.UnitTests
 
                 listener.NewConnection += delegate (NewConnectionEventArgs args)
                 {
-                    MessageWriter writer = MessageWriter.Get(SendOption.None);
+                    MessageWriter writer = MessageWriter.Get(TestHelper.WriterPool, SendOption.None);
                     writer.Write("Goodbye");
                     args.Connection.Disconnect("Testing", writer);
+                    writer.Recycle();
                 };
 
                 listener.Start();
