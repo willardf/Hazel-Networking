@@ -40,7 +40,7 @@ namespace Hazel.UnitTests
 
         protected override void WriteBytesToConnection(byte[] bytes, int length)
         {
-            this.BytesSent.Add(MessageReader.Get(bytes));
+            this.BytesSent.Add(MessageReader.Get(TestHelper.ReaderPool, bytes));
         }
 
         public void Test_Receive(MessageWriter msg)
@@ -48,7 +48,7 @@ namespace Hazel.UnitTests
             byte[] buffer = new byte[msg.Length];
             Buffer.BlockCopy(msg.Buffer, 0, buffer, 0, msg.Length);
 
-            var data = MessageReader.Get(buffer);
+            var data = MessageReader.Get(TestHelper.ReaderPool, buffer);
             this.HandleReceive(data, data.Length);
         }
     }

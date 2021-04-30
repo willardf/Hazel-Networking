@@ -159,7 +159,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
             public void InjectPacket(ByteSpan packet, IPEndPoint peerAddress, ConnectionId connectionId)
             {
-                MessageReader reader = MessageReader.GetSized(packet.Length);
+                MessageReader reader = MessageReader.GetSized(TestHelper.ReaderPool, packet.Length);
                 reader.Length = packet.Length;
                 Array.Copy(packet.GetUnderlyingArray(), packet.Offset, reader.Buffer, reader.Offset, packet.Length);
 

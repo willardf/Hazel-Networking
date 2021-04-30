@@ -41,6 +41,7 @@ namespace Hazel.Udp.FewerThreads
 
         private Socket socket;
         protected ILogger Logger;
+        protected ObjectPool<MessageReader> readerPool = MessageReader.CreatePool();
 
         public IPEndPoint EndPoint { get; }
         public IPMode IPMode { get; }
@@ -212,7 +213,7 @@ namespace Hazel.Udp.FewerThreads
                 if (this.socket.Poll(Timeout.Infinite, SelectMode.SelectRead))
                 {
                     EndPoint remoteEP = new IPEndPoint(this.EndPoint.Address, this.EndPoint.Port);
-                    MessageReader message = MessageReader.GetSized(BufferSize);
+                    MessageReader message = MessageReader.GetSized(this.readerPool, BufferSize);
                     try
                     {
                         message.Length = socket.ReceiveFrom(message.Buffer, 0, message.Buffer.Length, SocketFlags.None, ref remoteEP);

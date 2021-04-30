@@ -192,7 +192,7 @@ namespace Hazel.Udp
             }
 #endif
 
-            var msg = MessageReader.GetSized(ushort.MaxValue);
+            var msg = MessageReader.GetSized(this.readerPool, ushort.MaxValue);
             try
             {
                 socket.BeginReceive(msg.Buffer, 0, msg.Buffer.Length, SocketFlags.None, ReadCallback, msg);

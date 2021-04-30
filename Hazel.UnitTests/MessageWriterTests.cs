@@ -138,7 +138,7 @@ namespace Hazel.UnitTests
             Assert.AreEqual(3 + 1 + 2 + 3, msg.Position);
             Assert.AreEqual(msg.Length, msg.Position);
 
-            MessageReader reader = MessageReader.Get(msg.Buffer, 0);
+            MessageReader reader = MessageReader.Get(TestHelper.ReaderPool, msg.Buffer, 0);
 
             Assert.AreEqual(8u, reader.ReadPackedUInt32());
             Assert.AreEqual(250u, reader.ReadPackedUInt32());
@@ -167,7 +167,7 @@ namespace Hazel.UnitTests
             Assert.AreEqual(3 + 1 + 2 + 3 + 4 + 5 + 5 + 5 + 1 + 5 + 5 + 5, msg.Position);
             Assert.AreEqual(msg.Length, msg.Position);
 
-            MessageReader reader = MessageReader.Get(msg.Buffer, 0);
+            MessageReader reader = MessageReader.Get(TestHelper.ReaderPool, msg.Buffer, 0);
 
             Assert.AreEqual(8, reader.ReadPackedInt32());
             Assert.AreEqual(250, reader.ReadPackedInt32());

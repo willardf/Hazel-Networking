@@ -68,11 +68,12 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ByteSpan.cs" />
-    <Compile Include="ByteSpanExtensions.cs" />
+    <Compile Include="Core\ByteSpan.cs" />
+    <Compile Include="Core\ByteSpanExtensions.cs" />
     <Compile Include="Connection.cs" />
     <Compile Include="ConnectionListener.cs" />
     <Compile Include="ConnectionState.cs" />
+    <Compile Include="Core\ObjectPool.cs" />
     <Compile Include="Crypto\AesGcm.cs" />
     <Compile Include="Crypto\Const.cs" />
     <Compile Include="Crypto\Sha256Stream.cs" />
@@ -95,13 +96,12 @@
     <Compile Include="FewerThreads\ThreadLimitedUdpServerConnection.cs" />
     <Compile Include="HazelException.cs" />
     <Compile Include="IPMode.cs" />
-    <Compile Include="IRecyclable.cs" />
-    <Compile Include="MessageReader.cs" />
+    <Compile Include="Core\IRecyclable.cs" />
+    <Compile Include="Core\MessageReader.cs" />
     <Compile Include="NetworkConnection.cs" />
     <Compile Include="NetworkConnectionListener.cs" />
-    <Compile Include="MessageWriter.cs" />
+    <Compile Include="Core\MessageWriter.cs" />
     <Compile Include="NewConnectionEventArgs.cs" />
-    <Compile Include="ObjectPool.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SendOption.cs" />
     <Compile Include="Udp\SendOptionInternal.cs" />
@@ -117,7 +117,7 @@
     <Compile Include="Udp\UdpConnection.Reliable.cs" />
     <Compile Include="Udp\UdpConnectionListener.cs" />
     <Compile Include="Udp\UdpServerConnection.cs" />
-    <Compile Include="UPnP\ILogger.cs" />
+    <Compile Include="Core\ILogger.cs" />
     <Compile Include="UPnP\NetUtility.cs" />
     <Compile Include="UPnP\UPnPHelper.cs" />
   </ItemGroup>

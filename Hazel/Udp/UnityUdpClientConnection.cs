@@ -190,7 +190,7 @@ namespace Hazel.Udp
         /// </summary>
         void StartListeningForData()
         {
-            var msg = MessageReader.GetSized(ushort.MaxValue);
+            var msg = MessageReader.GetSized(this.readerPool, ushort.MaxValue);
             try
             {
                 EndPoint ep = this.EndPoint;

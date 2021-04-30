@@ -23,7 +23,7 @@ namespace Hazel.UnitTests
             Assert.AreEqual(11, msg.Length);
             Assert.AreEqual(msg.Length, msg.Position);
 
-            MessageReader reader = MessageReader.Get(msg.Buffer, 0);
+            MessageReader reader = MessageReader.Get(TestHelper.ReaderPool, msg.Buffer, 0);
             Assert.AreEqual(Test1, reader.ReadInt32());
             Assert.AreEqual(Test2, reader.ReadInt32());
         }
@@ -43,7 +43,7 @@ namespace Hazel.UnitTests
             Assert.AreEqual(5, msg.Length);
             Assert.AreEqual(msg.Length, msg.Position);
 
-            MessageReader reader = MessageReader.Get(msg.Buffer, 0);
+            MessageReader reader = MessageReader.Get(TestHelper.ReaderPool, msg.Buffer, 0);
 
             Assert.AreEqual(Test1, reader.ReadBoolean());
             Assert.AreEqual(Test2, reader.ReadBoolean());
@@ -64,7 +64,7 @@ namespace Hazel.UnitTests
 
             Assert.AreEqual(msg.Length, msg.Position);
 
-            MessageReader reader = MessageReader.Get(msg.Buffer, 0);
+            MessageReader reader = MessageReader.Get(TestHelper.ReaderPool, msg.Buffer, 0);
 
             Assert.AreEqual(Test1, reader.ReadString());
             Assert.AreEqual(Test2, reader.ReadString());
@@ -85,7 +85,7 @@ namespace Hazel.UnitTests
             Assert.AreEqual(7, msg.Length);
             Assert.AreEqual(msg.Length, msg.Position);
 
-            MessageReader reader = MessageReader.Get(msg.Buffer, 0);
+            MessageReader reader = MessageReader.Get(TestHelper.ReaderPool, msg.Buffer, 0);
 
             Assert.AreEqual(Test1, reader.ReadSingle());
         }
@@ -121,7 +121,7 @@ namespace Hazel.UnitTests
             msg.Write(Test5);
             msg.EndMessage();
 
-            MessageReader reader = MessageReader.Get(msg.Buffer);
+            MessageReader reader = MessageReader.Get(TestHelper.ReaderPool, msg.Buffer);
             reader.Length = msg.Length;
 
             var zero = reader.ReadMessage();
@@ -161,10 +161,10 @@ namespace Hazel.UnitTests
 
             msg.EndMessage();
 
-            MessageReader handleMessage = MessageReader.Get(msg.Buffer, 0);
+            MessageReader handleMessage = MessageReader.Get(TestHelper.ReaderPool, msg.Buffer, 0);
             Assert.AreEqual(1, handleMessage.Tag);
 
-            var parentReader = MessageReader.Get(handleMessage);
+            var parentReader = MessageReader.Get(TestHelper.ReaderPool, handleMessage);
 
             handleMessage.Recycle();
             SetZero(handleMessage);
@@ -180,7 +180,7 @@ namespace Hazel.UnitTests
                 Assert.AreEqual(Test2, reader.ReadByte());
 
                 var temp = parentReader;
-                parentReader = MessageReader.CopyMessageIntoParent(reader);
+                parentReader = MessageReader.CopyMessageIntoParent(TestHelper.ReaderPool, reader);
 
                 temp.Recycle();
                 SetZero(temp);
@@ -203,7 +203,7 @@ namespace Hazel.UnitTests
 
             Assert.AreEqual(msg.Length, msg.Position);
 
-            MessageReader reader = MessageReader.Get(msg.Buffer, 0);
+            MessageReader reader = MessageReader.Get(TestHelper.ReaderPool, msg.Buffer, 0);
             Assert.AreEqual(1, reader.Tag);
             Assert.AreEqual(65534, reader.ReadInt32()); // Content
 
@@ -232,7 +232,7 @@ namespace Hazel.UnitTests
 
             Assert.AreEqual(msg.Length, msg.Position);
 
-            MessageReader reader = MessageReader.Get(msg.Buffer, 0);
+            MessageReader reader = MessageReader.Get(TestHelper.ReaderPool, msg.Buffer, 0);
             Assert.AreEqual(1, reader.Tag);
             Assert.AreEqual(65534, reader.ReadInt32()); // Content
 
@@ -284,7 +284,7 @@ namespace Hazel.UnitTests
             // One extra byte for the MessageWriter header, one more for the malicious data
             Assert.AreEqual(DataLength + 1, testData.Length);
 
-            var dut = MessageReader.Get(testData);
+            var dut = MessageReader.Get(TestHelper.ReaderPool, testData);
 
             // If Length is short by even a byte, ReadString should obey that.
             dut.Length--;
@@ -325,7 +325,7 @@ namespace Hazel.UnitTests
 
             Assert.AreEqual(DataLength, testData.Length);
 
-            var outer = MessageReader.Get(testData);
+            var outer = MessageReader.Get(TestHelper.ReaderPool, testData);
 
             // Length is just the malicious message header.
             outer.Length = 3;

@@ -12,6 +12,8 @@ namespace Hazel.UnitTests
     [TestClass]
     public static class TestHelper
     {
+        public static ObjectPool<MessageReader> ReaderPool = MessageReader.CreatePool();
+
         /// <summary>
         ///     Runs a general test on the given listener and connection.
         /// </summary>
@@ -222,19 +224,26 @@ namespace Hazel.UnitTests
         {
             ManualResetEvent mutex = new ManualResetEvent(false);
 
-            connection.Disconnected += delegate(object sender, DisconnectedEventArgs args)
+            connection.Disconnected += delegate (object sender, DisconnectedEventArgs args)
             {
                 mutex.Set();
             };
 
-            listener.NewConnection += delegate(NewConnectionEventArgs args)
+            listener.NewConnection += delegate (NewConnectionEventArgs args)
             {
-                args.Connection.Disconnect("Testing");
+                // Because we're on a loopback, a disconnect may send before the connect does causing this to be flaky.
+                // But also... is this a problem with disconnecting during connect in general?
+                // If so, it would only be a miscategorization of failure to connect.
+                ThreadPool.QueueUserWorkItem(_ =>
+                {
+                    Thread.Sleep(100);
+                    args.Connection.Disconnect("Testing");
+                });
             };
 
             listener.Start();
 
-            connection.Connect();
+            connection.Connect(timeout: 500);
 
             mutex.WaitOne();
         }

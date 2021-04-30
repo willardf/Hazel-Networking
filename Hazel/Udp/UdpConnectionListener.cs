@@ -26,9 +26,10 @@ namespace Hazel.Udp
         private Socket socket;
         private Action<string> Logger;
         private Timer reliablePacketTimer;
+        protected ObjectPool<MessageReader> readerPool = MessageReader.CreatePool();
 
         private ConcurrentDictionary<EndPoint, UdpServerConnection> allConnections = new ConcurrentDictionary<EndPoint, UdpServerConnection>();
-        
+
         public int ConnectionCount { get { return this.allConnections.Count; } }
 
         /// <summary>
@@ -42,10 +43,10 @@ namespace Hazel.Udp
             this.IPMode = ipMode;
 
             this.socket = UdpConnection.CreateSocket(this.IPMode);
-            
+
             socket.ReceiveBufferSize = SendReceiveBufferSize;
             socket.SendBufferSize = SendReceiveBufferSize;
-            
+
             reliablePacketTimer = new Timer(ManageReliablePackets, null, 100, Timeout.Infinite);
         }
 
@@ -53,7 +54,7 @@ namespace Hazel.Udp
         {
             this.Dispose(false);
         }
-        
+
         private void ManageReliablePackets(object state)
         {
             foreach (var kvp in this.allConnections)
@@ -94,7 +95,7 @@ namespace Hazel.Udp
             MessageReader message = null;
             try
             {
-                message = MessageReader.GetSized(BufferSize);
+                message = MessageReader.GetSized(this.readerPool, BufferSize);
                 socket.BeginReceiveFrom(message.Buffer, 0, message.Buffer.Length, SocketFlags.None, ref remoteEP, ReadCallback, message);
             }
             catch (SocketException sx)
@@ -323,7 +324,11 @@ namespace Hazel.Udp
         {
             foreach (var kvp in this.allConnections)
             {
-                kvp.Value.Dispose();
+                try
+                {
+                    kvp.Value.Dispose();
+                }
+                catch { }
             }
 
             try { this.socket.Shutdown(SocketShutdown.Both); } catch { }

@@ -8,7 +8,7 @@ namespace Hazel
 {
     public class MessageReader : IRecyclable
     {
-        public static readonly ObjectPool<MessageReader> ReaderPool = new ObjectPool<MessageReader>(() => new MessageReader());
+        private readonly ObjectPool<MessageReader> parentPool;
 
         public byte[] Buffer;
         public byte Tag;
@@ -33,9 +33,21 @@ namespace Hazel
         private int _position;
         private int readHead;
 
-        public static MessageReader GetSized(int minSize)
+        public MessageReader(ObjectPool<MessageReader> parentPool)
         {
-            var output = ReaderPool.GetObject();
+            this.parentPool = parentPool;
+        }
+
+        public static ObjectPool<MessageReader> CreatePool()
+        {
+            ObjectPool<MessageReader> output = null;
+            output = new ObjectPool<MessageReader>(() => new MessageReader(output));
+            return output;
+        }
+
+        public static MessageReader GetSized(ObjectPool<MessageReader> readerPool, int minSize)
+        {
+            var output = readerPool.GetObject();
 
             if (output.Buffer == null || output.Buffer.Length < minSize)
             {
@@ -52,9 +64,9 @@ namespace Hazel
             return output;
         }
 
-        public static MessageReader Get(byte[] buffer)
+        public static MessageReader Get(ObjectPool<MessageReader> readerPool, byte[] buffer)
         {
-            var output = ReaderPool.GetObject();
+            var output = readerPool.GetObject();
 
             output.Buffer = buffer;
             output.Offset = 0;
@@ -65,9 +77,9 @@ namespace Hazel
             return output;
         }
 
-        public static MessageReader CopyMessageIntoParent(MessageReader source)
+        public static MessageReader CopyMessageIntoParent(ObjectPool<MessageReader> readerPool, MessageReader source)
         {
-            var output = MessageReader.GetSized(source.Length + 3);
+            var output = MessageReader.GetSized(readerPool, source.Length + 3);
             System.Buffer.BlockCopy(source.Buffer, source.Offset - 3, output.Buffer, 0, source.Length + 3);
 
             output.Offset = 0;
@@ -77,9 +89,9 @@ namespace Hazel
             return output;
         }
 
-        public static MessageReader Get(MessageReader source)
+        public static MessageReader Get(ObjectPool<MessageReader> readerPool, MessageReader source)
         {
-            var output = MessageReader.GetSized(source.Buffer.Length);
+            var output = MessageReader.GetSized(readerPool, source.Buffer.Length);
             System.Buffer.BlockCopy(source.Buffer, 0, output.Buffer, 0, source.Buffer.Length);
 
             output.Offset = source.Offset;
@@ -93,12 +105,12 @@ namespace Hazel
             return output;
         }
 
-        public static MessageReader Get(byte[] buffer, int offset)
+        public static MessageReader Get(ObjectPool<MessageReader> readerPool, byte[] buffer, int offset)
         {
             // Ensure there is at least a header
             if (offset + 3 > buffer.Length) return null;
 
-            var output = ReaderPool.GetObject();
+            var output = readerPool.GetObject();
 
             output.Buffer = buffer;
             output.Offset = offset;
@@ -121,7 +133,7 @@ namespace Hazel
             // Ensure there is at least a header
             if (this.BytesRemaining < 3) throw new InvalidDataException($"ReadMessage header is longer than message length: 3 of {this.BytesRemaining}");
 
-            var output = new MessageReader();
+            var output = new MessageReader(null);
 
             output.Parent = this;
             output.Buffer = this.Buffer;
@@ -152,7 +164,7 @@ namespace Hazel
 
             if (this.BytesRemaining < len) throw new InvalidDataException($"Message Length at Position {this.readHead} is longer than message length: {len} of {this.BytesRemaining}");
 
-            var output = MessageReader.GetSized(len);
+            var output = MessageReader.GetSized(this.parentPool, len);
 
             output.Parent = this;
             Array.Copy(this.Buffer, this.readHead, output.Buffer, 0, len);
@@ -173,22 +185,17 @@ namespace Hazel
 
         public void RemoveMessage(MessageReader reader)
         {
-            var temp = MessageReader.GetSized(reader.Buffer.Length);
-            try
-            {
-                var headerOffset = reader.Offset - 3;
-                var endOfMessage = reader.Offset + reader.Length;
-                var len = reader.Buffer.Length - endOfMessage;
+            var temp = new MessageReader(null);
+            temp.Buffer = new byte[reader.Buffer.Length];
 
-                Array.Copy(reader.Buffer, endOfMessage, temp.Buffer, 0, len);
-                Array.Copy(temp.Buffer, 0, this.Buffer, headerOffset, len);
+            var headerOffset = reader.Offset - 3;
+            var endOfMessage = reader.Offset + reader.Length;
+            var len = reader.Buffer.Length - endOfMessage;
 
-                this.AdjustLength(reader.Offset, reader.Length + 3);
-            }
-            finally
-            {
-                temp.Recycle();
-            }
+            Array.Copy(reader.Buffer, endOfMessage, temp.Buffer, 0, len);
+            Array.Copy(temp.Buffer, 0, this.Buffer, headerOffset, len);
+
+            this.AdjustLength(reader.Offset, reader.Length + 3);
         }
 
         private void AdjustLength(int offset, int amount)
@@ -217,7 +224,7 @@ namespace Hazel
         public void Recycle()
         {
             this.Parent = null;
-            ReaderPool.PutObject(this);
+            this.parentPool.PutObject(this);
         }
 
         #region Read Methods
