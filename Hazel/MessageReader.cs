@@ -191,6 +191,32 @@ namespace Hazel
             }
         }
 
+        public void InsertMessage(MessageReader reader, MessageWriter writer)
+        {
+            var temp = MessageReader.GetSized(reader.Buffer.Length);
+            try 
+            {
+                var headerOffset = reader.Offset - 3;
+                var startOfMessage = reader.Offset;
+                var len = reader.Buffer.Length - startOfMessage;
+                
+                //store the original buffer in temp
+                Array.Copy(reader.Buffer, startOfMessage, temp.Buffer, 0, len);
+
+                //put the contents of writer in at headerOffset
+                Array.Copy(writer.Buffer, 3, this.Buffer, headerOffset, writer.Length);
+
+                //put the original buffer in after that
+                Array.Copy(temp.Buffer, 0, this.Buffer, headerOffset + writer.Length, len - writer.Length);
+
+                this.AdjustLength(-1 * reader.Offset , -1 * (writer.Length - 3));
+            }
+            finally
+            {
+                temp.Recycle();
+            }
+        }
+
         private void AdjustLength(int offset, int amount)
         {
             if (this.readHead > offset)
