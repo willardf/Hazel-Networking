@@ -4,6 +4,7 @@ using System.Net;
 using System.Threading;
 using Hazel.Udp;
 using System.Net.Sockets;
+using System.Threading.Tasks;
 
 namespace Hazel.UnitTests
 {
@@ -489,9 +490,15 @@ namespace Hazel.UnitTests
 
                 listener.NewConnection += delegate (NewConnectionEventArgs args)
                 {
-                    MessageWriter writer = MessageWriter.Get(SendOption.None);
-                    writer.Write("Goodbye");
-                    args.Connection.Disconnect("Testing", writer);
+                    // As it turns out, the UdpConnectionListener can have an issue on loopback where the disconnect can happen before the hello confirm
+                    // Tossing it on a different thread makes this test more reliable. Perhaps something to think about elsewhere though.
+                    Task.Run(async () =>
+                    {
+                        await Task.Delay(1);
+                        MessageWriter writer = MessageWriter.Get(SendOption.None);
+                        writer.Write("Goodbye");
+                        args.Connection.Disconnect("Testing", writer);
+                    });
                 };
 
                 listener.Start();

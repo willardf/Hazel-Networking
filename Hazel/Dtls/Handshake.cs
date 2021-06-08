@@ -246,16 +246,23 @@ namespace Hazel.Dtls
                     break;
                 }
             }
-            span = span.Slice(1 + compressionMethodsSize);
 
-            if (!foundNullCompressionMethod)
+            if (!foundNullCompressionMethod
+                || span.Length < 1 + compressionMethodsSize)
             {
                 return false;
             }
 
+            span = span.Slice(1 + compressionMethodsSize);
+
             // Parse extensions
             if (span.Length > 0)
             {
+                if (span.Length < 2)
+                {
+                    return false;
+                }
+
                 ushort extensionsSize = span.ReadBigEndian16();
                 span = span.Slice(2);
                 if (span.Length != extensionsSize)
@@ -273,12 +280,13 @@ namespace Hazel.Dtls
 
                     ExtensionType extensionType = (ExtensionType)span.ReadBigEndian16(0);
                     ushort extensionLength = span.ReadBigEndian16(2);
-                    ByteSpan extensionData = span.Slice(4, extensionLength);
-                    if (extensionData.Length < extensionLength)
+
+                    if (span.Length < 4 + extensionLength)
                     {
                         return false;
                     }
 
+                    ByteSpan extensionData = span.Slice(4, extensionLength);
                     span = span.Slice(4 + extensionLength);
                     result.ParseExtension(extensionType, extensionData);
                 }

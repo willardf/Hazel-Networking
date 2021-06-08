@@ -50,6 +50,8 @@ namespace Hazel.Udp.FewerThreads
         private Thread sendThread;
         private HazelThreadPool processThreads;
 
+        public bool ReceiveThreadRunning => this.receiveThread.ThreadState == ThreadState.Running;
+
         public struct ConnectionId : IEquatable<ConnectionId>
         {
             public IPEndPoint EndPoint;

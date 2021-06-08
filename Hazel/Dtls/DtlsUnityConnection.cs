@@ -867,7 +867,7 @@ namespace Hazel.Dtls
         /// <summary>
         /// Send (resend) a ClientHello message to the server
         /// </summary>
-        private void SendClientHello()
+        protected virtual void SendClientHello()
         {
             // Reset our verification stream
             this.nextEpoch.VerificationStream.Reset();
@@ -905,6 +905,66 @@ namespace Hazel.Dtls
             handshake.Encode(writer);
             writer = writer.Slice(Handshake.Size);
             clientHello.Encode(writer);
+
+            // Write ClientHello to the verification stream
+            this.nextEpoch.VerificationStream.AddData(
+                packet.Slice(
+                      Record.Size
+                    , Handshake.Size + (int)handshake.Length
+                )
+            );
+
+            // Protect the record
+            this.currentEpoch.RecordProtection.EncryptClientPlaintext(
+                  packet.Slice(Record.Size, outgoingRecord.Length)
+                , packet.Slice(Record.Size, plaintextLength)
+                , ref outgoingRecord
+            );
+
+            this.nextEpoch.State = HandshakeState.ExpectingServerHello;
+            this.nextEpoch.NextPacketResendTime = DateTime.UtcNow + this.handshakeResendTimeout;
+            base.WriteBytesToConnection(packet.GetUnderlyingArray(), packet.Length);
+        }
+
+        protected void Test_SendClientHello(Func<ClientHello, ByteSpan, ByteSpan> encodeCallback)
+        {
+            // Reset our verification stream
+            this.nextEpoch.VerificationStream.Reset();
+
+            // Describe our ClientHello flight
+            ClientHello clientHello = new ClientHello();
+            clientHello.Random = this.nextEpoch.ClientRandom;
+            clientHello.Cookie = this.nextEpoch.Cookie;
+            clientHello.CipherSuites = new byte[2];
+            clientHello.CipherSuites.WriteBigEndian16((ushort)CipherSuite.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256);
+            clientHello.SupportedCurves = new byte[2];
+            clientHello.SupportedCurves.WriteBigEndian16((ushort)NamedCurve.x25519);
+
+            Handshake handshake = new Handshake();
+            handshake.MessageType = HandshakeType.ClientHello;
+            handshake.Length = (uint)clientHello.CalculateSize();
+            handshake.MessageSequence = 0;
+            handshake.FragmentOffset = 0;
+            handshake.FragmentLength = handshake.Length;
+
+            // Describe the record
+            int plaintextLength = (int)(Handshake.Size + handshake.Length);
+            Record outgoingRecord = new Record();
+            outgoingRecord.ContentType = ContentType.Handshake;
+            outgoingRecord.Epoch = this.epoch;
+            outgoingRecord.SequenceNumber = this.currentEpoch.NextOutgoingSequence;
+            outgoingRecord.Length = (ushort)this.currentEpoch.RecordProtection.GetEncryptedSize(plaintextLength);
+            ++this.currentEpoch.NextOutgoingSequence;
+
+            // Convert the record to wire format
+            ByteSpan packet = new byte[Record.Size + outgoingRecord.Length];
+            ByteSpan writer = packet;
+            outgoingRecord.Encode(packet);
+            writer = writer.Slice(Record.Size);
+            handshake.Encode(writer);
+            writer = writer.Slice(Handshake.Size);
+
+            writer = encodeCallback(clientHello, writer);
 
             // Write ClientHello to the verification stream
             this.nextEpoch.VerificationStream.AddData(
