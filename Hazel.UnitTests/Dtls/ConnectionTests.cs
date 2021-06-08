@@ -172,6 +172,55 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             }
         }
 
+        class MalformedDTLSClient : DtlsUnityConnection
+        {
+            public MalformedDTLSClient(ILogger logger, IPEndPoint remoteEndPoint, IPMode ipMode = IPMode.IPv4) : base(logger, remoteEndPoint, ipMode)
+            {
+                
+            }
+
+            protected override void SendClientHello()
+            {
+                Test_SendClientHello((clientHello, writer) =>
+                {
+                    ByteSpanBigEndianExtensions.WriteBigEndian16(writer, (ushort)ProtocolVersion.DTLS1_2);
+                    writer = writer.Slice(2);
+
+                    clientHello.Random.CopyTo(writer);
+                    writer = writer.Slice(Hazel.Dtls.Random.Size);
+
+                    // Do not encode session ids
+                    writer[0] = (byte)0;
+                    writer = writer.Slice(1);
+
+                    writer[0] = (byte)clientHello.Cookie.Length;
+                    clientHello.Cookie.CopyTo(writer.Slice(1));
+                    writer = writer.Slice(1 + clientHello.Cookie.Length);
+
+                    ByteSpanBigEndianExtensions.WriteBigEndian16(writer, (ushort)clientHello.CipherSuites.Length);
+                    clientHello.CipherSuites.CopyTo(writer.Slice(2));
+                    writer = writer.Slice(2 + clientHello.CipherSuites.Length);
+
+                    // ============ Here is the corruption. writer[0] should be 1. ============
+                    writer[0] = 255;
+                    writer[1] = (byte)CompressionMethod.Null;
+                    writer = writer.Slice(2);
+
+                    // Extensions size
+                    ByteSpanBigEndianExtensions.WriteBigEndian16(writer, (ushort)(6 + clientHello.SupportedCurves.Length));
+                    writer = writer.Slice(2);
+
+                    // Supported curves extension
+                    ByteSpanBigEndianExtensions.WriteBigEndian16(writer, (ushort)ExtensionType.EllipticCurves);
+                    ByteSpanBigEndianExtensions.WriteBigEndian16(writer, (ushort)(2 + clientHello.SupportedCurves.Length), 2);
+                    ByteSpanBigEndianExtensions.WriteBigEndian16(writer, (ushort)clientHello.SupportedCurves.Length, 4);
+                    clientHello.SupportedCurves.CopyTo(writer.Slice(6));
+
+                    return writer;
+                });
+            }
+        }
+
         [TestMethod]
         public void TestMalformedApplicationData()
         {
@@ -220,6 +269,47 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 data.CopyTo(encoded.Slice(Record.Size));
 
                 listener.InjectPacket(encoded, connectionEndPoint, connectionId);
+
+                // wait for the client to disconnect
+                listener.Dispose();
+                signal.WaitOne(100);
+            }
+        }
+
+        [TestMethod]
+        public void TestMalformedConnectionData()
+        {
+            IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 27510);
+
+            IPEndPoint connectionEndPoint = ep;
+            DtlsConnectionListener.ConnectionId connectionId = new ThreadLimitedUdpConnectionListener.ConnectionId();
+
+            Semaphore signal = new Semaphore(0, int.MaxValue);
+
+            using (DtlsConnectionListener listener = new DtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, ep.Port), new TestLogger()))
+            using (MalformedDTLSClient connection = new MalformedDTLSClient(new TestLogger(), ep))
+            {
+                listener.SetCertificate(GetCertificateForServer());
+                connection.SetValidServerCertificates(GetCertificateForClient());
+
+                listener.NewConnection += (evt) =>
+                {
+                    connectionEndPoint = evt.Connection.EndPoint;
+                    connectionId = ((ThreadLimitedUdpServerConnection)evt.Connection).ConnectionId;
+
+                    signal.Release();
+                    evt.Connection.Disconnected += (o, et) => {
+                    };
+                };
+                connection.Disconnected += (o, evt) => {
+                    signal.Release();
+                };
+
+                listener.Start();
+                connection.Connect();
+
+                Assert.IsTrue(listener.ReceiveThreadRunning, "Listener should be able to handle a malformed hello packet");
+                Assert.AreEqual(ConnectionState.NotConnected, connection.State);
 
                 // wait for the client to disconnect
                 listener.Dispose();
