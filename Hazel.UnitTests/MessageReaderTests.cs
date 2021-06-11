@@ -407,6 +407,80 @@ namespace Hazel.UnitTests
         }
 
         [TestMethod]
+        public void InsertMessageMultipleInsertsWithoutReset()
+        {
+            const byte Test0 = 11;
+            const byte Test3 = 33;
+            const byte Test4 = 44;
+            const byte Test5 = 55;
+            const byte Test6 = 66;
+            const byte TestInsert = 77;
+            const byte TestInsert2 = 88;
+
+            var msg = new MessageWriter(2048);
+            msg.StartMessage(0);
+            msg.Write(Test0);
+            msg.EndMessage();
+
+            msg.StartMessage(12);
+            msg.StartMessage(23);
+
+            msg.StartMessage(34);
+            msg.Write(Test3);
+            msg.EndMessage();
+
+            msg.StartMessage(45);
+            msg.Write(Test4);
+            msg.EndMessage();
+
+            msg.EndMessage();
+
+            msg.StartMessage(56);
+            msg.Write(Test5);
+            msg.EndMessage();
+
+            msg.EndMessage();
+
+            msg.StartMessage(67);
+            msg.Write(Test6);
+            msg.EndMessage();
+
+            MessageReader reader = MessageReader.Get(msg.Buffer);
+
+            MessageWriter writer = MessageWriter.Get(SendOption.Reliable);
+            writer.StartMessage(5);
+            writer.Write(TestInsert);
+            writer.EndMessage();
+
+            MessageWriter writer2 = MessageWriter.Get(SendOption.Reliable);
+            writer2.StartMessage(6);
+            writer2.Write(TestInsert2);
+            writer2.EndMessage();
+
+            reader.ReadMessage();
+            var one = reader.ReadMessage();
+            var two = one.ReadMessage();
+            var three = two.ReadMessage();
+
+            two.InsertMessage(three, writer);
+
+            // three becomes invalid
+            Assert.AreNotEqual(Test3, three.ReadByte());
+
+            // Continuing to read works
+            var four = two.ReadMessage();
+            Assert.AreEqual(Test4, four.ReadByte());
+
+            var five = one.ReadMessage();
+            Assert.AreEqual(Test5, five.ReadByte());
+
+            reader.InsertMessage(one, writer2);
+
+            var six = reader.ReadMessage();
+            Assert.AreEqual(Test6, six.ReadByte());
+        }
+
+        [TestMethod]
         public void CopySubMessage()
         {
             const byte Test1 = 12;
