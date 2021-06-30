@@ -204,6 +204,32 @@ namespace Hazel
             if (this.Position > this.Length) this.Length = this.Position;
         }
 
+        public void Write(ulong value)
+        {
+            this.Buffer[this.Position++] = (byte)value;
+            this.Buffer[this.Position++] = (byte)(value >> 8);
+            this.Buffer[this.Position++] = (byte)(value >> 16);
+            this.Buffer[this.Position++] = (byte)(value >> 24);
+            this.Buffer[this.Position++] = (byte)(value >> 32);
+            this.Buffer[this.Position++] = (byte)(value >> 40);
+            this.Buffer[this.Position++] = (byte)(value >> 48);
+            this.Buffer[this.Position++] = (byte)(value >> 56);
+            if (this.Position > this.Length) this.Length = this.Position;
+        }
+
+        public void Write(long value)
+        {
+            this.Buffer[this.Position++] = (byte)value;
+            this.Buffer[this.Position++] = (byte)(value >> 8);
+            this.Buffer[this.Position++] = (byte)(value >> 16);
+            this.Buffer[this.Position++] = (byte)(value >> 24);
+            this.Buffer[this.Position++] = (byte)(value >> 32);
+            this.Buffer[this.Position++] = (byte)(value >> 40);
+            this.Buffer[this.Position++] = (byte)(value >> 48);
+            this.Buffer[this.Position++] = (byte)(value >> 56);
+            if (this.Position > this.Length) this.Length = this.Position;
+        }
+
         public unsafe void Write(float value)
         {
             fixed (byte* ptr = &this.Buffer[this.Position])

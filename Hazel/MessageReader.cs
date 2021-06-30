@@ -309,6 +309,34 @@ namespace Hazel
             return output;
         }
 
+        public ulong ReadUInt64()
+        {
+            ulong output = (ulong)this.FastByte()
+                | (ulong)this.FastByte() << 8
+                | (ulong)this.FastByte() << 16
+                | (ulong)this.FastByte() << 24
+                | (ulong)this.FastByte() << 32
+                | (ulong)this.FastByte() << 40
+                | (ulong)this.FastByte() << 48
+                | (ulong)this.FastByte() << 56;
+
+            return output;
+        }
+
+        public long ReadInt64()
+        {
+            long output = (long)this.FastByte()
+                | (long)this.FastByte() << 8
+                | (long)this.FastByte() << 16
+                | (long)this.FastByte() << 24
+                | (long)this.FastByte() << 32
+                | (long)this.FastByte() << 40
+                | (long)this.FastByte() << 48
+                | (long)this.FastByte() << 56;
+
+            return output;
+        }
+
         public unsafe float ReadSingle()
         {
             float output = 0;
