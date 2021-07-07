@@ -449,12 +449,13 @@ namespace Hazel.UnitTests
             using (UdpConnectionListener listener = new UdpConnectionListener(new IPEndPoint(IPAddress.Any, 4296)))
             using (UdpConnection connection = new UnityUdpClientConnection(new IPEndPoint(IPAddress.Loopback, 4296)))
             {
-                MessageReader received = null;
+                string received = null;
                 ManualResetEvent mutex = new ManualResetEvent(false);
 
                 connection.Disconnected += delegate (object sender, DisconnectedEventArgs args)
                 {
-                    received = args.Message;
+                    // We don't own the message, we have to read the string now
+                    received = args.Message.ReadString();
                     mutex.Set();
                 };
 
@@ -478,7 +479,7 @@ namespace Hazel.UnitTests
                 mutex.WaitOne();
 
                 Assert.IsNotNull(received);
-                Assert.AreEqual("Goodbye", received.ReadString());
+                Assert.AreEqual("Goodbye", received);
             }
         }
     }

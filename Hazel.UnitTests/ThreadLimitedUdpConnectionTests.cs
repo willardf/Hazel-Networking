@@ -5,6 +5,8 @@ using System.Threading;
 using Hazel.Udp;
 using Hazel.Udp.FewerThreads;
 using System.Net.Sockets;
+using System.Linq;
+using System.Collections;
 
 namespace Hazel.UnitTests
 {
@@ -461,12 +463,13 @@ namespace Hazel.UnitTests
             using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
             using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
-                MessageReader received = null;
+                string received = null;
                 ManualResetEvent mutex = new ManualResetEvent(false);
 
                 connection.Disconnected += delegate (object sender, DisconnectedEventArgs args)
                 {
-                    received = args.Message;
+                    // We don't own the message, we have to read the string now
+                    received = args.Message.ReadString();
                     mutex.Set();
                 };
 
@@ -484,7 +487,7 @@ namespace Hazel.UnitTests
                 mutex.WaitOne();
 
                 Assert.IsNotNull(received);
-                Assert.AreEqual("Goodbye", received.ReadString());
+                Assert.AreEqual("Goodbye", received);
             }
         }
     }
