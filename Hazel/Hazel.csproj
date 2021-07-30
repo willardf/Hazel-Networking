@@ -75,6 +75,9 @@
     <Compile Include="ConnectionState.cs" />
     <Compile Include="Crypto\AesGcm.cs" />
     <Compile Include="Crypto\Const.cs" />
+    <Compile Include="Crypto\CryptoProvider.cs" />
+    <Compile Include="Crypto\DefaultAes.cs" />
+    <Compile Include="Crypto\IAes.cs" />
     <Compile Include="Crypto\Sha256Stream.cs" />
     <Compile Include="Crypto\SpanCryptoExtensions.cs" />
     <Compile Include="Crypto\X25519.cs" />

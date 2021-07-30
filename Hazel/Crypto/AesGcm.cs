@@ -22,7 +22,7 @@ namespace Hazel.Crypto
 
         private const int TagSize = 16;
 
-        private readonly ICryptoTransform encryptor_;
+        private readonly IAes encryptor_;
 
         private readonly ByteSpan hashSubkey_;
         private readonly ByteSpan blockJ_;
@@ -43,17 +43,7 @@ namespace Hazel.Crypto
             }
 
             // Create the AES block cipher
-            using (Aes aes = Aes.Create())
-            {
-                aes.KeySize = 128;
-                aes.KeySize = 128;
-                aes.BlockSize = 128;
-                aes.Mode = CipherMode.ECB;
-                aes.Padding = PaddingMode.Zeros;
-                aes.Key = key.ToArray();
-
-                this.encryptor_ = aes.CreateEncryptor();
-            }
+            this.encryptor_ = CryptoProvider.CreateAes(key);
 
             // Allocate scratch space
             ByteSpan scratchSpace = new byte[96];
@@ -65,7 +55,7 @@ namespace Hazel.Crypto
             this.blockScratch_ = scratchSpace.Slice(80, 16);
 
             // Create the GHASH subkey by encrypting the 0-block
-            this.encryptor_.TransformBlock(this.hashSubkey_.GetUnderlyingArray(), this.hashSubkey_.Offset, this.hashSubkey_.Length, this.hashSubkey_.GetUnderlyingArray(), this.hashSubkey_.Offset);
+            this.encryptor_.EncryptBlock(this.hashSubkey_, this.hashSubkey_);
         }
 
         /// <summary>
@@ -235,7 +225,7 @@ namespace Hazel.Crypto
                 ++counter;
 
                 // CIPH[k](CB[i])
-                this.encryptor_.TransformBlock(counterBlock.GetUnderlyingArray(), counterBlock.Offset, 16, this.blockScratch_.GetUnderlyingArray(), this.blockScratch_.Offset);
+                this.encryptor_.EncryptBlock(counterBlock.Slice(0, 16), this.blockScratch_);
 
                 // Y[i] = X[i] xor CIPH[k](CB[i])
                 for (int jj = 0; jj != 16 && writeIndex < data.Length; ++jj, ++writeIndex)
