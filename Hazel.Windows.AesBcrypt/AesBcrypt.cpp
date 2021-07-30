@@ -54,32 +54,6 @@ extern "C" __declspec(dllexport) AesBcrypt* AesBrypt_create(uint8_t* keyArray, i
 		return nullptr;
 	}
 
-	DWORD blockLength = keyArrayLength;
-	result = BCryptSetProperty(
-		  context->m_algorithm
-		, BCRYPT_BLOCK_LENGTH
-		, reinterpret_cast<PBYTE>(&blockLength)
-		, sizeof(blockLength)
-		, 0
-	);
-	if (!NT_SUCCESS(result))
-	{
-		return nullptr;
-	}
-
-	DWORD keyLengthInBits = keyArrayLength * 8;
-	result = BCryptSetProperty(
-		  context->m_algorithm
-		, BCRYPT_KEY_LENGTH
-		, reinterpret_cast<PBYTE>(&keyLengthInBits)
-		, sizeof(keyLengthInBits)
-		, 0
-	);
-	if (!NT_SUCCESS(result))
-	{
-		return nullptr;
-	}
-
 	result = BCryptSetProperty(
 		  context->m_algorithm
 		, BCRYPT_CHAINING_MODE
