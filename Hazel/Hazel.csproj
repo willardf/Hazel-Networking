@@ -74,6 +74,7 @@
     <Compile Include="ConnectionListener.cs" />
     <Compile Include="ConnectionState.cs" />
     <Compile Include="Crypto\AesGcm.cs" />
+    <Compile Include="Crypto\BcryptAes.cs" />
     <Compile Include="Crypto\Const.cs" />
     <Compile Include="Crypto\CryptoProvider.cs" />
     <Compile Include="Crypto\DefaultAes.cs" />
