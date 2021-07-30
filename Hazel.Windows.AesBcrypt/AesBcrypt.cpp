@@ -121,5 +121,5 @@ extern "C" __declspec(dllexport) int AesBcrypt_encrpytBlock(AesBcrypt * context,
 		return 0;
 	}
 
-	return 0;
+	return bytesEncrypted;
 }
