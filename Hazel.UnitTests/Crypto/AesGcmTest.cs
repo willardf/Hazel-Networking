@@ -1,9 +1,41 @@
 using Hazel.Crypto;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
 using System.Text;
 
 namespace Hazel.UnitTests.Crypto
 {
+    [TestClass]
+    public class BcryptAesGcmTest : AesGcmTest
+    {
+        private static IAes CreateAes(ByteSpan key)
+        {
+            if (Environment.Is64BitProcess)
+            {
+                return new Bcrypt64Aes(key);
+            }
+            else
+            {
+                return new Bcrypt32Aes(key);
+            }
+        }
+
+        [ClassInitialize]
+        public static void ClassInitialize(TestContext context)
+        {
+            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            {
+                CryptoProvider.OverrideCreateAes = CreateAes;
+            }
+        }
+
+        [ClassCleanup]
+        public static void ClassCleanup()
+        {
+            CryptoProvider.OverrideCreateAes = null;
+        }
+    }
+
     [TestClass]
     public class AesGcmTest
     {

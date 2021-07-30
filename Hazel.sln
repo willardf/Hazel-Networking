@@ -6,6 +6,9 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hazel", "Hazel\Hazel.csproj", "{02CFBD30-D77D-400F-94B2-700F60EFDD7F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hazel.UnitTests", "Hazel.UnitTests\Hazel.UnitTests.csproj", "{1394E4CA-E17A-42F5-9216-8046ACA8D16B}"
+	ProjectSection(ProjectDependencies) = postProject
+		{C5BFCC0E-7831-4255-B700-E4F70641EAC0} = {C5BFCC0E-7831-4255-B700-E4F70641EAC0}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Hazel.Aes.Bcrypt", "Hazel.Windows.AesBcrypt\Hazel.Windows.AesBcrypt.vcxproj", "{C5BFCC0E-7831-4255-B700-E4F70641EAC0}"
 EndProject
