@@ -1,27 +1,26 @@
 #### Hazel Networking is a low-level networking library for C# providing connection-oriented, message based communication via UDP and RUDP.
 
-The aim of this fork is to create a simple interface for ultra-fast connection-based UDP communication for games.
+The aim of this fork is to create a simple interface for ultra-fast connection-based UDP communication for games. JamJar and I generally consider it the primary fork, but we goofed and didn't transfer the repo, so idk maybe someday.
 
 -----
 
 ## Features
 - UDP and Reliable UDP.
+- Encrypted packets using DTLS
 - UDP Broadcast for local-multiplayer.
 - Completely thread safe.
 - All protocols are connection oriented (similar to TCP) and message based (similar to UDP)
 - IPv4 and IPv6 support
 - Automatic statistics about data passing in and out of connections
-- Designed to be as fast and leightweight as possible
+- Designed to be as fast and lightweight as possible
 
 -----
 
-### This fork has been heavily modified from the original to reduce allocations, copies, and locking. As such, it's fairly stable, but not guaranteed. However, my game Among Us currently runs on it with over 500k MAU, so that counts for something.
+### This fork has been heavily modified from the original to reduce allocations, copies, and locking. It's pretty stable and Among Us uses it for all platforms, but still has the occasional issue.
 
 -----
 
-HTML documentation, tutorials and quickstarts from the DarkRift Website [here](http://www.darkriftnetworking.com/Hazel/Docs) should be relatively accurate; but I doubt the original creator will want support calls for this fork. I can provide some limited support if you create an issue.
-
-I have changed some interfaces in "non-intuitive ways", it is my hope that [this example repo](https://github.com/willardf/Hazel-Examples) will be able to help users get started.
+There is currently no online documentation. I might get around to it someday. I have changed some interfaces in "unintuitive ways", it is my hope that [this example repo](https://github.com/willardf/Hazel-Examples) will be able to help users get started.
 
 If you want to make improvements, I am open to pull requests. If you find bugs, feel free raise issues.
 
@@ -29,9 +28,13 @@ If you want to make improvements, I am open to pull requests. If you find bugs, 
 
 ## Building Hazel
 
-To build Hazel open [solution file](Hazel.sln) using your favourite C# IDE (I use Visual Studio 2017) and then build as you would any other project.
+To build Hazel open [solution file](Hazel.sln) using your favourite C# IDE (I use Visual Studio 2019) and then build as you would any other project.
 
 -----
+## Tips with this fork
+
+ * Pay attention to which callbacks give you ownership of the MessageReader, making you responsible for recycling. In particular, disconnect events do not.
+ * Hazel doesn't support fragmented packets. It used to, but I wasn't sure of it so I removed it and have never needed it since. Just stay under 1kb packets.
 
 ## Tips for using Hazel with Unity
 
