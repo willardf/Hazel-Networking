@@ -211,8 +211,10 @@ namespace Hazel.Udp.FewerThreads
         {
             while (this.isActive)
             {
-                if (this.socket.Poll(Timeout.Infinite, SelectMode.SelectRead))
+                if (this.socket.Poll(1000, SelectMode.SelectRead))
                 {
+                    if (!isActive) break;
+
                     EndPoint remoteEP = new IPEndPoint(this.EndPoint.Address, this.EndPoint.Port);
                     MessageReader message = MessageReader.GetSized(BufferSize);
                     try
@@ -265,6 +267,11 @@ namespace Hazel.Udp.FewerThreads
                     if (this.socket.Poll(Timeout.Infinite, SelectMode.SelectWrite))
                     {
                         this.socket.SendTo(msg.Span.GetUnderlyingArray(), msg.Span.Offset, msg.Span.Length, SocketFlags.None, msg.Recipient);
+                    }
+                    else
+                    {
+                        this.Logger.WriteError("Socket is no longer able to send");
+                        break;
                     }
                 }
                 catch (Exception e)
@@ -373,6 +380,7 @@ namespace Hazel.Udp.FewerThreads
 
             // Flush outgoing packets
             this.sendQueue?.CompleteAdding();
+
             if (wasActive)
             {
                 this.sendThread.Join();
