@@ -99,6 +99,7 @@ namespace Hazel.Udp.FewerThreads
                 SendDisconnect();
             }
 
+            Listener.RemovePeerRecord(this.ConnectionId);
             base.Dispose(disposing);
         }
     }

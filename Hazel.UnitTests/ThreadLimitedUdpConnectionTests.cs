@@ -62,7 +62,7 @@ namespace Hazel.UnitTests
         }
 
         [TestMethod]
-        public void ClientServerDisposeDisconnectsTest()
+        public void ClientDisposeDisconnectTest()
         {
             IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 4296);
 
@@ -484,7 +484,7 @@ namespace Hazel.UnitTests
 
                 connection.Connect();
 
-                mutex.WaitOne();
+                mutex.WaitOne(5000);
 
                 Assert.IsNotNull(received);
                 Assert.AreEqual("Goodbye", received);

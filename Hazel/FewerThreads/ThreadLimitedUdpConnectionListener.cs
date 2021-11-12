@@ -153,6 +153,7 @@ namespace Hazel.Udp.FewerThreads
             }
         }
 
+        // This is just for booting people after they've been connected a certain amount of time...
         public virtual void DisconnectOldConnections(TimeSpan maxAge, MessageWriter disconnectMessage)
         {
             var now = DateTime.UtcNow;
@@ -253,6 +254,7 @@ namespace Hazel.Udp.FewerThreads
                 }
             }
         }
+
         protected virtual void ProcessIncomingMessageFromOtherThread(MessageReader message, IPEndPoint remoteEndPoint, ConnectionId connectionId)
         {
             this.receiveQueue.Add(new ReceiveMessageInfo() { Message = message, Sender = remoteEndPoint, ConnectionId = connectionId });
@@ -365,7 +367,14 @@ namespace Hazel.Udp.FewerThreads
         /// <param name="endPoint">Connection key of the virtual connection.</param>
         internal bool RemoveConnectionTo(ConnectionId connectionId)
         {
-            return this.allConnections.TryRemove(connectionId, out var conn);
+            return this.allConnections.TryRemove(connectionId, out _);
+        }
+
+        /// <summary>
+        ///  This is after all messages could be sent. Clean up anything extra.
+        /// </summary>
+        internal virtual void RemovePeerRecord(ConnectionId connectionId)
+        {
         }
 
         protected virtual void Dispose(bool disposing)

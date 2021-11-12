@@ -120,6 +120,7 @@ namespace Hazel.Dtls
 
                 this.NextEpoch.State = HandshakeState.ExpectingHello;
                 this.NextEpoch.RecordProtection = null;
+                this.NextEpoch.Handshake = null;
                 this.NextEpoch.ClientRandom = new byte[Random.Size];
                 this.NextEpoch.ServerRandom = new byte[Random.Size];
                 this.NextEpoch.VerificationStream = new Sha256Stream();
@@ -155,6 +156,7 @@ namespace Hazel.Dtls
         private static readonly TimeSpan CookieHmacRotationTimeout = TimeSpan.FromHours(1.0);
 
         private readonly ConcurrentDictionary<IPEndPoint, PeerData> existingPeers = new ConcurrentDictionary<IPEndPoint, PeerData>();
+        public int PeerCount => this.existingPeers.Count;
 
         private int connectionSerial_unsafe =  0;
 
@@ -654,7 +656,7 @@ namespace Hazel.Dtls
                             // Either way, there is not a feasible
                             // way to progress the connection.
                             base.MarkConnectionAsStale(peer.ConnectionId);
-                            this.existingPeers.TryRemove(peerAddress, out peer);
+                            this.existingPeers.TryRemove(peerAddress, out _);
                             return false;
                         }
 
@@ -1073,17 +1075,17 @@ namespace Hazel.Dtls
             // from a non-peer.
             if (record.Length != message.Length)
             {
-                ///NOTE(mendsley): This isn't always fatal.
-                /// However, this is an indication that something
-                /// fishy is going on. In the best case, there's a
-                /// bug on the client or in the UDP stack (some
-                /// stacks don't both to verify the checksum). In the
-                /// worst case we're dealing with a malicious actor.
-                /// In the malicious case, we'll end up dropping the
-                /// connection later in the process.
-                this.Logger.WriteInfo($"Received multiple record from non-peer `{peerAddress}`. Dropping all but first");
+                // NOTE(mendsley): This isn't always fatal.
+                // However, this is an indication that something
+                // fishy is going on. In the best case, there's a
+                // bug on the client or in the UDP stack (some
+                // stacks don't both to verify the checksum). In the
+                // worst case we're dealing with a malicious actor.
+                // In the malicious case, we'll end up dropping the
+                // connection later in the process.
                 if (message.Length < record.Length)
                 {
+                    this.Logger.WriteInfo($"Dropping bad record from non-peer `{peerAddress}`. Msg length {message.Length} < {record.Length}");
                     return;
                 }
             }
@@ -1285,7 +1287,7 @@ namespace Hazel.Dtls
             foreach (KeyValuePair<IPEndPoint, PeerData> kvp in this.existingPeers)
             {
                 PeerData peer = kvp.Value;
-                lock(peer)
+                lock (peer)
                 {
                     if (peer.Epoch == 0 || peer.NextEpoch.State != HandshakeState.ExpectingHello)
                     {
@@ -1299,6 +1301,12 @@ namespace Hazel.Dtls
             }
 
             base.DisconnectOldConnections(maxAge, disconnectMessage);
+        }
+
+        /// <inheritdoc />
+        internal override void RemovePeerRecord(ConnectionId connectionId)
+        {
+            this.existingPeers.TryRemove(connectionId.EndPoint, out _);
         }
 
         /// <summary>
