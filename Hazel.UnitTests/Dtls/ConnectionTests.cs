@@ -104,7 +104,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         }
 
         [TestMethod]
-        public void TestClientConnects()
+        public void DtlsServerDisposeDisconnectsTest()
         {
             IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 27510);
 
@@ -114,12 +114,9 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
             Semaphore signal = new Semaphore(0, int.MaxValue);
 
-            using (DtlsConnectionListener listener = new DtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, ep.Port), new TestLogger()))
-            using (DtlsUnityConnection connection = new DtlsUnityConnection(new TestLogger(), ep))
+            using (var listener = (DtlsConnectionListener)CreateListener(2, new IPEndPoint(IPAddress.Any, ep.Port), new TestLogger()))
+            using (var connection = CreateConnection(ep, new TestLogger()))
             {
-                listener.SetCertificate(GetCertificateForServer());
-                connection.SetValidServerCertificates(GetCertificateForClient());
-
                 listener.NewConnection += (evt) =>
                 {
                     serverConnected = true;
@@ -147,6 +144,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 Assert.IsTrue(serverConnected);
                 Assert.IsTrue(clientDisconnected);
                 Assert.IsFalse(serverDisconnected);
+                Assert.AreEqual(0, listener.PeerCount);
             }
         }
 
@@ -311,6 +309,8 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 Assert.IsTrue(listener.ReceiveThreadRunning, "Listener should be able to handle a malformed hello packet");
                 Assert.AreEqual(ConnectionState.NotConnected, connection.State);
 
+                Assert.AreEqual(0, listener.PeerCount);
+
                 // wait for the client to disconnect
                 listener.Dispose();
                 signal.WaitOne(100);
@@ -388,6 +388,54 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 Assert.IsTrue(clientDisconnected);
                 Assert.IsFalse(serverDisconnected);
             }
+        }
+
+        /// <summary>
+        ///     Tests the keepalive functionality from the client,
+        /// </summary>
+        [TestMethod]
+        public void PingDisconnectClientTest()
+        {
+#if DEBUG
+            IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 27510);
+            using (DtlsConnectionListener listener = (DtlsConnectionListener)CreateListener(2, new IPEndPoint(IPAddress.Any, ep.Port), new TestLogger()))
+            {
+                // Adjust the ping rate to end the test faster
+                listener.NewConnection += (evt) =>
+                {
+                    var conn = (ThreadLimitedUdpServerConnection)evt.Connection;
+                    conn.KeepAliveInterval = 100;
+                    conn.MissingPingsUntilDisconnect = 3;
+                };
+
+                listener.Start();
+
+                for (int i = 0; i < 5; ++i)
+                {
+                    using (DtlsUnityConnection connection = (DtlsUnityConnection)CreateConnection(ep, new TestLogger()))
+                    {
+                        connection.KeepAliveInterval = 100;
+                        connection.MissingPingsUntilDisconnect = 3;
+                        connection.Connect();
+
+                        Thread.Sleep(10);
+
+                        // After connecting, quietly stop responding to all messages to fake connection loss.
+                        connection.TestDropRate = 1;
+
+                        Thread.Sleep(500);    //Enough time for ~3 keep alive packets
+
+                        Assert.AreEqual(ConnectionState.NotConnected, connection.State);
+                    }
+                }
+
+                listener.DisconnectOldConnections(TimeSpan.FromMilliseconds(500), null);
+
+                Assert.AreEqual(0, listener.PeerCount, "All clients disconnected, peer count should be zero.");
+            }
+#else
+            Assert.Inconclusive("Only works in DEBUG");
+#endif
         }
     }
 }
