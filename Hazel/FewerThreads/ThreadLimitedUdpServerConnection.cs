@@ -7,7 +7,7 @@ namespace Hazel.Udp.FewerThreads
     /// Represents a servers's connection to a client that uses the UDP protocol.
     /// </summary>
     /// <inheritdoc/>
-    internal sealed class ThreadLimitedUdpServerConnection : UdpConnection
+    public sealed class ThreadLimitedUdpServerConnection : UdpConnection
     {
         public readonly DateTime CreationTime = DateTime.UtcNow;
 

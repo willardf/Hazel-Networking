@@ -435,24 +435,37 @@ namespace Hazel.UnitTests
             using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
             using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
-
-                ManualResetEvent mutex = new ManualResetEvent(false);
+                SemaphoreSlim mutex = new SemaphoreSlim(0, 100);
+                ManualResetEventSlim serverMutex = new ManualResetEventSlim(false);
 
                 connection.Disconnected += delegate (object sender, DisconnectedEventArgs args)
                 {
-                    mutex.Set();
+                    mutex.Release();
                 };
 
                 listener.NewConnection += delegate (NewConnectionEventArgs args)
                 {
-                    args.Connection.Disconnect("Testing");
+                    mutex.Release();
+
+                    // This has to be on a new thread because the client will go straight from Connecting to NotConnected
+                    ThreadPool.QueueUserWorkItem(_ =>
+                    {
+                        serverMutex.Wait(500);
+                        args.Connection.Disconnect("Testing");
+                    });
                 };
 
                 listener.Start();
 
                 connection.Connect();
 
-                mutex.WaitOne();
+                mutex.Wait(500);
+                Assert.AreEqual(ConnectionState.Connected, connection.State);
+
+                serverMutex.Set();
+
+                mutex.Wait(500);
+                Assert.AreEqual(ConnectionState.NotConnected, connection.State);
             }
         }
 
