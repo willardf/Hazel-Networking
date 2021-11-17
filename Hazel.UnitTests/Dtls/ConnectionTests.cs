@@ -338,6 +338,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 Thread throttleThread = new Thread(() => {
                     // HelloVerifyRequest
                     listenerToConnectionThrottle.Release(1);
+
                     // ServerHello, Server Certificate
                     listenerToConnectionThrottle.Release(1);
 
@@ -356,6 +357,57 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                     capture.SendToLocalSemaphore = null;
                 });
                 throttleThread.Start();
+
+                listener.SetCertificate(GetCertificateForServer());
+                connection.SetValidServerCertificates(GetCertificateForClient());
+
+                listener.NewConnection += (evt) =>
+                {
+                    serverConnected = true;
+                    signal.Release();
+                    evt.Connection.Disconnected += (o, et) => {
+                        serverDisconnected = true;
+                    };
+                };
+                connection.Disconnected += (o, evt) => {
+                    clientDisconnected = true;
+                    signal.Release();
+                };
+
+                listener.Start();
+                connection.Connect();
+
+                // wait for the client to connect
+                signal.WaitOne(10);
+
+                listener.Dispose();
+
+                // wait for the client to disconnect
+                signal.WaitOne(100);
+
+                Assert.IsTrue(serverConnected);
+                Assert.IsTrue(clientDisconnected);
+                Assert.IsFalse(serverDisconnected);
+            }
+        }
+
+        [TestMethod]
+        public void TestConnectionSuccessAfterClientKeyExchangeFlightDropped()
+        {
+            IPEndPoint captureEndPoint = new IPEndPoint(IPAddress.Loopback, 27511);
+            IPEndPoint listenerEndPoint = new IPEndPoint(IPAddress.Loopback, 27510);
+
+            bool serverConnected = false;
+            bool serverDisconnected = false;
+            bool clientDisconnected = false;
+
+            Semaphore signal = new Semaphore(0, int.MaxValue);
+
+            using (SocketCapture capture = new SocketCapture(captureEndPoint, listenerEndPoint))
+            using (DtlsConnectionListener listener = new DtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, listenerEndPoint.Port), new TestLogger()))
+            using (TestDtlsHandshakeDropUnityConnection connection = new TestDtlsHandshakeDropUnityConnection(new TestLogger(), captureEndPoint))
+            {
+                connection.DropSendClientKeyExchangeFlightCount = 1;
 
                 listener.SetCertificate(GetCertificateForServer());
                 connection.SetValidServerCertificates(GetCertificateForClient());
