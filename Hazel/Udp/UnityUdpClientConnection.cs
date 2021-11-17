@@ -64,6 +64,7 @@ namespace Hazel.Udp
         {
             try
             {
+                this.Statistics.LogPacketSend(length);
                 socket.BeginSendTo(
                     bytes,
                     0,

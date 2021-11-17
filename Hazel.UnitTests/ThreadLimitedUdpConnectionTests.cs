@@ -192,6 +192,8 @@ namespace Hazel.UnitTests
                 listener.Start();
 
                 connection.Connect();
+
+                Assert.AreEqual(ConnectionState.Connected, connection.State);
             }
         }
 
