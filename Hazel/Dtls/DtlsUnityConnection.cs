@@ -1074,7 +1074,7 @@ namespace Hazel.Dtls
 
             // Calculate the hash of the verification stream
             ByteSpan handshakeHash = new byte[Sha256Stream.DigestSize];
-            this.nextEpoch.VerificationStream.CalculateHash(handshakeHash);
+            this.nextEpoch.VerificationStream.CopyOrCalculateFinalHash(handshakeHash);
 
             // Expand our master secret into Finished digests for the client and server
             PrfSha256.ExpandSecret(

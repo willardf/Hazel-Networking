@@ -574,7 +574,7 @@ namespace Hazel.Dtls
 
                         // Generate verification signatures
                         ByteSpan handshakeStreamHash = new byte[Sha256Stream.DigestSize];
-                        peer.NextEpoch.VerificationStream.CalculateHash(handshakeStreamHash);
+                        peer.NextEpoch.VerificationStream.CopyOrCalculateFinalHash(handshakeStreamHash);
 
                         PrfSha256.ExpandSecret(
                             peer.NextEpoch.ClientVerification

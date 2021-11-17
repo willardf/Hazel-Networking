@@ -67,7 +67,7 @@ namespace Hazel.Crypto
         /// <param name="output">
         /// Target span to which the hash will be written
         /// </param>
-        public void CalculateHash(ByteSpan output)
+        public void CopyOrCalculateFinalHash(ByteSpan output)
         {
             if (output.Length != DigestSize)
             {
