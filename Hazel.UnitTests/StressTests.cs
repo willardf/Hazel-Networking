@@ -63,6 +63,7 @@ namespace Hazel.UnitTests
                 }
             }
         }
+
         public static byte[] StringToByteArray(string hex)
         {
             return Enumerable.Range(0, hex.Length / 2)

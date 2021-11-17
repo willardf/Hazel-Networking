@@ -172,50 +172,54 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
         class MalformedDTLSClient : DtlsUnityConnection
         {
+            public Func<ClientHello, ByteSpan, ByteSpan> EncodeClientHelloCallback = Test_CompressionLengthOverrunClientHello;
+
             public MalformedDTLSClient(ILogger logger, IPEndPoint remoteEndPoint, IPMode ipMode = IPMode.IPv4) : base(logger, remoteEndPoint, ipMode)
             {
-                
+
             }
 
             protected override void SendClientHello()
             {
-                Test_SendClientHello((clientHello, writer) =>
-                {
-                    ByteSpanBigEndianExtensions.WriteBigEndian16(writer, (ushort)ProtocolVersion.DTLS1_2);
-                    writer = writer.Slice(2);
+                Test_SendClientHello(EncodeClientHelloCallback);
+            }
 
-                    clientHello.Random.CopyTo(writer);
-                    writer = writer.Slice(Hazel.Dtls.Random.Size);
+            public static ByteSpan Test_CompressionLengthOverrunClientHello(ClientHello clientHello, ByteSpan writer)
+            {
+                ByteSpanBigEndianExtensions.WriteBigEndian16(writer, (ushort)ProtocolVersion.DTLS1_2);
+                writer = writer.Slice(2);
 
-                    // Do not encode session ids
-                    writer[0] = (byte)0;
-                    writer = writer.Slice(1);
+                clientHello.Random.CopyTo(writer);
+                writer = writer.Slice(Hazel.Dtls.Random.Size);
 
-                    writer[0] = (byte)clientHello.Cookie.Length;
-                    clientHello.Cookie.CopyTo(writer.Slice(1));
-                    writer = writer.Slice(1 + clientHello.Cookie.Length);
+                // Do not encode session ids
+                writer[0] = (byte)0;
+                writer = writer.Slice(1);
 
-                    ByteSpanBigEndianExtensions.WriteBigEndian16(writer, (ushort)clientHello.CipherSuites.Length);
-                    clientHello.CipherSuites.CopyTo(writer.Slice(2));
-                    writer = writer.Slice(2 + clientHello.CipherSuites.Length);
+                writer[0] = (byte)clientHello.Cookie.Length;
+                clientHello.Cookie.CopyTo(writer.Slice(1));
+                writer = writer.Slice(1 + clientHello.Cookie.Length);
 
-                    // ============ Here is the corruption. writer[0] should be 1. ============
-                    writer[0] = 255;
-                    writer[1] = (byte)CompressionMethod.Null;
-                    writer = writer.Slice(2);
+                ByteSpanBigEndianExtensions.WriteBigEndian16(writer, (ushort)clientHello.CipherSuites.Length);
+                clientHello.CipherSuites.CopyTo(writer.Slice(2));
+                writer = writer.Slice(2 + clientHello.CipherSuites.Length);
 
-                    // Extensions size
-                    ByteSpanBigEndianExtensions.WriteBigEndian16(writer, (ushort)(6 + clientHello.SupportedCurves.Length));
-                    writer = writer.Slice(2);
+                // ============ Here is the corruption. writer[0] should be 1. ============
+                writer[0] = 255;
+                writer[1] = (byte)CompressionMethod.Null;
+                writer = writer.Slice(2);
 
-                    // Supported curves extension
-                    ByteSpanBigEndianExtensions.WriteBigEndian16(writer, (ushort)ExtensionType.EllipticCurves);
-                    ByteSpanBigEndianExtensions.WriteBigEndian16(writer, (ushort)(2 + clientHello.SupportedCurves.Length), 2);
-                    ByteSpanBigEndianExtensions.WriteBigEndian16(writer, (ushort)clientHello.SupportedCurves.Length, 4);
-                    clientHello.SupportedCurves.CopyTo(writer.Slice(6));
+                // Extensions size
+                ByteSpanBigEndianExtensions.WriteBigEndian16(writer, (ushort)(6 + clientHello.SupportedCurves.Length));
+                writer = writer.Slice(2);
 
-                    return writer;
-                });
+                // Supported curves extension
+                ByteSpanBigEndianExtensions.WriteBigEndian16(writer, (ushort)ExtensionType.EllipticCurves);
+                ByteSpanBigEndianExtensions.WriteBigEndian16(writer, (ushort)(2 + clientHello.SupportedCurves.Length), 2);
+                ByteSpanBigEndianExtensions.WriteBigEndian16(writer, (ushort)clientHello.SupportedCurves.Length, 4);
+                clientHello.SupportedCurves.CopyTo(writer.Slice(6));
+
+                return writer;
             }
         }
 

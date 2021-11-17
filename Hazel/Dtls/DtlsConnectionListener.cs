@@ -158,6 +158,12 @@ namespace Hazel.Dtls
         private readonly ConcurrentDictionary<IPEndPoint, PeerData> existingPeers = new ConcurrentDictionary<IPEndPoint, PeerData>();
         public int PeerCount => this.existingPeers.Count;
 
+        // TODO: Move these into an DtlsErrorStatistics class
+        public int NonPeerNonHelloPacketsDropped;
+        public int NonVerifiedFinishedHandshake;
+        public int NonPeerVerifyHelloRequests;
+        public int PeerVerifyHelloRequests;
+
         private int connectionSerial_unsafe =  0;
 
         /// <summary>
@@ -646,7 +652,12 @@ namespace Hazel.Dtls
                         }
                         else if (1 != Crypto.Const.ConstantCompareSpans(payload, peer.CurrentEpoch.ExpectedClientFinishedVerification))
                         {
+
+#if DEBUG
                             this.Logger.WriteError($"Dropping non-verified Finished Handshake from `{peerAddress}`");
+#else
+                            Interlocked.Increment(ref this.NonVerifiedFinishedHandshake);
+#endif
 
                             // Abort the connection here
                             //
@@ -657,6 +668,7 @@ namespace Hazel.Dtls
                             // way to progress the connection.
                             base.MarkConnectionAsStale(peer.ConnectionId);
                             this.existingPeers.TryRemove(peerAddress, out _);
+
                             return false;
                         }
 
@@ -798,6 +810,11 @@ namespace Hazel.Dtls
                         recordProtection = peer.CurrentEpoch.RecordProtection;
                     }
 
+#if DEBUG
+                    this.Logger.WriteError($"Sending HelloVerifyRequest to peer `{peerAddress}`");
+#else
+                    Interlocked.Increment(ref this.PeerVerifyHelloRequests);
+#endif
                     this.SendHelloVerifyRequest(peerAddress, outgoingSequence, record.Epoch, recordProtection);
                     return true;
                 }
@@ -1118,7 +1135,11 @@ namespace Hazel.Dtls
             // We only accept ClientHello messages from non-peers
             if (handshake.MessageType != HandshakeType.ClientHello)
             {
+#if DEBUG
                 this.Logger.WriteError($"Dropping non-ClientHello ({handshake.MessageType}) message from non-peer `{peerAddress}`");
+#else
+                Interlocked.Increment(ref this.NonPeerNonHelloPacketsDropped);
+#endif
                 return;
             }
             message = message.Slice(Handshake.Size);
@@ -1136,6 +1157,11 @@ namespace Hazel.Dtls
             {
                 if (!HelloVerifyRequest.VerifyCookie(clientHello.Cookie, peerAddress, this.previousCookieHmac))
                 {
+#if DEBUG
+                    this.Logger.WriteError($"Sending HelloVerifyRequest to non-peer `{peerAddress}`");
+#else
+                    Interlocked.Increment(ref this.NonPeerVerifyHelloRequests);
+#endif
                     this.SendHelloVerifyRequest(peerAddress, 1, 0, NullRecordProtection.Instance);
                     return;
                 }

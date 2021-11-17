@@ -26,6 +26,9 @@ namespace Hazel
             }
         }
 
+        private int packetsSent;
+        public int PacketsSent => this.packetsSent;
+
         /// <summary>
         ///     The number of messages sent larger than 576 bytes. This is smaller than most default MTUs.
         /// </summary>
@@ -404,6 +407,11 @@ namespace Hazel
             Interlocked.Increment(ref unreliableMessagesSent);
             Interlocked.Add(ref dataBytesSent, dataLength);
             Interlocked.Add(ref totalBytesSent, totalLength);
+        }
+
+        internal void LogPacketSend(int totalLength)
+        {
+            Interlocked.Increment(ref this.packetsSent);
 
             if (totalLength > ExpectedMTU)
             {
@@ -424,11 +432,6 @@ namespace Hazel
             Interlocked.Increment(ref reliableMessagesSent);
             Interlocked.Add(ref dataBytesSent, dataLength);
             Interlocked.Add(ref totalBytesSent, totalLength);
-
-            if (totalLength > ExpectedMTU)
-            {
-                Interlocked.Increment(ref fragmentableMessagesSent);
-            }
         }
 
         /// <summary>
@@ -444,11 +447,6 @@ namespace Hazel
             Interlocked.Increment(ref fragmentedMessagesSent);
             Interlocked.Add(ref dataBytesSent, dataLength);
             Interlocked.Add(ref totalBytesSent, totalLength);
-
-            if (totalLength > ExpectedMTU)
-            {
-                Interlocked.Increment(ref fragmentableMessagesSent);
-            }
         }
 
         /// <summary>
