@@ -21,7 +21,7 @@ namespace Hazel.UnitTests.Crypto
             using (Sha256Stream sha256 = new Sha256Stream())
             {
                 sha256.AddData(message);
-                sha256.CalculateHash(actualDigest);
+                sha256.CopyOrCalculateFinalHash(actualDigest);
             }
 
             CollectionAssert.AreEqual(expectedDigest, actualDigest);
@@ -41,7 +41,7 @@ namespace Hazel.UnitTests.Crypto
             using (Sha256Stream sha256 = new Sha256Stream())
             {
                 sha256.AddData(message);
-                sha256.CalculateHash(actualDigest);
+                sha256.CopyOrCalculateFinalHash(actualDigest);
             }
 
             CollectionAssert.AreEqual(expectedDigest, actualDigest);
@@ -61,7 +61,7 @@ namespace Hazel.UnitTests.Crypto
             using (Sha256Stream sha256 = new Sha256Stream())
             {
                 sha256.AddData(message);
-                sha256.CalculateHash(actualDigest);
+                sha256.CopyOrCalculateFinalHash(actualDigest);
             }
 
             CollectionAssert.AreEqual(expectedDigest, actualDigest);

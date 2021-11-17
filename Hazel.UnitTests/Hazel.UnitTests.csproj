@@ -65,6 +65,7 @@
     <Compile Include="Crypto\X25519Tests.cs" />
     <Compile Include="Dtls\AesGcmRecordProtectedTests.cs" />
     <Compile Include="Dtls\ConnectionTests.cs" />
+    <Compile Include="Dtls\TestDtlsHandshakeDropUnityConnection.cs" />
     <Compile Include="Dtls\X25519EcdheRsaSha256Tests.cs" />
     <Compile Include="MessageReaderTests.cs" />
     <Compile Include="SocketCapture.cs" />

@@ -81,6 +81,8 @@ namespace Hazel.Dtls
             public ByteSpan CertificatePayload;
         }
 
+        protected readonly ILogger logger = null;
+
         private readonly object syncRoot = new object();
         private readonly RandomNumberGenerator random = RandomNumberGenerator.Create();
 
@@ -92,8 +94,6 @@ namespace Hazel.Dtls
         private readonly List<ByteSpan> queuedApplicationData = new List<ByteSpan>();
 
         private X509Certificate2Collection serverCertificates = new X509Certificate2Collection();
-
-        private readonly ILogger logger = null;
 
         /// <summary>
         /// Create a new instance of the DTLS connection
@@ -1074,7 +1074,7 @@ namespace Hazel.Dtls
 
             // Calculate the hash of the verification stream
             ByteSpan handshakeHash = new byte[Sha256Stream.DigestSize];
-            this.nextEpoch.VerificationStream.CalculateHash(handshakeHash);
+            this.nextEpoch.VerificationStream.CopyOrCalculateFinalHash(handshakeHash);
 
             // Expand our master secret into Finished digests for the client and server
             PrfSha256.ExpandSecret(
@@ -1115,7 +1115,18 @@ namespace Hazel.Dtls
 
             this.nextEpoch.State = HandshakeState.ExpectingChangeCipherSpec;
             this.nextEpoch.NextPacketResendTime = DateTime.UtcNow + this.handshakeResendTimeout;
+#if DEBUG
+            if (DropClientKeyExchangeFlight())
+            {
+                return;
+            }
+#endif
             base.WriteBytesToConnection(packet.GetUnderlyingArray(), packet.Length);
+        }
+
+        protected virtual bool DropClientKeyExchangeFlight()
+        {
+            return false;
         }
     }
 }

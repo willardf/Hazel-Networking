@@ -14,6 +14,7 @@ namespace Hazel.Crypto
         public const int DigestSize = 32;
 
         private SHA256 hash = SHA256.Create();
+        private bool isHashFinished = false;
 
         struct EmptyArray
         {
@@ -45,6 +46,7 @@ namespace Hazel.Crypto
         {
             this.hash?.Dispose();
             this.hash = SHA256.Create();
+            this.isHashFinished = false;
         }
 
         /// <summary>
@@ -65,14 +67,19 @@ namespace Hazel.Crypto
         /// <param name="output">
         /// Target span to which the hash will be written
         /// </param>
-        public void CalculateHash(ByteSpan output)
+        public void CopyOrCalculateFinalHash(ByteSpan output)
         {
             if (output.Length != DigestSize)
             {
                 throw new ArgumentException($"Expected a span of {DigestSize} bytes. Got a span of {output.Length} bytes", nameof(output));
             }
 
-            this.hash.TransformFinalBlock(EmptyArray.Value, 0, 0);
+            if (this.isHashFinished == false)
+            {
+                this.hash.TransformFinalBlock(EmptyArray.Value, 0, 0);
+                this.isHashFinished = true;
+            }
+
             new ByteSpan(this.hash.Hash).CopyTo(output);
         }
     }
