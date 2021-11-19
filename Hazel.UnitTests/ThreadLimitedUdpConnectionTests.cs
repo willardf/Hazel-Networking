@@ -371,9 +371,12 @@ namespace Hazel.UnitTests
                     client = (UdpConnection)args.Connection;
                     client.KeepAliveInterval = 100;
 
-                    Thread.Sleep(1050);    //Enough time for ~10 keep alive packets
-
-                    mutex.Set();
+                    Thread timeoutThread = new Thread(() =>
+                    {
+                        Thread.Sleep(1050);    //Enough time for ~10 keep alive packets
+                        mutex.Set();
+                    });
+                    timeoutThread.Start();
                 };
 
                 listener.Start();

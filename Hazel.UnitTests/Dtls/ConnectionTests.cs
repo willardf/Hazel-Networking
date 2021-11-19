@@ -161,11 +161,6 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 reader.Length = packet.Length;
                 Array.Copy(packet.GetUnderlyingArray(), packet.Offset, reader.Buffer, reader.Offset, packet.Length);
 
-                this.ProcessIncomingMessageFromOtherThread(reader, peerAddress, connectionId);
-            }
-
-            protected override void ProcessIncomingMessageFromOtherThread(MessageReader reader, IPEndPoint peerAddress, ConnectionId connectionId)
-            {
                 base.ProcessIncomingMessageFromOtherThread(reader, peerAddress, connectionId);
             }
         }

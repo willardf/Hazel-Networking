@@ -253,7 +253,7 @@ namespace Hazel.Dtls
         /// This is primarily a wrapper around ProcessIncomingMessage
         /// to ensure `reader.Recycle()` is always called
         /// </summary>
-        protected override void ProcessIncomingMessageFromOtherThread(MessageReader reader, IPEndPoint peerAddress, ConnectionId connectionId)
+        protected override void ReadCallback(MessageReader reader, IPEndPoint peerAddress, ConnectionId connectionId)
         {
             ByteSpan message = new ByteSpan(reader.Buffer, reader.Offset + reader.Position, reader.BytesRemaining);
             this.ProcessIncomingMessage(message, peerAddress);
@@ -457,7 +457,7 @@ namespace Hazel.Dtls
                             reader.Length = recordPayload.Length;
                             recordPayload.CopyTo(reader.Buffer);
 
-                            base.ProcessIncomingMessageFromOtherThread(reader, peerAddress, peer.ConnectionId);
+                            base.ReadCallback(reader, peerAddress, peer.ConnectionId);
                             break;
                     }
                 }
