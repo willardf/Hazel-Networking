@@ -131,7 +131,7 @@ namespace Hazel.Udp
         public override void Connect(byte[] bytes = null, int timeout = 5000)
         {
             this.ConnectAsync(bytes);
-            for(int timer = 0; timer < timeout; timeout += 100)
+            for(int timer = 0; timer < timeout; timer += 100)
             {
                 if (this.State != ConnectionState.Connecting) return;
                 Thread.Sleep(100);

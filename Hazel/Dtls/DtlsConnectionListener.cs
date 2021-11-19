@@ -155,6 +155,7 @@ namespace Hazel.Dtls
         private DateTime nextCookieHmacRotation;
         private static readonly TimeSpan CookieHmacRotationTimeout = TimeSpan.FromHours(1.0);
 
+        private ConcurrentStack<ConnectionId> staleConnections = new ConcurrentStack<ConnectionId>();
         private readonly ConcurrentDictionary<IPEndPoint, PeerData> existingPeers = new ConcurrentDictionary<IPEndPoint, PeerData>();
         public int PeerCount => this.existingPeers.Count;
 
@@ -165,6 +166,8 @@ namespace Hazel.Dtls
         public int PeerVerifyHelloRequests;
 
         private int connectionSerial_unsafe =  0;
+
+        private Timer staleConnectionUpkeep;
 
         /// <summary>
         /// Create a new instance of the DTLS listener
@@ -181,12 +184,16 @@ namespace Hazel.Dtls
             this.currentCookieHmac = CreateNewCookieHMAC();
             this.previousCookieHmac = CreateNewCookieHMAC();
             this.nextCookieHmacRotation = DateTime.UtcNow + CookieHmacRotationTimeout;
+
+            this.staleConnectionUpkeep = new Timer(this.HandleStaleConnections, null, 2500, 1000);
         }
 
         /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
             base.Dispose(disposing);
+
+            this.staleConnectionUpkeep.Dispose();
 
             this.random?.Dispose();
             this.random = null;
@@ -666,7 +673,7 @@ namespace Hazel.Dtls
                             //
                             // Either way, there is not a feasible
                             // way to progress the connection.
-                            base.MarkConnectionAsStale(peer.ConnectionId);
+                            MarkConnectionAsStale(peer.ConnectionId);
                             this.existingPeers.TryRemove(peerAddress, out _);
 
                             return false;
@@ -830,7 +837,7 @@ namespace Hazel.Dtls
 
                 // Inform the parent layer that the existing
                 // connection should be abandoned.
-                base.MarkConnectionAsStale(oldConnectionId);
+                MarkConnectionAsStale(oldConnectionId);
             }
 
             // Determine if this is an original message, or a retransmission
@@ -1306,9 +1313,9 @@ namespace Hazel.Dtls
             }
         }
 
-        /// <inheritdoc />
-        public override void DisconnectOldConnections(TimeSpan maxAge, MessageWriter disconnectMessage)
+        private void HandleStaleConnections(object _)
         {
+            TimeSpan maxAge = TimeSpan.FromSeconds(2.5f);
             DateTime now = DateTime.UtcNow;
             foreach (KeyValuePair<IPEndPoint, PeerData> kvp in this.existingPeers)
             {
@@ -1320,13 +1327,29 @@ namespace Hazel.Dtls
                         TimeSpan negotiationAge = now - peer.StartOfNegotiation;
                         if (negotiationAge > maxAge)
                         {
-                            base.MarkConnectionAsStale(peer.ConnectionId);
+                            MarkConnectionAsStale(peer.ConnectionId);
                         }
                     }
                 }
             }
 
-            base.DisconnectOldConnections(maxAge, disconnectMessage);
+            ConnectionId connectionId;
+            while (this.staleConnections.TryPop(out connectionId))
+            {
+                ThreadLimitedUdpServerConnection connection;
+                if (this.allConnections.TryGetValue(connectionId, out connection))
+                {
+                    connection.Disconnect("Stale Connection", null);
+                }
+            }
+        }
+
+        protected void MarkConnectionAsStale(ConnectionId connectionId)
+        {
+            if (this.allConnections.ContainsKey(connectionId))
+            {
+                this.staleConnections.Push(connectionId);
+            }
         }
 
         /// <inheritdoc />
