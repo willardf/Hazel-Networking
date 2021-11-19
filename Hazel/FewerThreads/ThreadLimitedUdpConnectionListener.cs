@@ -255,7 +255,7 @@ namespace Hazel.Udp.FewerThreads
             }
         }
 
-        protected virtual void ProcessIncomingMessageFromOtherThread(MessageReader message, IPEndPoint remoteEndPoint, ConnectionId connectionId)
+        protected void ProcessIncomingMessageFromOtherThread(MessageReader message, IPEndPoint remoteEndPoint, ConnectionId connectionId)
         {
             this.receiveQueue.Add(new ReceiveMessageInfo() { Message = message, Sender = remoteEndPoint, ConnectionId = connectionId });
         }
@@ -284,7 +284,7 @@ namespace Hazel.Udp.FewerThreads
             }
         }
 
-        void ReadCallback(MessageReader message, IPEndPoint remoteEndPoint, ConnectionId connectionId)
+        protected virtual void ReadCallback(MessageReader message, IPEndPoint remoteEndPoint, ConnectionId connectionId)
         {
             int bytesReceived = message.Length;
             bool aware = true;
