@@ -279,8 +279,13 @@ namespace Hazel.Dtls
                 return;
             }
 
+            List<MessageReader> applicationMessages = new List<MessageReader>();
+            ConnectionId peerConnectionId;
+
             lock (peer)
             {
+                peerConnectionId = peer.ConnectionId;
+
                 // Each incoming packet may contain multiple DTLS
                 // records
                 while (message.Length > 0)
@@ -464,10 +469,18 @@ namespace Hazel.Dtls
                             reader.Length = recordPayload.Length;
                             recordPayload.CopyTo(reader.Buffer);
 
-                            base.ReadCallback(reader, peerAddress, peer.ConnectionId);
+                            applicationMessages.Add(reader);
                             break;
                     }
                 }
+            }
+
+            // The peer lock must be exited before leaving the DtlsConnectionListener context to prevent deadlocks
+            //   because ApplicationData processing may reenter this context
+            int numberApplicationMessages = applicationMessages.Count;
+            for (int i = 0; i < numberApplicationMessages; ++i)
+            {
+                base.ReadCallback(applicationMessages[i], peerAddress, peerConnectionId);
             }
         }
 
