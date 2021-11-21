@@ -481,9 +481,12 @@ namespace Hazel.Dtls
                 data[ii] = address[ii];
             }
 
-            ///NOTE(mendsley): Lame that we need to allocate+copy here
-            ByteSpan signature = hmac.ComputeHash(data);
-            return signature.Slice(0, CookieSize);
+            lock (hmac)
+            {
+                ///NOTE(mendsley): Lame that we need to allocate+copy here
+                ByteSpan signature = hmac.ComputeHash(data);
+                return signature.Slice(0, CookieSize);
+            }
         }
 
         /// <summary>

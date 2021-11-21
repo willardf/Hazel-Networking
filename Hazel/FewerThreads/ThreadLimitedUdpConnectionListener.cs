@@ -221,6 +221,7 @@ namespace Hazel.Udp.FewerThreads
                 }
             }
         }
+
         private void ProcessingLoop()
         {
             foreach (ReceiveMessageInfo msg in this.receiveQueue.GetConsumingEnumerable())

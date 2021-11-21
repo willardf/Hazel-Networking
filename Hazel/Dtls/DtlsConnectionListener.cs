@@ -90,6 +90,7 @@ namespace Hazel.Dtls
             public ConnectionId ConnectionId;
 
             public readonly List<ByteSpan> QueuedApplicationDataMessage = new List<ByteSpan>();
+            public readonly ConcurrentBag<MessageReader> ApplicationData = new ConcurrentBag<MessageReader>();
 
             public DateTime StartOfNegotiation;
 
@@ -139,6 +140,15 @@ namespace Hazel.Dtls
                 this.NextEpoch.RecordProtection?.Dispose();
                 this.NextEpoch.Handshake?.Dispose();
                 this.NextEpoch.VerificationStream?.Dispose();
+
+                while (this.ApplicationData.TryTake(out var msg))
+                {
+                    try
+                    {
+                        msg.Recycle();
+                    }
+                    catch { }
+                }
             }
         }
 
@@ -262,9 +272,15 @@ namespace Hazel.Dtls
         /// </summary>
         protected override void ReadCallback(MessageReader reader, IPEndPoint peerAddress, ConnectionId connectionId)
         {
-            ByteSpan message = new ByteSpan(reader.Buffer, reader.Offset + reader.Position, reader.BytesRemaining);
-            this.ProcessIncomingMessage(message, peerAddress);
-            reader.Recycle();
+            try
+            {
+                ByteSpan message = new ByteSpan(reader.Buffer, reader.Offset + reader.Position, reader.BytesRemaining);
+                this.ProcessIncomingMessage(message, peerAddress);
+            }
+            finally
+            {
+                reader.Recycle();
+            }
         }
 
         /// <summary>
@@ -279,7 +295,6 @@ namespace Hazel.Dtls
                 return;
             }
 
-            List<MessageReader> applicationMessages = new List<MessageReader>();
             ConnectionId peerConnectionId;
 
             lock (peer)
@@ -469,7 +484,7 @@ namespace Hazel.Dtls
                             reader.Length = recordPayload.Length;
                             recordPayload.CopyTo(reader.Buffer);
 
-                            applicationMessages.Add(reader);
+                            peer.ApplicationData.Add(reader);
                             break;
                     }
                 }
@@ -477,10 +492,9 @@ namespace Hazel.Dtls
 
             // The peer lock must be exited before leaving the DtlsConnectionListener context to prevent deadlocks
             //   because ApplicationData processing may reenter this context
-            int numberApplicationMessages = applicationMessages.Count;
-            for (int i = 0; i < numberApplicationMessages; ++i)
+            while (peer.ApplicationData.TryTake(out var appMsg))
             {
-                base.ReadCallback(applicationMessages[i], peerAddress, peerConnectionId);
+                base.ReadCallback(appMsg, peerAddress, peerConnectionId);
             }
         }
 
@@ -1178,7 +1192,7 @@ namespace Hazel.Dtls
                 if (!HelloVerifyRequest.VerifyCookie(clientHello.Cookie, peerAddress, this.previousCookieHmac))
                 {
 #if DEBUG
-                    this.Logger.WriteError($"Sending HelloVerifyRequest to non-peer `{peerAddress}`");
+                    this.Logger.WriteVerbose($"Sending HelloVerifyRequest to non-peer `{peerAddress}`");
 #else
                     Interlocked.Increment(ref this.NonPeerVerifyHelloRequests);
 #endif
