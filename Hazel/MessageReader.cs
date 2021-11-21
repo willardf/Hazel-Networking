@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -20,6 +22,8 @@ namespace Hazel
 
         private MessageReader Parent;
 
+        public Stack<StackTrace> recycles = new Stack<StackTrace>();
+
         public int Position
         {
             get { return this._position; }
@@ -36,6 +40,7 @@ namespace Hazel
         public static MessageReader GetSized(int minSize)
         {
             var output = ReaderPool.GetObject();
+            lock (output.recycles) output.recycles.Push(null);
 
             if (output.Buffer == null || output.Buffer.Length < minSize)
             {
@@ -55,6 +60,7 @@ namespace Hazel
         public static MessageReader Get(byte[] buffer)
         {
             var output = ReaderPool.GetObject();
+            lock (output.recycles) output.recycles.Push(null);
 
             output.Buffer = buffer;
             output.Offset = 0;
@@ -99,6 +105,7 @@ namespace Hazel
             if (offset + 3 > buffer.Length) return null;
 
             var output = ReaderPool.GetObject();
+            lock (output.recycles) output.recycles.Push(null);
 
             output.Buffer = buffer;
             output.Offset = offset;
@@ -252,6 +259,20 @@ namespace Hazel
 
         public void Recycle()
         {
+            lock (this.recycles)
+            {
+                var trace = this.recycles.Pop();
+                this.recycles.Push(new StackTrace());
+                if (trace != null)
+                {
+                    foreach (var stack in this.recycles)
+                    {
+                        // Console.WriteLine(stack);
+                        // Console.WriteLine();
+                    }
+                }
+            }
+
             this.Parent = null;
             ReaderPool.PutObject(this);
         }
@@ -437,6 +458,28 @@ namespace Hazel
             }
 
             return b == 1;
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (this.Buffer == null)
+            {
+                return false;
+            }
+
+            if (obj is MessageReader)
+            {
+                var other = ((MessageReader)obj);
+                return other.Buffer != null
+                    && this.Buffer == other.Buffer;
+            }
+
+            return false;
+        }
+
+        public override string ToString()
+        {
+            return $"Reader {this.Position}/{this.Length}: {string.Join(" ", this.Buffer.Take(Math.Min(10, this.Length)))}";
         }
     }
 }

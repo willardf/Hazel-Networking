@@ -155,10 +155,21 @@ namespace Hazel.Udp
                     DisconnectRemote("The remote sent a disconnect request", message);
                     message.Recycle();
                     break;
+
+                case (byte)SendOption.None:
+                    Console.WriteLine("---------- " + message.Buffer[0]);
+                    System.Threading.Thread.Sleep(1);
+                    Console.WriteLine("---------- " + message.Buffer[0]);
                     
-                //Treat everything else as unreliable
-                default:
                     InvokeDataReceived(SendOption.None, message, 1, bytesReceived);
+                    Statistics.LogUnreliableReceive(bytesReceived - 1, bytesReceived);
+                    break;
+
+                // Treat everything else as garbage
+                default:
+                    message.Recycle();
+
+                    // TODO: A new stat for unused data
                     Statistics.LogUnreliableReceive(bytesReceived - 1, bytesReceived);
                     break;
             }

@@ -100,7 +100,16 @@ namespace Hazel
             else
             {
 #if DEBUG
-                throw new Exception("Duplicate add " + typeof(T).Name);
+                lock (this)
+                {
+                    foreach (var stack in (item as MessageReader).recycles)
+                    {
+                        // Console.WriteLine(stack);
+                        // Console.WriteLine();
+                    }
+
+                    throw new Exception("Duplicate add " + typeof(T).Name);
+                }
 #endif
             }
         }
