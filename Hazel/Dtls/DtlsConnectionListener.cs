@@ -160,20 +160,10 @@ namespace Hazel.Dtls
         private RSA certificatePrivateKey;
 
         // HMAC key to validate ClientHello cookie
-        private ThreadedHmacHelper hmacHelper;
-        private HMAC CurrentCookieHmac { 
-            get 
-            {
-                return hmacHelper.GetCurrentCookieHmacsForThread();
-            }
-        }
-        private HMAC PreviousCookieHmac
-        {
-            get
-            {
-                return hmacHelper.GetPreviousCookieHmacsForThread();
-            }
-        }
+        private HMAC currentCookieHmac;
+        private HMAC previousCookieHmac;
+        private DateTime nextCookieHmacRotation;
+        private static readonly TimeSpan CookieHmacRotationTimeout = TimeSpan.FromHours(1.0);
 
         private ConcurrentStack<ConnectionId> staleConnections = new ConcurrentStack<ConnectionId>();
         private readonly ConcurrentDictionary<IPEndPoint, PeerData> existingPeers = new ConcurrentDictionary<IPEndPoint, PeerData>();
@@ -201,8 +191,11 @@ namespace Hazel.Dtls
         {
             this.random = RandomNumberGenerator.Create();
 
+            this.currentCookieHmac = CreateNewCookieHMAC();
+            this.previousCookieHmac = CreateNewCookieHMAC();
+            this.nextCookieHmacRotation = DateTime.UtcNow + CookieHmacRotationTimeout;
+
             this.staleConnectionUpkeep = new Timer(this.HandleStaleConnections, null, 2500, 1000);
-            this.hmacHelper = new ThreadedHmacHelper(logger);
         }
 
         /// <inheritdoc />
@@ -215,8 +208,10 @@ namespace Hazel.Dtls
             this.random?.Dispose();
             this.random = null;
 
-            this.hmacHelper?.Dispose();
-            this.hmacHelper = null;
+            this.currentCookieHmac?.Dispose();
+            this.previousCookieHmac?.Dispose();
+            this.currentCookieHmac = null;
+            this.previousCookieHmac = null;
 
             foreach (var pair in this.existingPeers)
             {
@@ -835,9 +830,9 @@ namespace Hazel.Dtls
 
             // If this message was not signed by us,
             // request a signed message before doing anything else
-            if (!HelloVerifyRequest.VerifyCookie(clientHello.Cookie, peerAddress, this.CurrentCookieHmac))
+            if (!HelloVerifyRequest.VerifyCookie(clientHello.Cookie, peerAddress, this.currentCookieHmac))
             {
-                if (!HelloVerifyRequest.VerifyCookie(clientHello.Cookie, peerAddress, this.PreviousCookieHmac))
+                if (!HelloVerifyRequest.VerifyCookie(clientHello.Cookie, peerAddress, this.previousCookieHmac))
                 {
                     ulong outgoingSequence = 1;
                     IRecordProtection recordProtection = NullRecordProtection.Instance;
@@ -1192,9 +1187,9 @@ namespace Hazel.Dtls
 
             // If this ClientHello is not signed by us, request the
             // client send us a signed message
-            if (!HelloVerifyRequest.VerifyCookie(clientHello.Cookie, peerAddress, this.CurrentCookieHmac))
+            if (!HelloVerifyRequest.VerifyCookie(clientHello.Cookie, peerAddress, this.currentCookieHmac))
             {
-                if (!HelloVerifyRequest.VerifyCookie(clientHello.Cookie, peerAddress, this.PreviousCookieHmac))
+                if (!HelloVerifyRequest.VerifyCookie(clientHello.Cookie, peerAddress, this.previousCookieHmac))
                 {
 #if DEBUG
                     this.Logger.WriteVerbose($"Sending HelloVerifyRequest to non-peer `{peerAddress}`");
@@ -1221,6 +1216,16 @@ namespace Hazel.Dtls
         //Send a HelloVerifyRequest handshake message to a peer
         private void SendHelloVerifyRequest(IPEndPoint peerAddress, ulong recordSequence, ushort epoch, IRecordProtection recordProtection)
         {
+            // Do we need to rotate the HMAC key?
+            DateTime now = DateTime.UtcNow;
+            if (now > this.nextCookieHmacRotation)
+            {
+                this.previousCookieHmac.Dispose();
+                this.previousCookieHmac = this.currentCookieHmac;
+                this.currentCookieHmac = CreateNewCookieHMAC();
+                this.nextCookieHmacRotation = now + CookieHmacRotationTimeout;
+            }
+
             Handshake handshake = new Handshake();
             handshake.MessageType = HandshakeType.HelloVerifyRequest;
             handshake.Length = HelloVerifyRequest.Size;
@@ -1243,7 +1248,7 @@ namespace Hazel.Dtls
             writer = writer.Slice(Record.Size);
             handshake.Encode(writer);
             writer = writer.Slice(Handshake.Size);
-            HelloVerifyRequest.Encode(writer, peerAddress, this.CurrentCookieHmac);
+            HelloVerifyRequest.Encode(writer, peerAddress, this.currentCookieHmac);
 
             // Protect record payload
             recordProtection.EncryptServerPlaintext(
@@ -1389,5 +1394,13 @@ namespace Hazel.Dtls
             return ConnectionId.Create(endPoint, rawSerialId);
         }
 
+        /// <summary>
+        /// Create a new cookie HMAC signer
+        /// </summary>
+        private static HMAC CreateNewCookieHMAC()
+        {
+            const string HMACProvider = "System.Security.Cryptography.HMACSHA1";
+            return HMAC.Create(HMACProvider);
+        }
     }
 }

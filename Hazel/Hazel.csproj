@@ -92,7 +92,6 @@
     <Compile Include="Dtls\NullRecordProtection.cs" />
     <Compile Include="Dtls\PrfSha256.cs" />
     <Compile Include="Dtls\Record.cs" />
-    <Compile Include="Dtls\ThreadedHmacHelper.cs" />
     <Compile Include="Dtls\X25519EcdheRsaSha256.cs" />
     <Compile Include="FewerThreads\HazelThreadPool.cs" />
     <Compile Include="FewerThreads\ThreadLimitedUdpConnectionListener.cs" />
