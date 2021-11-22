@@ -90,6 +90,7 @@ namespace Hazel.Dtls
             public ConnectionId ConnectionId;
 
             public readonly List<ByteSpan> QueuedApplicationDataMessage = new List<ByteSpan>();
+            public readonly ConcurrentBag<MessageReader> ApplicationData = new ConcurrentBag<MessageReader>();
 
             public DateTime StartOfNegotiation;
 
@@ -139,6 +140,15 @@ namespace Hazel.Dtls
                 this.NextEpoch.RecordProtection?.Dispose();
                 this.NextEpoch.Handshake?.Dispose();
                 this.NextEpoch.VerificationStream?.Dispose();
+
+                while (this.ApplicationData.TryTake(out var msg))
+                {
+                    try
+                    {
+                        msg.Recycle();
+                    }
+                    catch { }
+                }
             }
         }
 
@@ -150,9 +160,12 @@ namespace Hazel.Dtls
         private RSA certificatePrivateKey;
 
         // HMAC key to validate ClientHello cookie
-        private HMAC currentCookieHmac;
-        private HMAC previousCookieHmac;
-        private DateTime nextCookieHmacRotation;
+        [ThreadStatic]
+        private static HMAC currentCookieHmac;
+        [ThreadStatic]
+        private static HMAC previousCookieHmac;
+        [ThreadStatic]
+        private static DateTime nextCookieHmacRotation;
         private static readonly TimeSpan CookieHmacRotationTimeout = TimeSpan.FromHours(1.0);
 
         private ConcurrentStack<ConnectionId> staleConnections = new ConcurrentStack<ConnectionId>();
@@ -181,9 +194,9 @@ namespace Hazel.Dtls
         {
             this.random = RandomNumberGenerator.Create();
 
-            this.currentCookieHmac = CreateNewCookieHMAC();
-            this.previousCookieHmac = CreateNewCookieHMAC();
-            this.nextCookieHmacRotation = DateTime.UtcNow + CookieHmacRotationTimeout;
+            DtlsConnectionListener.currentCookieHmac = CreateNewCookieHMAC();
+            DtlsConnectionListener.previousCookieHmac = CreateNewCookieHMAC();
+            DtlsConnectionListener.nextCookieHmacRotation = DateTime.UtcNow + CookieHmacRotationTimeout;
 
             this.staleConnectionUpkeep = new Timer(this.HandleStaleConnections, null, 2500, 1000);
         }
@@ -198,10 +211,10 @@ namespace Hazel.Dtls
             this.random?.Dispose();
             this.random = null;
 
-            this.currentCookieHmac?.Dispose();
-            this.previousCookieHmac?.Dispose();
-            this.currentCookieHmac = null;
-            this.previousCookieHmac = null;
+            DtlsConnectionListener.currentCookieHmac?.Dispose();
+            DtlsConnectionListener.previousCookieHmac?.Dispose();
+            DtlsConnectionListener.currentCookieHmac = null;
+            DtlsConnectionListener.previousCookieHmac = null;
 
             foreach (var pair in this.existingPeers)
             {
@@ -262,9 +275,15 @@ namespace Hazel.Dtls
         /// </summary>
         protected override void ReadCallback(MessageReader reader, IPEndPoint peerAddress, ConnectionId connectionId)
         {
-            ByteSpan message = new ByteSpan(reader.Buffer, reader.Offset + reader.Position, reader.BytesRemaining);
-            this.ProcessIncomingMessage(message, peerAddress);
-            reader.Recycle();
+            try
+            {
+                ByteSpan message = new ByteSpan(reader.Buffer, reader.Offset + reader.Position, reader.BytesRemaining);
+                this.ProcessIncomingMessage(message, peerAddress);
+            }
+            finally
+            {
+                reader.Recycle();
+            }
         }
 
         /// <summary>
@@ -279,8 +298,12 @@ namespace Hazel.Dtls
                 return;
             }
 
+            ConnectionId peerConnectionId;
+
             lock (peer)
             {
+                peerConnectionId = peer.ConnectionId;
+
                 // Each incoming packet may contain multiple DTLS
                 // records
                 while (message.Length > 0)
@@ -464,10 +487,17 @@ namespace Hazel.Dtls
                             reader.Length = recordPayload.Length;
                             recordPayload.CopyTo(reader.Buffer);
 
-                            base.ReadCallback(reader, peerAddress, peer.ConnectionId);
+                            peer.ApplicationData.Add(reader);
                             break;
                     }
                 }
+            }
+
+            // The peer lock must be exited before leaving the DtlsConnectionListener context to prevent deadlocks
+            //   because ApplicationData processing may reenter this context
+            while (peer.ApplicationData.TryTake(out var appMsg))
+            {
+                base.ReadCallback(appMsg, peerAddress, peerConnectionId);
             }
         }
 
@@ -803,9 +833,9 @@ namespace Hazel.Dtls
 
             // If this message was not signed by us,
             // request a signed message before doing anything else
-            if (!HelloVerifyRequest.VerifyCookie(clientHello.Cookie, peerAddress, this.currentCookieHmac))
+            if (!HelloVerifyRequest.VerifyCookie(clientHello.Cookie, peerAddress, DtlsConnectionListener.currentCookieHmac))
             {
-                if (!HelloVerifyRequest.VerifyCookie(clientHello.Cookie, peerAddress, this.previousCookieHmac))
+                if (!HelloVerifyRequest.VerifyCookie(clientHello.Cookie, peerAddress, DtlsConnectionListener.previousCookieHmac))
                 {
                     ulong outgoingSequence = 1;
                     IRecordProtection recordProtection = NullRecordProtection.Instance;
@@ -1160,12 +1190,12 @@ namespace Hazel.Dtls
 
             // If this ClientHello is not signed by us, request the
             // client send us a signed message
-            if (!HelloVerifyRequest.VerifyCookie(clientHello.Cookie, peerAddress, this.currentCookieHmac))
+            if (!HelloVerifyRequest.VerifyCookie(clientHello.Cookie, peerAddress, DtlsConnectionListener.currentCookieHmac))
             {
-                if (!HelloVerifyRequest.VerifyCookie(clientHello.Cookie, peerAddress, this.previousCookieHmac))
+                if (!HelloVerifyRequest.VerifyCookie(clientHello.Cookie, peerAddress, DtlsConnectionListener.previousCookieHmac))
                 {
 #if DEBUG
-                    this.Logger.WriteError($"Sending HelloVerifyRequest to non-peer `{peerAddress}`");
+                    this.Logger.WriteVerbose($"Sending HelloVerifyRequest to non-peer `{peerAddress}`");
 #else
                     Interlocked.Increment(ref this.NonPeerVerifyHelloRequests);
 #endif
@@ -1191,12 +1221,12 @@ namespace Hazel.Dtls
         {
             // Do we need to rotate the HMAC key?
             DateTime now = DateTime.UtcNow;
-            if (now > this.nextCookieHmacRotation)
+            if (now > DtlsConnectionListener.nextCookieHmacRotation)
             {
-                this.previousCookieHmac.Dispose();
-                this.previousCookieHmac = this.currentCookieHmac;
-                this.currentCookieHmac = CreateNewCookieHMAC();
-                this.nextCookieHmacRotation = now + CookieHmacRotationTimeout;
+                DtlsConnectionListener.previousCookieHmac.Dispose();
+                DtlsConnectionListener.previousCookieHmac = DtlsConnectionListener.currentCookieHmac;
+                DtlsConnectionListener.currentCookieHmac = CreateNewCookieHMAC();
+                DtlsConnectionListener.nextCookieHmacRotation = now + CookieHmacRotationTimeout;
             }
 
             Handshake handshake = new Handshake();
@@ -1221,7 +1251,7 @@ namespace Hazel.Dtls
             writer = writer.Slice(Record.Size);
             handshake.Encode(writer);
             writer = writer.Slice(Handshake.Size);
-            HelloVerifyRequest.Encode(writer, peerAddress, this.currentCookieHmac);
+            HelloVerifyRequest.Encode(writer, peerAddress, DtlsConnectionListener.currentCookieHmac);
 
             // Protect record payload
             recordProtection.EncryptServerPlaintext(
