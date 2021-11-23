@@ -487,12 +487,6 @@ namespace Hazel.Dtls
                             reader.Length = recordPayload.Length;
                             recordPayload.CopyTo(reader.Buffer);
 
-                            if (reader.Buffer[0] == 22
-                                || reader.Buffer[0] == 0)
-                            {
-                                Console.WriteLine(reader);
-                            }
-
                             peer.ApplicationData.Add(reader);
                             break;
                     }

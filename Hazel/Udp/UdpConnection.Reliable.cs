@@ -303,7 +303,7 @@ namespace Hazel.Udp
         /// <param name="bytes">The buffer containing the data.</param>
         /// <param name="offset">The offset of the reliable header.</param>
         /// <returns>Whether the packet was a new packet or not.</returns>
-        internal bool ProcessReliableReceive(byte[] bytes, int offset, out ushort id)
+        private bool ProcessReliableReceive(byte[] bytes, int offset, out ushort id)
         {
             byte b1 = bytes[offset];
             byte b2 = bytes[offset + 1];
