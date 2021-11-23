@@ -7,21 +7,29 @@ namespace Hazel.Dtls
 {
     internal class ThreadedHmacHelper : IDisposable
     {
-        private static readonly TimeSpan CookieHmacRotationTimeout = TimeSpan.FromHours(1.0);
+        private class ThreadHmacs
+        {
+            public HMAC currentHmac;
+            public HMAC previousHmac;
+            public HMAC hmacToDispose;
+        }
+
+        private static readonly int CookieHmacRotationTimeout = (int)TimeSpan.FromHours(1.0).TotalMilliseconds;
 
         private readonly ILogger logger;
-        private readonly ConcurrentDictionary<int, HMAC> currentHmacs;
-        private readonly ConcurrentDictionary<int, HMAC> previousHmacs;
-
-        private DateTime nextCookieHmacRotation;
+        private readonly ConcurrentDictionary<int, ThreadHmacs> hmacs;
+        private Timer rotateKeyTimer;
+        private RandomNumberGenerator cryptoRandom;
+        private byte[] currentHmacKey;
 
         public ThreadedHmacHelper(ILogger logger)
         {
-            this.currentHmacs = new ConcurrentDictionary<int, HMAC>();
-            this.previousHmacs = new ConcurrentDictionary<int, HMAC>();
-            this.nextCookieHmacRotation = DateTime.UtcNow + CookieHmacRotationTimeout;
+            this.hmacs = new ConcurrentDictionary<int, ThreadHmacs>();
+            this.rotateKeyTimer = new Timer(RotateKeys, null, CookieHmacRotationTimeout, CookieHmacRotationTimeout);
+            this.cryptoRandom = RandomNumberGenerator.Create();
 
             this.logger = logger;
+            SetHmacKey();
         }
 
         /// <summary>
@@ -29,19 +37,7 @@ namespace Hazel.Dtls
         /// </summary>
         public HMAC GetCurrentCookieHmacsForThread()
         {
-            int threadId = Thread.CurrentThread.ManagedThreadId;
-            RotateKeys(threadId);
-
-            if (!this.currentHmacs.TryGetValue(threadId, out HMAC currentCookieHmac))
-            {
-                currentCookieHmac = CreateNewCookieHMAC();
-                if (!this.currentHmacs.TryAdd(threadId, currentCookieHmac))
-                {
-                    this.logger.WriteError($"Cannot add currentCookieHmac to currentHmacs! - Should never happen - should be accessed only by a single thread");
-                }
-            }
-
-            return currentCookieHmac;
+            return GetHmacsForThread().currentHmac;
         }
 
         /// <summary>
@@ -49,84 +45,115 @@ namespace Hazel.Dtls
         /// </summary>
         public HMAC GetPreviousCookieHmacsForThread()
         {
-            int threadId = Thread.CurrentThread.ManagedThreadId;
-            RotateKeys(threadId);
-
-            if (!this.previousHmacs.TryGetValue(threadId, out HMAC previousCookieHmac))
-            {
-                previousCookieHmac = CreateNewCookieHMAC();
-                if (!this.previousHmacs.TryAdd(threadId, previousCookieHmac))
-                {
-                    this.logger.WriteError($"Cannot add previousCookieHmac to previousHmacs! - Should never happen - should be accessed only by a single thread");
-                }
-            }
-
-            return previousCookieHmac;
+            return GetHmacsForThread().previousHmac;
         }
 
         public void Dispose()
         {
-            foreach (var threadIdToHmac in this.currentHmacs)
+            ManualResetEvent signalRotateKeyTimerEnded = new ManualResetEvent(false);
+            this.rotateKeyTimer.Dispose(signalRotateKeyTimerEnded);
+            signalRotateKeyTimerEnded.WaitOne();
+            signalRotateKeyTimerEnded.Dispose();
+            signalRotateKeyTimerEnded = null;
+            this.rotateKeyTimer = null;
+
+            this.cryptoRandom.Dispose();
+            this.cryptoRandom = null;
+
+            foreach (var threadIdToHmac in this.hmacs)
             {
-                threadIdToHmac.Value.Dispose();
+                ThreadHmacs threadHmacs = threadIdToHmac.Value;
+                threadHmacs.currentHmac?.Dispose();
+                threadHmacs.currentHmac = null;
+                threadHmacs.previousHmac?.Dispose();
+                threadHmacs.previousHmac = null;
+                threadHmacs.hmacToDispose?.Dispose();
+                threadHmacs.hmacToDispose = null;
             }
 
-            this.currentHmacs.Clear();
+            this.hmacs.Clear();
+        }
 
-            foreach (var threadIdToHmac in this.previousHmacs)
+        private ThreadHmacs GetHmacsForThread()
+        {
+            int threadId = Thread.CurrentThread.ManagedThreadId;
+
+            if (!this.hmacs.TryGetValue(threadId, out ThreadHmacs threadHmacs))
             {
-                threadIdToHmac.Value.Dispose();
+                threadHmacs = CreateNewThreadHmacs();
+
+                if (!this.hmacs.TryAdd(threadId, threadHmacs))
+                {
+                    this.logger.WriteError($"Cannot add threadHmacs for thread {threadId} during GetHmacsForThread! Should never happen!");
+                }
             }
 
-            this.previousHmacs.Clear();
+            return threadHmacs;
         }
 
         /// <summary>
-        /// 
+        /// Rotates the hmacs of all active threads
+        /// </summary>
+        private void RotateKeys(object _)
+        {
+            SetHmacKey();
+
+            foreach (var threadIds in this.hmacs)
+            {
+                RotateKey(threadIds.Key);
+            }
+        }
+
+        /// <summary>
+        /// Rotate hmacs of single thread
         /// </summary>
         /// <param name="threadId">Managed thread Id of thread calling this method.</param>
-        private void RotateKeys(int threadId)
+        private void RotateKey(int threadId)
         {
-            // Do we need to rotate the HMAC key?
-            DateTime now = DateTime.UtcNow;
-            if (now <= this.nextCookieHmacRotation)
+            ThreadHmacs threadHmacs;
+
+            if (!this.hmacs.TryGetValue(threadId, out threadHmacs))
             {
+                this.logger.WriteError($"Cannot find thread {threadId} in hmacs during rotation! Should never happen!");
                 return;
             }
 
-            if (this.previousHmacs.TryRemove(threadId, out HMAC previousHmac)) 
-            {
-                previousHmac.Dispose();
-            }
+            // No thread should still have a reference to hmacToDispose, which should now have a lifetime of > 1 hour
+            threadHmacs.hmacToDispose?.Dispose();
+            threadHmacs.hmacToDispose = threadHmacs.previousHmac;
+            threadHmacs.previousHmac = threadHmacs.currentHmac;
+            threadHmacs.currentHmac = CreateNewCookieHMAC();
+        }
 
-            if (!this.currentHmacs.TryGetValue(threadId, out HMAC currentHmac))
+        private ThreadHmacs CreateNewThreadHmacs()
+        {
+            return new ThreadHmacs
             {
-                currentHmac = CreateNewCookieHMAC();
-                this.logger.WriteError($"currentHmac did not exist when rotating keys - Should not happen");
-            }
-
-            if (!this.previousHmacs.TryAdd(threadId, currentHmac))
-            {
-                this.logger.WriteError($"Cannot add currentHmac to previousHmacs during rotation! - Should never happen - should be accessed only by a single thread");
+                previousHmac = CreateNewCookieHMAC(),
+                currentHmac = CreateNewCookieHMAC()
             };
-
-            currentHmac = CreateNewCookieHMAC();
-
-            if (!this.currentHmacs.TryAdd(threadId, currentHmac))
-            {
-                this.logger.WriteError($"Cannot add currentHmac to currentHmacs during rotation! - Should never happen - should be accessed only by a single thread");
-            };
-
-            this.nextCookieHmacRotation = now + CookieHmacRotationTimeout;
         }
 
         /// <summary>
         /// Create a new cookie HMAC signer
         /// </summary>
-        private static HMAC CreateNewCookieHMAC()
+        private HMAC CreateNewCookieHMAC()
         {
             const string HMACProvider = "System.Security.Cryptography.HMACSHA1";
-            return HMAC.Create(HMACProvider);
+            HMAC hmac = HMAC.Create(HMACProvider);
+            hmac.Key = this.currentHmacKey;
+            return hmac;
+        }
+
+        /// <summary>
+        /// Creates a new cryptographically secure random Hmac key
+        /// </summary>
+        private void SetHmacKey()
+        {
+            // MSDN recommends 64 bytes key for HMACSHA-1
+            byte[] newKey = new byte[64];
+            this.cryptoRandom.GetBytes(newKey);
+            this.currentHmacKey = newKey;
         }
     }
 }
