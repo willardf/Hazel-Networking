@@ -102,13 +102,17 @@ namespace Hazel
 #if DEBUG
                 lock (this)
                 {
-                    foreach (var stack in (item as MessageReader).recycles)
+                    var i = (item as MessageReader);
+                    foreach (var stack in i.recycles)
                     {
-                        // Console.WriteLine(stack);
-                        // Console.WriteLine();
+                        Console.WriteLine(stack ?? null);
+                        Console.WriteLine();
                     }
 
-                    throw new Exception("Duplicate add " + typeof(T).Name);
+                    i.recycles.Clear();
+
+                    Console.WriteLine(new System.Diagnostics.StackTrace());
+                    // throw new Exception("Duplicate add " + typeof(T).Name);
                 }
 #endif
             }

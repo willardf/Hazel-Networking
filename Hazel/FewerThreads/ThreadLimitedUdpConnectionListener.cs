@@ -217,7 +217,7 @@ namespace Hazel.Udp.FewerThreads
                     }
 
                     ConnectionId connectionId = ConnectionId.Create((IPEndPoint)remoteEP, 0);
-                    this.ProcessIncomingMessageFromOtherThread(message, (IPEndPoint)remoteEP, connectionId);
+                    this.receiveQueue.Add(new ReceiveMessageInfo() { Message = message, Sender = (IPEndPoint)remoteEP, ConnectionId = connectionId });
                 }
             }
         }
@@ -235,11 +235,6 @@ namespace Hazel.Udp.FewerThreads
 
                 }
             }
-        }
-
-        protected void ProcessIncomingMessageFromOtherThread(MessageReader message, IPEndPoint remoteEndPoint, ConnectionId connectionId)
-        {
-            this.receiveQueue.Add(new ReceiveMessageInfo() { Message = message, Sender = remoteEndPoint, ConnectionId = connectionId });
         }
 
         private void SendLoop()
