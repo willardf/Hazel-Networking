@@ -1223,7 +1223,7 @@ namespace Hazel.Dtls
             DateTime now = DateTime.UtcNow;
             if (now > DtlsConnectionListener.nextCookieHmacRotation)
             {
-                DtlsConnectionListener.previousCookieHmac?.Dispose();
+                DtlsConnectionListener.previousCookieHmac.Dispose();
                 DtlsConnectionListener.previousCookieHmac = DtlsConnectionListener.currentCookieHmac;
                 DtlsConnectionListener.currentCookieHmac = CreateNewCookieHMAC();
                 DtlsConnectionListener.nextCookieHmacRotation = now + CookieHmacRotationTimeout;
