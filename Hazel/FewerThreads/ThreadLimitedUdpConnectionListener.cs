@@ -217,7 +217,7 @@ namespace Hazel.Udp.FewerThreads
                     }
 
                     ConnectionId connectionId = ConnectionId.Create((IPEndPoint)remoteEP, 0);
-                    this.receiveQueue.Add(new ReceiveMessageInfo() { Message = message, Sender = (IPEndPoint)remoteEP, ConnectionId = connectionId });
+                    this.ProcessIncomingMessageFromOtherThread(message, (IPEndPoint)remoteEP, connectionId);
                 }
             }
         }
@@ -235,6 +235,11 @@ namespace Hazel.Udp.FewerThreads
 
                 }
             }
+        }
+
+        protected void ProcessIncomingMessageFromOtherThread(MessageReader message, IPEndPoint remoteEndPoint, ConnectionId connectionId)
+        {
+            this.receiveQueue.Add(new ReceiveMessageInfo() { Message = message, Sender = remoteEndPoint, ConnectionId = connectionId });
         }
 
         private void SendLoop()
@@ -316,16 +321,18 @@ namespace Hazel.Udp.FewerThreads
                 message.Offset = 4;
                 message.Length = bytesReceived - 4;
                 message.Position = 0;
-                this.NewConnection?.Invoke(new NewConnectionEventArgs(message, connection));
+                try
+                {
+                    this.NewConnection?.Invoke(new NewConnectionEventArgs(message, connection));
+                }
+                catch (Exception e)
+                {
+                    this.Logger.WriteError("NewConnection handler threw: " + e);
+                }
             }
 
             // Inform the connection of the buffer (new connections need to send an ack back to client)
             connection.HandleReceive(message, bytesReceived);
-
-            if (isHello && aware)
-            {
-                message.Recycle();
-            }
         }
 
         internal void SendDataRaw(byte[] response, IPEndPoint remoteEndPoint)

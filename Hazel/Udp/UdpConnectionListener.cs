@@ -227,11 +227,6 @@ namespace Hazel.Udp
 
             // Inform the connection of the buffer (new connections need to send an ack back to client)
             connection.HandleReceive(message, bytesReceived);
-
-            if (aware && isHello)
-            {
-                message.Recycle();
-            }
         }
 
 #if DEBUG

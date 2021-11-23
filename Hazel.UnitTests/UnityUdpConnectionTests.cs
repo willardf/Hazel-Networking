@@ -106,6 +106,8 @@ namespace Hazel.UnitTests
         public void UdpHandshakeTest()
         {
             byte[] TestData = new byte[] { 1, 2, 3, 4, 5, 6 };
+
+            using (ManualResetEventSlim mutex = new ManualResetEventSlim(false))
             using (UdpConnectionListener listener = new UdpConnectionListener(new IPEndPoint(IPAddress.Any, 4296)))
             using (UdpConnection connection = new UnityUdpClientConnection(new IPEndPoint(IPAddress.Loopback, 4296)))
             {
@@ -114,12 +116,13 @@ namespace Hazel.UnitTests
                 MessageReader output = null;
                 listener.NewConnection += delegate (NewConnectionEventArgs e)
                 {
-                    output = e.HandshakeData;
+                    output = e.HandshakeData.Duplicate();
+                    mutex.Set();
                 };
 
                 connection.Connect(TestData);
+                mutex.Wait(5000);
 
-                Thread.Sleep(10);
                 for (int i = 0; i < TestData.Length; ++i)
                 {
                     Assert.AreEqual(TestData[i], output.ReadByte());
@@ -219,7 +222,6 @@ namespace Hazel.UnitTests
                 listener.NewConnection += (obj) =>
                 {
                     Interlocked.Increment(ref connects);
-                    obj.HandshakeData.Recycle();
                 };
 
                 listener.Start();
@@ -251,7 +253,6 @@ namespace Hazel.UnitTests
                 listener.NewConnection += (obj) =>
                 {
                     Interlocked.Increment(ref connects);
-                    obj.HandshakeData.Recycle();
                 };
 
                 listener.Start();

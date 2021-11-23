@@ -147,6 +147,7 @@ namespace Hazel.Udp
                 case (byte)UdpSendOption.Hello:
                     ProcessReliableReceive(message.Buffer, 1, out id);
                     Statistics.LogHelloReceive(bytesReceived);
+                    message.Recycle();
                     break;
 
                 case (byte)UdpSendOption.Disconnect:
@@ -157,10 +158,6 @@ namespace Hazel.Udp
                     break;
 
                 case (byte)SendOption.None:
-                    Console.WriteLine("---------- " + message.Buffer[0]);
-                    System.Threading.Thread.Sleep(1);
-                    Console.WriteLine("---------- " + message.Buffer[0]);
-                    
                     InvokeDataReceived(SendOption.None, message, 1, bytesReceived);
                     Statistics.LogUnreliableReceive(bytesReceived - 1, bytesReceived);
                     break;

@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -12,7 +10,7 @@ namespace Hazel
     {
         public static readonly ObjectPool<MessageReader> ReaderPool = new ObjectPool<MessageReader>(() => new MessageReader());
 
-        public readonly byte[] Buffer;
+        public byte[] Buffer;
         public byte Tag;
 
         public int Length;
@@ -21,8 +19,6 @@ namespace Hazel
         public int BytesRemaining => this.Length - this.Position;
 
         private MessageReader Parent;
-
-        public Stack<Tuple<StackTrace, StackTrace>> recycles = new Stack<Tuple<StackTrace, StackTrace>>();
 
         public int Position
         {
@@ -37,20 +33,13 @@ namespace Hazel
         private int _position;
         private int readHead;
 
-        public MessageReader()
-        {
-            this.Buffer = new byte[ushort.MaxValue];
-        }
-
         public static MessageReader GetSized(int minSize)
         {
             var output = ReaderPool.GetObject();
-            lock (output.recycles) output.recycles.Push(new Tuple<StackTrace, StackTrace>(new StackTrace(), null));
 
             if (output.Buffer == null || output.Buffer.Length < minSize)
             {
-                throw new NotImplementedException();
-                // output.Buffer = new byte[minSize];
+                output.Buffer = new byte[minSize];
             }
             else
             {
@@ -66,10 +55,8 @@ namespace Hazel
         public static MessageReader Get(byte[] buffer)
         {
             var output = ReaderPool.GetObject();
-            lock (output.recycles) output.recycles.Push(new Tuple<StackTrace, StackTrace>(new StackTrace(), null));
 
-            buffer.CopyTo(output.Buffer, 0);
-            // output.Buffer = buffer;
+            output.Buffer = buffer;
             output.Offset = 0;
             output.Position = 0;
             output.Length = buffer.Length;
@@ -112,10 +99,8 @@ namespace Hazel
             if (offset + 3 > buffer.Length) return null;
 
             var output = ReaderPool.GetObject();
-            lock (output.recycles) output.recycles.Push(new Tuple<StackTrace, StackTrace>(new StackTrace(), null));
 
-            buffer.CopyTo(output.Buffer, 0);
-            // output.Buffer = buffer;
+            output.Buffer = buffer;
             output.Offset = offset;
             output.Position = 0;
 
@@ -139,10 +124,7 @@ namespace Hazel
             var output = new MessageReader();
 
             output.Parent = this;
-
-            this.Buffer.CopyTo(output.Buffer, 0);
-            //output.Buffer = this.Buffer;
-
+            output.Buffer = this.Buffer;
             output.Offset = this.readHead;
             output.Position = 0;
 
@@ -186,6 +168,17 @@ namespace Hazel
         {
             var output = new MessageWriter(this.Buffer);
             output.Position = this.readHead;
+            return output;
+        }
+
+        public MessageReader Duplicate()
+        {
+            var output = GetSized(this.Length);
+            Array.Copy(this.Buffer, this.Offset, output.Buffer, 0, this.Length);
+            output.Length = this.Length;
+            output.Offset = 0;
+            output.Position = 0;
+
             return output;
         }
 
@@ -270,23 +263,6 @@ namespace Hazel
 
         public void Recycle()
         {
-            lock (this.recycles)
-            {
-                var tup = this.recycles.Peek();
-                if (tup.Item2 != null)
-                {
-                    Console.WriteLine(tup);
-                    Console.WriteLine(new StackTrace());
-
-                    // throw new Exception();
-                }
-                else
-                {
-                    this.recycles.Pop();
-                    this.recycles.Push(new Tuple<StackTrace, StackTrace>(tup.Item1, new StackTrace()));
-                }
-            }
-
             this.Parent = null;
             ReaderPool.PutObject(this);
         }
@@ -472,21 +448,6 @@ namespace Hazel
             }
 
             return b == 1;
-        }
-
-        public override bool Equals(object obj)
-        {
-            return this.Buffer == ((MessageReader)obj).Buffer;
-        }
-
-        public override int GetHashCode()
-        {
-            return this.Buffer.GetHashCode();
-        }
-
-        public override string ToString()
-        {
-            return $"Reader {this.Position}/{this.Length}: {string.Join(" ", this.Buffer.Take(Math.Min(10, this.Length)))}";
         }
     }
 }

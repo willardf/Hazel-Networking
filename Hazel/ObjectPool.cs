@@ -100,20 +100,7 @@ namespace Hazel
             else
             {
 #if DEBUG
-                lock (this)
-                {
-                    var i = (item as MessageReader);
-                    foreach (var stack in i.recycles)
-                    {
-                        Console.WriteLine(stack ?? null);
-                        Console.WriteLine();
-                    }
-
-                    i.recycles.Clear();
-
-                    Console.WriteLine(new System.Diagnostics.StackTrace());
-                    // throw new Exception("Duplicate add " + typeof(T).Name);
-                }
+                throw new Exception("Duplicate add " + typeof(T).Name);
 #endif
             }
         }
