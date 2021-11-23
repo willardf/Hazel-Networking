@@ -75,7 +75,9 @@ namespace Hazel
                 {
                     handler(new NewConnectionEventArgs(msg, connection));
                 }
-                catch { }
+                catch (Exception e)
+                {
+                }
             }
             else
             {

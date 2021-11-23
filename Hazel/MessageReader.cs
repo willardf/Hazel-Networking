@@ -171,6 +171,17 @@ namespace Hazel
             return output;
         }
 
+        public MessageReader Duplicate()
+        {
+            var output = GetSized(this.Length);
+            Array.Copy(this.Buffer, this.Offset, output.Buffer, 0, this.Length);
+            output.Length = this.Length;
+            output.Offset = 0;
+            output.Position = 0;
+
+            return output;
+        }
+
         public void RemoveMessage(MessageReader reader)
         {
             var temp = MessageReader.GetSized(reader.Buffer.Length);

@@ -132,7 +132,7 @@ namespace Hazel.UnitTests
                 MessageReader output = null;
                 listener.NewConnection += delegate (NewConnectionEventArgs e)
                 {
-                    output = e.HandshakeData;
+                    output = e.HandshakeData.Duplicate();
                 };
 
                 connection.Connect(TestData);
@@ -157,7 +157,7 @@ namespace Hazel.UnitTests
                 {
                     e.Connection.DataReceived += delegate (DataReceivedEventArgs evt)
                     {
-                        output = evt.Message;
+                        output = evt.Message.Duplicate();
                     };
                 };
 
@@ -210,7 +210,6 @@ namespace Hazel.UnitTests
                 listener.NewConnection += (obj) =>
                 {
                     Interlocked.Increment(ref connects);
-                    obj.HandshakeData.Recycle();
                 };
 
                 listener.Start();

@@ -321,16 +321,18 @@ namespace Hazel.Udp.FewerThreads
                 message.Offset = 4;
                 message.Length = bytesReceived - 4;
                 message.Position = 0;
-                this.NewConnection?.Invoke(new NewConnectionEventArgs(message, connection));
+                try
+                {
+                    this.NewConnection?.Invoke(new NewConnectionEventArgs(message, connection));
+                }
+                catch (Exception e)
+                {
+                    this.Logger.WriteError("NewConnection handler threw: " + e);
+                }
             }
 
             // Inform the connection of the buffer (new connections need to send an ack back to client)
             connection.HandleReceive(message, bytesReceived);
-
-            if (isHello && aware)
-            {
-                message.Recycle();
-            }
         }
 
         internal void SendDataRaw(byte[] response, IPEndPoint remoteEndPoint)

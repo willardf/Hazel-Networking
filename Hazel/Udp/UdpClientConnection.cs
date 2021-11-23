@@ -208,14 +208,20 @@ namespace Hazel.Udp
         {
             try
             {
-                if (state == ConnectionState.Connected)
+                // If the server disconnects you during the hello
+                // you can go straight from Connecting to NotConnected.
+                if (state == ConnectionState.Connected
+                    || state == ConnectionState.NotConnected)
+                {
                     connectWaitLock.Set();
+                }
                 else
+                {
                     connectWaitLock.Reset();
+                }
             }
             catch (ObjectDisposedException)
             {
-
             }
         }
 
@@ -298,7 +304,7 @@ namespace Hazel.Udp
             lock (this)
             {
                 if (this._state == ConnectionState.NotConnected) return false;
-                this._state = ConnectionState.NotConnected;
+                this.State = ConnectionState.NotConnected; // Use the property so we release the state lock
             }
 
             var bytes = EmptyDisconnectBytes;

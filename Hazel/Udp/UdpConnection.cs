@@ -147,6 +147,7 @@ namespace Hazel.Udp
                 case (byte)UdpSendOption.Hello:
                     ProcessReliableReceive(message.Buffer, 1, out id);
                     Statistics.LogHelloReceive(bytesReceived);
+                    message.Recycle();
                     break;
 
                 case (byte)UdpSendOption.Disconnect:
@@ -155,10 +156,17 @@ namespace Hazel.Udp
                     DisconnectRemote("The remote sent a disconnect request", message);
                     message.Recycle();
                     break;
-                    
-                //Treat everything else as unreliable
-                default:
+
+                case (byte)SendOption.None:
                     InvokeDataReceived(SendOption.None, message, 1, bytesReceived);
+                    Statistics.LogUnreliableReceive(bytesReceived - 1, bytesReceived);
+                    break;
+
+                // Treat everything else as garbage
+                default:
+                    message.Recycle();
+
+                    // TODO: A new stat for unused data
                     Statistics.LogUnreliableReceive(bytesReceived - 1, bytesReceived);
                     break;
             }

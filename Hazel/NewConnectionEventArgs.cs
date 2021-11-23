@@ -4,7 +4,7 @@
     {
         /// <summary>
         /// The data received from the client in the handshake.
-        /// This data is yours. Remember to recycle it.
+        /// You must not recycle this. If you need the message outside of a callback, you should copy it.
         /// </summary>
         public readonly MessageReader HandshakeData;
 
