@@ -89,9 +89,11 @@ namespace Hazel.UnitTests
 
         public static RSA DecodeRSAKeyFromPEM(string pemData)
         {
-            PemReader pemReader = new PemReader(new StringReader(pemData));
-            RsaPrivateCrtKeyParameters keyParameters = (RsaPrivateCrtKeyParameters)pemReader.ReadObject();
-            return DotNetUtilities.ToRSA(keyParameters);
+            var pemReader = new PemReader(new StringReader(pemData));
+            var parameters = DotNetUtilities.ToRSAParameters((RsaPrivateCrtKeyParameters)pemReader.ReadObject());
+            var rsa = RSA.Create();
+            rsa.ImportParameters(parameters);
+            return rsa;
         }
     }
 }

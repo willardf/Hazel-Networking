@@ -265,7 +265,7 @@ namespace Hazel.UnitTests
         [TestMethod]
         public void UdpIPv6ConnectionTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger(), IPMode.IPv6))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.IPv6Any, 4296), new TestLogger(), IPMode.IPv6))
             {
                 listener.Start();
 
