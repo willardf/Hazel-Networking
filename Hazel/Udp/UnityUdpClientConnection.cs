@@ -14,10 +14,12 @@ namespace Hazel.Udp
     public class UnityUdpClientConnection : UdpConnection
     {
         private Socket socket;
+        protected readonly ILogger logger;
 
-        public UnityUdpClientConnection(IPEndPoint remoteEndPoint, IPMode ipMode = IPMode.IPv4)
+        public UnityUdpClientConnection(ILogger logger, IPEndPoint remoteEndPoint, IPMode ipMode = IPMode.IPv4)
             : base()
         {
+            this.logger = logger;
             this.EndPoint = remoteEndPoint;
             this.IPMode = ipMode;
 
@@ -32,7 +34,23 @@ namespace Hazel.Udp
 
         public void FixedUpdate()
         {
-            this.ResendPacketsIfNeeded();
+            try
+            {
+                ResendPacketsIfNeeded();
+            }
+            catch (Exception e)
+            {
+                this.logger.WriteError("FixedUpdate: " + e);
+            }
+
+            try
+            {
+                ManageReliablePackets();
+            }
+            catch (Exception e)
+            {
+                this.logger.WriteError("FixedUpdate: " + e);
+            }
         }
 
         protected virtual void RestartConnection()
@@ -41,7 +59,6 @@ namespace Hazel.Udp
 
         protected virtual void ResendPacketsIfNeeded()
         {
-            base.ManageReliablePackets();
         }
 
 
@@ -135,7 +152,9 @@ namespace Hazel.Udp
             {
                 if (this.State != ConnectionState.Connecting) return;
                 Thread.Sleep(100);
-                this.ResendPacketsIfNeeded();
+
+                // I guess if we're gonna block in Unity, then let's assume no one will pump this for us.
+                this.FixedUpdate();
             }
         }
 

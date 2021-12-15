@@ -81,8 +81,6 @@ namespace Hazel.Dtls
             public ByteSpan CertificatePayload;
         }
 
-        protected readonly ILogger logger = null;
-
         private readonly object syncRoot = new object();
         private readonly RandomNumberGenerator random = RandomNumberGenerator.Create();
 
@@ -100,9 +98,8 @@ namespace Hazel.Dtls
         /// </summary>
         /// <inheritdoc />
         public DtlsUnityConnection(ILogger logger, IPEndPoint remoteEndPoint, IPMode ipMode = IPMode.IPv4)
-            : base(remoteEndPoint, ipMode)
+            : base(logger, remoteEndPoint, ipMode)
         {
-            this.logger = logger;
             this.nextEpoch.ServerRandom = new byte[Random.Size];
             this.nextEpoch.ClientRandom = new byte[Random.Size];
             this.nextEpoch.ServerVerification = new byte[Finished.Size];
