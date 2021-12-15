@@ -14,10 +14,12 @@ namespace Hazel.Udp
     public class UnityUdpClientConnection : UdpConnection
     {
         private Socket socket;
+        protected readonly ILogger logger;
 
-        public UnityUdpClientConnection(IPEndPoint remoteEndPoint, IPMode ipMode = IPMode.IPv4)
+        public UnityUdpClientConnection(ILogger logger, IPEndPoint remoteEndPoint, IPMode ipMode = IPMode.IPv4)
             : base()
         {
+            this.logger = logger;
             this.EndPoint = remoteEndPoint;
             this.IPMode = ipMode;
 
@@ -36,13 +38,19 @@ namespace Hazel.Udp
             {
                 ResendPacketsIfNeeded();
             }
-            catch { }
+            catch (Exception e)
+            {
+                this.logger.WriteError("FixedUpdate: " + e);
+            }
 
             try
             {
                 ManageReliablePackets();
             }
-            catch { }
+            catch (Exception e)
+            {
+                this.logger.WriteError("FixedUpdate: " + e);
+            }
         }
 
         protected virtual void RestartConnection()
