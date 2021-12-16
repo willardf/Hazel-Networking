@@ -1258,7 +1258,7 @@ namespace Hazel.Dtls
         /// <summary>
         /// Handle a requrest to send a datagram to the network
         /// </summary>
-        protected override void QueueRawData(ByteSpan span, IPEndPoint remoteEndPoint)
+        protected override void QueueRawData(ByteSpan span, IPEndPoint remoteEndPoint, Action onTooBig = null)
         {
             PeerData peer;
             if (!this.existingPeers.TryGetValue(remoteEndPoint, out peer))

@@ -33,9 +33,12 @@ namespace Hazel.Udp
 
             try
             {
-                socket.DontFragment = false;
+                socket.DontFragment = true;
             }
-            catch { }
+            catch
+            {
+                // ignored
+            }
 
             try
             {
@@ -51,7 +54,7 @@ namespace Hazel.Udp
         ///     Writes the given bytes to the connection.
         /// </summary>
         /// <param name="bytes">The bytes to write.</param>
-        protected abstract void WriteBytesToConnection(byte[] bytes, int length);
+        protected abstract void WriteBytesToConnection(byte[] bytes, int length, Action onTooBig = null);
 
         /// <inheritdoc/>
         public override void Send(MessageWriter msg)
@@ -59,22 +62,17 @@ namespace Hazel.Udp
             if (this._state != ConnectionState.Connected)
                 throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
 
-            byte[] buffer = new byte[msg.Length];
+            var buffer = new byte[msg.Length];
             Buffer.BlockCopy(msg.Buffer, 0, buffer, 0, msg.Length);
 
             switch (msg.SendOption)
             {
                 case SendOption.Reliable:
-                    ResetKeepAliveTimer();
-
-                    AttachReliableID(buffer, 1);
-                    WriteBytesToConnection(buffer, buffer.Length);
-                    Statistics.LogReliableSend(buffer.Length - 3, buffer.Length);
+                    ReliableSend((byte)msg.SendOption, buffer, includeHeader: false);
                     break;
 
                 default:
-                    WriteBytesToConnection(buffer, buffer.Length);
-                    Statistics.LogUnreliableSend(buffer.Length - 1, buffer.Length);
+                    UnreliableSend((byte)msg.SendOption, buffer, false);
                     break;
             }
         }
@@ -108,6 +106,7 @@ namespace Hazel.Udp
                 case (byte)UdpSendOption.Ping:
                 case (byte)SendOption.Reliable:
                 case (byte)UdpSendOption.Hello:
+                case (byte)UdpSendOption.MtuTest:
                     ReliableSend(sendOption, data, ackCallback);
                     break;
                                     
@@ -162,6 +161,16 @@ namespace Hazel.Udp
                     Statistics.LogUnreliableReceive(bytesReceived - 1, bytesReceived);
                     break;
 
+                case (byte)UdpSendOption.MtuTest:
+                    MtuTestMessageReceive(message);
+                    message.Recycle();
+                    break;
+
+                case (byte)UdpSendOption.Fragment:
+                    FragmentMessageReceive(message);
+                    message.Recycle();
+                    break;
+
                 // Treat everything else as garbage
                 default:
                     message.Recycle();
@@ -177,32 +186,28 @@ namespace Hazel.Udp
         /// </summary>
         /// <param name="sendOption">The SendOption to attach.</param>
         /// <param name="data">The data.</param>
-        void UnreliableSend(byte sendOption, byte[] data)
+        void UnreliableSend(byte sendOption, byte[] data, bool includeHeader = true)
         {
-            this.UnreliableSend(sendOption, data, 0, data.Length);
-        }
+            var length = includeHeader ? data.Length + 1 : data.Length;
+            if (length >= Mtu)
+            {
+                throw new HazelException("Unreliable messages can't be bigger than MTU");
+            }
 
-        /// <summary>
-        ///     Sends bytes using the unreliable UDP protocol.
-        /// </summary>
-        /// <param name="data">The data.</param>
-        /// <param name="sendOption">The SendOption to attach.</param>
-        /// <param name="offset"></param>
-        /// <param name="length"></param>
-        void UnreliableSend(byte sendOption, byte[] data, int offset, int length)
-        {
-            byte[] bytes = new byte[length + 1];
+            var bytes = new byte[length];
 
-            //Add message type
-            bytes[0] = sendOption;
+            if (includeHeader)
+            {
+                bytes[0] = sendOption;
+            }
 
             //Copy data into new array
-            Buffer.BlockCopy(data, offset, bytes, bytes.Length - length, length);
+            Buffer.BlockCopy(data, 0, bytes, length - data.Length, data.Length);
 
             //Write to connection
-            WriteBytesToConnection(bytes, bytes.Length);
+            WriteBytesToConnection(bytes, length);
 
-            Statistics.LogUnreliableSend(length, bytes.Length);
+            Statistics.LogUnreliableSend(data.Length, length);
         }
 
         /// <summary>

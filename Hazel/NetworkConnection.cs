@@ -14,7 +14,8 @@ namespace Hazel
         ReceivedZeroBytes,
         PingsWithoutResponse,
         ReliablePacketWithoutResponse,
-        ConnectionDisconnected
+        ConnectionDisconnected,
+        MtuTooLow
     }
 
     /// <summary>

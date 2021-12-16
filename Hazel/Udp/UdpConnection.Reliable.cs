@@ -221,7 +221,7 @@ namespace Hazel.Udp
         /// <param name="buffer">The buffer to attach to.</param>
         /// <param name="offset">The offset to attach at.</param>
         /// <param name="ackCallback">The callback to make once the packet has been acknowledged.</param>
-        protected void AttachReliableID(byte[] buffer, int offset, Action ackCallback = null)
+        protected ushort AttachReliableID(byte[] buffer, int offset, Action ackCallback = null)
         {
             ushort id = (ushort)Interlocked.Increment(ref lastIDAllocated);
 
@@ -241,6 +241,8 @@ namespace Hazel.Udp
             {
                 throw new Exception("That shouldn't be possible");
             }
+
+            return id;
         }
 
         public static int ClampToInt(float value, int min, int max)
@@ -256,15 +258,24 @@ namespace Hazel.Udp
         /// <param name="sendOption"></param>
         /// <param name="data">The byte array to write to.</param>
         /// <param name="ackCallback">The callback to make once the packet has been acknowledged.</param>
-        private void ReliableSend(byte sendOption, byte[] data, Action ackCallback = null)
+        private void ReliableSend(byte sendOption, byte[] data, Action ackCallback = null, bool includeHeader = true)
         {
+            var length = includeHeader ? data.Length + 3 : data.Length;
+            if (length >= Mtu)
+            {
+                FragmentedSend(data, ackCallback, includeHeader);
+                return;
+            }
+
+            var bytes = new byte[length];
+
+            if (includeHeader)
+            {
+                bytes[0] = sendOption;
+            }
+
             //Inform keepalive not to send for a while
             ResetKeepAliveTimer();
-
-            byte[] bytes = new byte[data.Length + 3];
-
-            //Add message type
-            bytes[0] = sendOption;
 
             //Add reliable ID
             AttachReliableID(bytes, 1, ackCallback);
@@ -419,7 +430,7 @@ namespace Hazel.Udp
             Statistics.LogReliableReceive(0, bytesReceived);
         }
 
-        private void AcknowledgeMessageId(ushort id)
+        protected void AcknowledgeMessageId(ushort id)
         {
             // Dispose of timer and remove from dictionary
             if (reliableDataPacketsSent.TryRemove(id, out Packet packet))

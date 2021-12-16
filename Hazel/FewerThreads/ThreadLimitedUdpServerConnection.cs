@@ -38,14 +38,15 @@ namespace Hazel.Udp.FewerThreads
 
             State = ConnectionState.Connected;
             this.InitializeKeepAliveTimer();
+            this.StartMtuDiscovery();
         }
 
         /// <inheritdoc />
-        protected override void WriteBytesToConnection(byte[] bytes, int length)
+        protected override void WriteBytesToConnection(byte[] bytes, int length, Action onTooBig = null)
         {
             if (bytes.Length != length) throw new ArgumentException("I made an assumption here. I hope you see this error.");
 
-            Listener.SendDataRaw(bytes, EndPoint);
+            Listener.SendDataRaw(bytes, EndPoint, onTooBig);
         }
 
         /// <inheritdoc />

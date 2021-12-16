@@ -63,21 +63,21 @@ namespace Hazel.Udp
 
 
         /// <inheritdoc />
-        protected override void WriteBytesToConnection(byte[] bytes, int length)
+        protected override void WriteBytesToConnection(byte[] bytes, int length, Action onTooBig = null)
         {
 #if DEBUG
             if (TestLagMs > 0)
             {
-                ThreadPool.QueueUserWorkItem(a => { Thread.Sleep(this.TestLagMs); WriteBytesToConnectionReal(bytes, length); });
+                ThreadPool.QueueUserWorkItem(a => { Thread.Sleep(this.TestLagMs); WriteBytesToConnectionReal(bytes, length, onTooBig); });
             }
             else
 #endif
             {
-                WriteBytesToConnectionReal(bytes, length);
+                WriteBytesToConnectionReal(bytes, length, onTooBig);
             }
         }
 
-        private void WriteBytesToConnectionReal(byte[] bytes, int length)
+        private void WriteBytesToConnectionReal(byte[] bytes, int length, Action onTooBig)
         {
             try
             {
@@ -95,6 +95,10 @@ namespace Hazel.Udp
             catch (ObjectDisposedException)
             {
                 // Already disposed and disconnected...
+            }
+            catch (SocketException e) when (onTooBig != null && e.SocketErrorCode == SocketError.MessageSize)
+            {
+                onTooBig();
             }
             catch (SocketException ex)
             {
@@ -121,6 +125,10 @@ namespace Hazel.Udp
             catch (ObjectDisposedException)
             {
                 // Already disposed and disconnected...
+            }
+            catch (SocketException e) when (e.SocketErrorCode == SocketError.MessageSize)
+            {
+                throw;
             }
             catch (SocketException ex)
             {
@@ -202,6 +210,7 @@ namespace Hazel.Udp
             SendHello(bytes, () =>
             {
                 this.State = ConnectionState.Connected;
+                this.StartMtuDiscovery();
             });
         }
 
