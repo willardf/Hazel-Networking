@@ -6,6 +6,7 @@ The aim of this fork is to create a simple interface for ultra-fast connection-b
 
 ## Features
 - UDP and Reliable UDP.
+- Fragmented packets with MTU discovery
 - Encrypted packets using DTLS
 - UDP Broadcast for local-multiplayer.
 - Completely thread safe.
@@ -37,7 +38,6 @@ To build Hazel open [solution file](Hazel.sln) using your favourite C# IDE (I us
    * You *should not* recycle messages after NewConnection events.
    * You *should not* recycle messages after Disconnect events.
    * You *should* recycle messages after DataReceived events.
- * Hazel doesn't support fragmented packets. It used to, but I wasn't sure of it so I removed it and have never needed it since. Just stay under 1kb packets.
 
 ## Tips for using Hazel with Unity
 
