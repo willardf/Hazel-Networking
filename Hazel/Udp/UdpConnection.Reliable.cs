@@ -263,7 +263,7 @@ namespace Hazel.Udp
             var length = includeHeader ? data.Length + 3 : data.Length;
             if (length >= Mtu)
             {
-                FragmentedSend(data, ackCallback, includeHeader);
+                FragmentedSend(sendOption, data, ackCallback, includeHeader);
                 return;
             }
 

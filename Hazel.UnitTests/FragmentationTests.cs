@@ -19,13 +19,13 @@ namespace Hazel.UnitTests
             using (var connection = new UdpClientConnection(new IPEndPoint(IPAddress.Loopback, 4296)))
             {
                 var manualResetEvent = new ManualResetEventSlim(false);
-                MessageReader messageReader = null;
+                DataReceivedEventArgs? data = null;
 
                 listener.NewConnection += e =>
                 {
-                    e.Connection.DataReceived += data =>
+                    e.Connection.DataReceived += de =>
                     {
-                        messageReader = data.Message;
+                        data = de;
                         manualResetEvent.Set();
                     };
                 };
@@ -37,10 +37,13 @@ namespace Hazel.UnitTests
 
                 manualResetEvent.Wait(TimeSpan.FromSeconds(5));
 
-                Assert.IsNotNull(messageReader);
+                Assert.IsNotNull(data);
 
-                var received = new byte[messageReader.Length - messageReader.Offset];
-                Array.Copy(messageReader.Buffer, messageReader.Offset + messageReader.Position, received, 0, messageReader.Length - messageReader.Offset);
+                Assert.AreEqual(SendOption.Reliable, data.Value.SendOption);
+
+                var messageReader = data.Value.Message;
+                var received = new byte[messageReader.Buffer.Length - messageReader.Offset - messageReader.Position];
+                Array.Copy(messageReader.Buffer, messageReader.Offset + messageReader.Position, received, 0, received.Length);
 
                 CollectionAssert.AreEqual(_testData, received);
             }

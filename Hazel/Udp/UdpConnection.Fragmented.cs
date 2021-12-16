@@ -105,12 +105,14 @@ namespace Hazel.Udp
 
         private const byte FragmentHeaderSize = sizeof(byte) + sizeof(ushort) + sizeof(ushort) + sizeof(ushort);
 
-        protected void FragmentedSend(byte[] data, Action ackCallback, bool includeHeader)
+        protected void FragmentedSend(byte sendOption, byte[] data, Action ackCallback, bool includeHeader)
         {
+            var length = includeHeader ? data.Length + 1 : data.Length;
+
             var id = (ushort)Interlocked.Increment(ref _lastFragmentedId);
             var fragmentSize = Mtu;
             var fragmentDataSize = fragmentSize - FragmentHeaderSize;
-            var fragmentsCount = (int)Math.Ceiling(data.Length / (double)fragmentDataSize);
+            var fragmentsCount = (int)Math.Ceiling(length / (double)fragmentDataSize);
 
             if (fragmentsCount >= ushort.MaxValue)
             {
@@ -121,7 +123,7 @@ namespace Hazel.Udp
 
             for (ushort i = 0; i < fragmentsCount; i++)
             {
-                var dataLength = Math.Min(fragmentDataSize, data.Length - fragmentDataSize * i);
+                var dataLength = Math.Min(fragmentDataSize, length - fragmentDataSize * i);
                 var buffer = new byte[dataLength + FragmentHeaderSize];
 
                 buffer[0] = (byte)UdpSendOption.Fragment;
@@ -142,7 +144,13 @@ namespace Hazel.Udp
                 buffer[5] = (byte)id;
                 buffer[6] = (byte)(id >> 8);
 
-                Buffer.BlockCopy(data, fragmentDataSize * i, buffer, FragmentHeaderSize, dataLength);
+                var includingHeader = i == 0 && includeHeader;
+                if (includingHeader)
+                {
+                    buffer[7] = sendOption;
+                }
+
+                Buffer.BlockCopy(data, fragmentDataSize * i - (includingHeader ? 0 : 1), buffer, FragmentHeaderSize + (includingHeader ? 1 : 0), dataLength - (includingHeader ? 1 : 0));
 
                 WriteBytesToConnection(buffer, buffer.Length);
             }
@@ -172,7 +180,7 @@ namespace Hazel.Udp
                     if (fragmentedMessage.Fragments.Count == fragmentsCount)
                     {
                         var reconstructed = fragmentedMessage.Reconstruct();
-                        InvokeDataReceived(MessageReader.Get(reconstructed), SendOption.Reliable);
+                        InvokeDataReceived(SendOption.Reliable, MessageReader.Get(reconstructed), 1, reconstructed.Length);
 
                         _fragmentedMessagesReceived.Remove(id);
                     }
