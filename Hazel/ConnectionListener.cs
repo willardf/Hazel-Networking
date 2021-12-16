@@ -79,10 +79,6 @@ namespace Hazel
                 {
                 }
             }
-            else
-            {
-                msg.Recycle();
-            }
         }
 
         /// <summary>
