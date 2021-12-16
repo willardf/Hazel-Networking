@@ -117,6 +117,8 @@ namespace Hazel.Udp
                 throw new HazelException("Too many fragments");
             }
 
+            var acksReceived = 0;
+
             for (ushort i = 0; i < fragmentsCount; i++)
             {
                 var dataLength = Math.Min(fragmentDataSize, data.Length - fragmentDataSize * i);
@@ -124,7 +126,15 @@ namespace Hazel.Udp
 
                 buffer[0] = (byte)UdpSendOption.Fragment;
 
-                AttachReliableID(buffer, 1);
+                AttachReliableID(buffer, 1, () =>
+                {
+                    acksReceived++;
+
+                    if (acksReceived >= fragmentsCount)
+                    {
+                        ackCallback?.Invoke();
+                    }
+                });
 
                 buffer[3] = (byte)fragmentsCount;
                 buffer[4] = (byte)(fragmentsCount >> 8);
