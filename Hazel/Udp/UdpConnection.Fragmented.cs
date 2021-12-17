@@ -1,6 +1,5 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.Collections.Concurrent;
 using System.Threading;
 
 namespace Hazel.Udp
@@ -43,7 +42,7 @@ namespace Hazel.Udp
 
         private byte _mtuIndex;
 
-        private readonly Dictionary<ushort, FragmentedMessage> _fragmentedMessagesReceived = new Dictionary<ushort, FragmentedMessage>();
+        private readonly ConcurrentDictionary<ushort, FragmentedMessage> _fragmentedMessagesReceived = new ConcurrentDictionary<ushort, FragmentedMessage>();
         private volatile int _lastFragmentedId;
 
         protected void StartMtuDiscovery()
@@ -171,13 +170,23 @@ namespace Hazel.Udp
                     return;
                 }
 
-                lock (_fragmentedMessagesReceived)
-                {
-                    if (!_fragmentedMessagesReceived.TryGetValue(fragmentedMessageId, out var fragmentedMessage))
-                    {
-                        _fragmentedMessagesReceived.Add(fragmentedMessageId, fragmentedMessage = new FragmentedMessage(fragmentsCount));
-                    }
 
+                if (!_fragmentedMessagesReceived.TryGetValue(fragmentedMessageId, out var fragmentedMessage))
+                {
+                    lock (_fragmentedMessagesReceived)
+                    {
+                        if (!_fragmentedMessagesReceived.TryGetValue(fragmentedMessageId, out fragmentedMessage))
+                        {
+                            if (!_fragmentedMessagesReceived.TryAdd(fragmentedMessageId, fragmentedMessage = new FragmentedMessage(fragmentsCount)))
+                            {
+                                throw new HazelException("Failed to add fragmented message");
+                            }
+                        }
+                    }
+                }
+
+                lock (fragmentedMessage)
+                {
                     if (fragmentedMessage.Fragments[fragmentId] != null)
                     {
                         return;
@@ -193,7 +202,7 @@ namespace Hazel.Udp
                         var reconstructed = fragmentedMessage.Reconstruct();
                         InvokeDataReceived((SendOption)reconstructed.ReadByte(), reconstructed, 1, fragmentedMessage.Size);
 
-                        _fragmentedMessagesReceived.Remove(fragmentedMessageId);
+                        _fragmentedMessagesReceived.TryRemove(fragmentedMessageId, out _);
                     }
                 }
             }
