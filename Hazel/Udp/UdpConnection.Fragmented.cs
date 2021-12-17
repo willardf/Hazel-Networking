@@ -191,7 +191,7 @@ namespace Hazel.Udp
                     if (fragmentedMessage.IsFinished)
                     {
                         var reconstructed = fragmentedMessage.Reconstruct();
-                        InvokeDataReceived((SendOption)reconstructed[0], MessageReader.Get(reconstructed), 1, reconstructed.Length);
+                        InvokeDataReceived((SendOption)reconstructed.ReadByte(), reconstructed, 1, fragmentedMessage.Size);
 
                         _fragmentedMessagesReceived.Remove(fragmentedMessageId);
                     }
@@ -239,20 +239,20 @@ namespace Hazel.Udp
                 FragmentsReceived++;
             }
 
-            public byte[] Reconstruct()
+            public MessageReader Reconstruct()
             {
                 if (!IsFinished)
                 {
                     throw new HazelException("Can't reconstruct a FragmentedMessage until all fragments are received");
                 }
 
-                var buffer = new byte[Size];
+                var buffer = MessageReader.GetSized(Size);
 
                 var offset = 0;
                 for (var i = 0; i < FragmentsCount; i++)
                 {
                     var data = Fragments[i];
-                    Buffer.BlockCopy(data, 0, buffer, offset, data.Length);
+                    Buffer.BlockCopy(data, 0, buffer.Buffer, offset, data.Length);
                     offset += data.Length;
                 }
 

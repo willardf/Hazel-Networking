@@ -53,8 +53,9 @@ namespace Hazel.UnitTests
                 Assert.AreEqual(SendOption.Reliable, data.Value.SendOption);
 
                 var messageReader = data.Value.Message;
-                var received = new byte[messageReader.Buffer.Length - messageReader.Offset - messageReader.Position];
+                var received = new byte[messageReader.Length];
                 Array.Copy(messageReader.Buffer, messageReader.Offset + messageReader.Position, received, 0, received.Length);
+                messageReader.Recycle();
 
                 CollectionAssert.AreEqual(_testData, received);
             }
