@@ -325,13 +325,13 @@ namespace Hazel.Dtls
         }
 
         /// <inheritdoc />
-        protected override void WriteBytesToConnection(byte[] bytes, int length)
+        protected override void WriteBytesToConnection(byte[] bytes, int length, Action onTooBig = null)
         {
             ByteSpan wireData = this.WriteBytesToConnectionInternal(bytes, length);
             if (wireData.Length > 0)
             {
                 Debug.Assert(wireData.Offset ==  0, "Got a non-zero write data offset");
-                base.WriteBytesToConnection(wireData.GetUnderlyingArray(), wireData.Length);
+                base.WriteBytesToConnection(wireData.GetUnderlyingArray(), wireData.Length, onTooBig);
             }
         }
 

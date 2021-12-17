@@ -239,7 +239,7 @@ namespace Hazel.Udp
         /// </summary>
         /// <param name="bytes">The bytes to send.</param>
         /// <param name="endPoint">The endpoint to send to.</param>
-        internal void SendData(byte[] bytes, int length, EndPoint endPoint)
+        internal void SendData(byte[] bytes, int length, EndPoint endPoint, Action onTooBig = null)
         {
             if (length > bytes.Length) return;
 
@@ -264,6 +264,10 @@ namespace Hazel.Udp
                     SendCallback,
                     null);
             }
+            catch (SocketException e) when (onTooBig != null && e.SocketErrorCode == SocketError.MessageSize)
+            {
+                onTooBig();
+            }
             catch (SocketException e)
             {
                 this.Logger?.Invoke("Could not send data as a SocketException occurred: " + e);
@@ -280,6 +284,10 @@ namespace Hazel.Udp
             try
             {
                 socket.EndSendTo(result);
+            }
+            catch (SocketException e) when (e.SocketErrorCode == SocketError.MessageSize)
+            {
+                throw;
             }
             catch { }
         }
