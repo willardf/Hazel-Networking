@@ -61,18 +61,28 @@ namespace Hazel.Udp
         {
             if (this._state != ConnectionState.Connected)
                 throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
+            
+            if (msg.GetLength(false) >= Mtu)
+            {
+                FragmentedSend((byte)msg.SendOption, msg.ToByteArray(false));
+                return;
+            }
 
-            var buffer = new byte[msg.Length];
-            Buffer.BlockCopy(msg.Buffer, 0, buffer, 0, msg.Length);
+            byte[] buffer = msg.ToByteArray(true);
 
             switch (msg.SendOption)
             {
                 case SendOption.Reliable:
-                    ReliableSend((byte)msg.SendOption, buffer, includeHeader: false);
+                    ResetKeepAliveTimer();
+
+                    AttachReliableID(buffer, 1);
+                    WriteBytesToConnection(buffer, buffer.Length);
+                    Statistics.LogReliableSend(buffer.Length - 3, buffer.Length);
                     break;
 
                 default:
-                    UnreliableSend((byte)msg.SendOption, buffer, false);
+                    WriteBytesToConnection(buffer, buffer.Length);
+                    Statistics.LogUnreliableSend(buffer.Length - 1, buffer.Length);
                     break;
             }
         }

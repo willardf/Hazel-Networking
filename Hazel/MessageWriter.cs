@@ -33,10 +33,12 @@ namespace Hazel
 
         public byte[] ToByteArray(bool includeHeader)
         {
+            var length = GetLength(includeHeader);
+            
             if (includeHeader)
             {
-                byte[] output = new byte[this.Length];
-                System.Buffer.BlockCopy(this.Buffer, 0, output, 0, this.Length);
+                byte[] output = new byte[length];
+                System.Buffer.BlockCopy(this.Buffer, 0, output, 0, length);
                 return output;
             }
             else
@@ -45,16 +47,38 @@ namespace Hazel
                 {
                     case SendOption.Reliable:
                         {
-                            byte[] output = new byte[this.Length - 3];
-                            System.Buffer.BlockCopy(this.Buffer, 3, output, 0, this.Length - 3);
+                            byte[] output = new byte[length];
+                            System.Buffer.BlockCopy(this.Buffer, 3, output, 0, length);
                             return output;
                         }
                     case SendOption.None:
                         {
-                            byte[] output = new byte[this.Length - 1];
-                            System.Buffer.BlockCopy(this.Buffer, 1, output, 0, this.Length - 1);
+                            byte[] output = new byte[length];
+                            System.Buffer.BlockCopy(this.Buffer, 1, output, 0, length);
                             return output;
                         }
+                }
+            }
+
+            throw new NotImplementedException();
+        }
+
+        public int GetLength(bool includeHeader)
+        {
+            if (includeHeader)
+            {
+                return Length;
+            }
+
+            switch (this.SendOption)
+            {
+                case SendOption.Reliable:
+                {
+                    return Length - 3;
+                }
+                case SendOption.None:
+                {
+                    return Length - 1;
                 }
             }
 

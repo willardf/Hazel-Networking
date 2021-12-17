@@ -13,7 +13,9 @@ namespace Hazel.UnitTests
         private readonly byte[] _testData = Enumerable.Range(0, 10000).Select(x => (byte)x).ToArray();
 
         [TestMethod]
-        public void ReliableSendTest()
+        [DataRow(false, DisplayName = "SendBytes")]
+        [DataRow(true, DisplayName = "MessageWriter")]
+        public void ReliableSendTest(bool useMessageWriter)
         {
             using (var listener = new UdpConnectionListener(new IPEndPoint(IPAddress.Any, 4296)))
             using (var connection = new UdpClientConnection(new IPEndPoint(IPAddress.Loopback, 4296)))
@@ -33,7 +35,16 @@ namespace Hazel.UnitTests
                 listener.Start();
                 connection.Connect();
 
-                connection.SendBytes(_testData, SendOption.Reliable);
+                if (useMessageWriter)
+                {
+                    var messageWriter = MessageWriter.Get(SendOption.Reliable);
+                    messageWriter.Write(_testData);
+                    connection.Send(messageWriter);
+                }
+                else
+                {
+                    connection.SendBytes(_testData, SendOption.Reliable);
+                }
 
                 manualResetEvent.Wait(TimeSpan.FromSeconds(5));
 

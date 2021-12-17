@@ -105,9 +105,9 @@ namespace Hazel.Udp
 
         private const byte FragmentHeaderSize = sizeof(byte) + sizeof(ushort) + sizeof(ushort) + sizeof(byte) + sizeof(byte);
 
-        protected void FragmentedSend(byte sendOption, byte[] data, Action ackCallback, bool includeHeader)
+        protected void FragmentedSend(byte sendOption, byte[] data, Action ackCallback = null)
         {
-            var length = includeHeader ? data.Length + 1 : data.Length;
+            var length = data.Length + 1;
 
             var id = (ushort)Interlocked.Increment(ref _lastFragmentedId);
             var fragmentSize = Mtu;
@@ -144,7 +144,7 @@ namespace Hazel.Udp
                 buffer[5] = (byte)fragmentsCount;
                 buffer[6] = i;
 
-                var includingHeader = i == 0 && includeHeader;
+                var includingHeader = i == 0;
                 if (includingHeader)
                 {
                     buffer[7] = sendOption;

@@ -258,24 +258,21 @@ namespace Hazel.Udp
         /// <param name="sendOption"></param>
         /// <param name="data">The byte array to write to.</param>
         /// <param name="ackCallback">The callback to make once the packet has been acknowledged.</param>
-        private void ReliableSend(byte sendOption, byte[] data, Action ackCallback = null, bool includeHeader = true)
+        private void ReliableSend(byte sendOption, byte[] data, Action ackCallback = null)
         {
-            var length = includeHeader ? data.Length + 3 : data.Length;
-            if (length >= Mtu)
+            if (data.Length >= Mtu)
             {
-                FragmentedSend(sendOption, data, ackCallback, includeHeader);
+                FragmentedSend(sendOption, data, ackCallback);
                 return;
-            }
-
-            var bytes = new byte[length];
-
-            if (includeHeader)
-            {
-                bytes[0] = sendOption;
             }
 
             //Inform keepalive not to send for a while
             ResetKeepAliveTimer();
+
+            byte[] bytes = new byte[data.Length + 3];
+
+            //Add message type
+            bytes[0] = sendOption;
 
             //Add reliable ID
             AttachReliableID(bytes, 1, ackCallback);
