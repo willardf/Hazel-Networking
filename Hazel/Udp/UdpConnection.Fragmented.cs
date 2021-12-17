@@ -103,7 +103,7 @@ namespace Hazel.Udp
             ProcessReliableReceive(message.Buffer, 1, out _);
         }
 
-        private const byte FragmentHeaderSize = sizeof(byte) + sizeof(ushort) + sizeof(ushort) + sizeof(ushort);
+        private const byte FragmentHeaderSize = sizeof(byte) + sizeof(ushort) + sizeof(ushort) + sizeof(byte) + sizeof(byte);
 
         protected void FragmentedSend(byte sendOption, byte[] data, Action ackCallback, bool includeHeader)
         {
@@ -114,14 +114,14 @@ namespace Hazel.Udp
             var fragmentDataSize = fragmentSize - FragmentHeaderSize;
             var fragmentsCount = (int)Math.Ceiling(length / (double)fragmentDataSize);
 
-            if (fragmentsCount >= ushort.MaxValue)
+            if (fragmentsCount >= byte.MaxValue)
             {
                 throw new HazelException("Too many fragments");
             }
 
             var acksReceived = 0;
 
-            for (ushort i = 0; i < fragmentsCount; i++)
+            for (byte i = 0; i < fragmentsCount; i++)
             {
                 var dataLength = Math.Min(fragmentDataSize, length - fragmentDataSize * i);
                 var buffer = new byte[dataLength + FragmentHeaderSize];
@@ -138,11 +138,11 @@ namespace Hazel.Udp
                     }
                 });
 
-                buffer[3] = (byte)fragmentsCount;
-                buffer[4] = (byte)(fragmentsCount >> 8);
+                buffer[3] = (byte)id;
+                buffer[4] = (byte)(id >> 8);
 
-                buffer[5] = (byte)id;
-                buffer[6] = (byte)(id >> 8);
+                buffer[5] = (byte)fragmentsCount;
+                buffer[6] = i;
 
                 var includingHeader = i == 0 && includeHeader;
                 if (includingHeader)
@@ -158,12 +158,18 @@ namespace Hazel.Udp
 
         protected void FragmentMessageReceive(MessageReader messageReader)
         {
-            if (ProcessReliableReceive(messageReader.Buffer, 1, out var id))
+            if (ProcessReliableReceive(messageReader.Buffer, 1, out _))
             {
                 messageReader.Position += 3;
 
-                var fragmentsCount = messageReader.ReadUInt16();
                 var fragmentedMessageId = messageReader.ReadUInt16();
+                var fragmentsCount = messageReader.ReadByte();
+                var fragmentId = messageReader.ReadByte();
+
+                if (fragmentsCount <= 0 || fragmentId >= fragmentsCount)
+                {
+                    return;
+                }
 
                 lock (_fragmentedMessagesReceived)
                 {
@@ -172,17 +178,22 @@ namespace Hazel.Udp
                         _fragmentedMessagesReceived.Add(fragmentedMessageId, fragmentedMessage = new FragmentedMessage(fragmentsCount));
                     }
 
+                    if (fragmentedMessage.Fragments[fragmentId] != null)
+                    {
+                        return;
+                    }
+
                     var buffer = new byte[messageReader.Length - messageReader.Position];
                     Buffer.BlockCopy(messageReader.Buffer, messageReader.Position, buffer, 0, messageReader.Length - messageReader.Position);
 
-                    fragmentedMessage.Fragments.Add(new FragmentedMessage.Fragment(id, buffer));
+                    fragmentedMessage.AddFragment(fragmentId, buffer);
 
-                    if (fragmentedMessage.Fragments.Count == fragmentsCount)
+                    if (fragmentedMessage.IsFinished)
                     {
                         var reconstructed = fragmentedMessage.Reconstruct();
-                        InvokeDataReceived(SendOption.Reliable, MessageReader.Get(reconstructed), 1, reconstructed.Length);
+                        InvokeDataReceived((SendOption)reconstructed[0], MessageReader.Get(reconstructed), 1, reconstructed.Length);
 
-                        _fragmentedMessagesReceived.Remove(id);
+                        _fragmentedMessagesReceived.Remove(fragmentedMessageId);
                     }
                 }
             }
@@ -196,45 +207,56 @@ namespace Hazel.Udp
             public int FragmentsCount { get; }
 
             /// <summary>
+            ///     The number of fragments received.
+            /// </summary>
+            public int FragmentsReceived { get; private set; }
+
+            /// <summary>
+            ///     The total size of all fragments.
+            /// </summary>
+            public int Size { get; private set; }
+
+            /// <summary>
             ///     The fragments received so far.
             /// </summary>
-            public HashSet<Fragment> Fragments { get; } = new HashSet<Fragment>();
+            public byte[][] Fragments { get; }
+
+            /// <summary>
+            ///     Whether all fragments were received.
+            /// </summary>
+            public bool IsFinished => FragmentsReceived == FragmentsCount;
+
+            public FragmentedMessage(int fragmentsCount)
+            {
+                FragmentsCount = fragmentsCount;
+                Fragments = new byte[fragmentsCount][];
+            }
+
+            public void AddFragment(byte id, byte[] fragment)
+            {
+                Fragments[id] = fragment;
+                Size += fragment.Length;
+                FragmentsReceived++;
+            }
 
             public byte[] Reconstruct()
             {
-                if (Fragments.Count != FragmentsCount)
+                if (!IsFinished)
                 {
                     throw new HazelException("Can't reconstruct a FragmentedMessage until all fragments are received");
                 }
 
-                var buffer = new byte[Fragments.Sum(x => x.Data.Length)];
+                var buffer = new byte[Size];
 
                 var offset = 0;
-                foreach (var fragment in Fragments.OrderBy(fragment => fragment.Id))
+                for (var i = 0; i < FragmentsCount; i++)
                 {
-                    var data = fragment.Data;
+                    var data = Fragments[i];
                     Buffer.BlockCopy(data, 0, buffer, offset, data.Length);
                     offset += data.Length;
                 }
 
                 return buffer;
-            }
-
-            public FragmentedMessage(int fragmentsCount)
-            {
-                FragmentsCount = fragmentsCount;
-            }
-
-            public readonly struct Fragment
-            {
-                public int Id { get; }
-                public byte[] Data { get; }
-
-                public Fragment(int id, byte[] data)
-                {
-                    Id = id;
-                    Data = data;
-                }
             }
         }
     }
