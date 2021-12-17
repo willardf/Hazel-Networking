@@ -1,136 +1,14 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
-  <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{02CFBD30-D77D-400F-94B2-700F60EFDD7F}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Hazel</RootNamespace>
-    <AssemblyName>Hazel</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <TargetFrameworkProfile />
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <DocumentationFile>
-    </DocumentationFile>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Prefer32Bit>false</Prefer32Bit>
-    <LangVersion>7.3</LangVersion>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>portable</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <DocumentationFile>
-    </DocumentationFile>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Prefer32Bit>false</Prefer32Bit>
-    <LangVersion>7.3</LangVersion>
-    <DebugSymbols>true</DebugSymbols>
-  </PropertyGroup>
-  <PropertyGroup>
-    <SignAssembly>true</SignAssembly>
-  </PropertyGroup>
-  <PropertyGroup>
-    <AssemblyOriginatorKeyFile>
-    </AssemblyOriginatorKeyFile>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'DebugClient|AnyCPU'">
-    <DebugSymbols>true</DebugSymbols>
-    <OutputPath>bin\DebugClient\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <DebugType>full</DebugType>
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <ErrorReport>prompt</ErrorReport>
-    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
-    <LangVersion>7.3</LangVersion>
-  </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Xml" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="ByteSpan.cs" />
-    <Compile Include="ByteSpanExtensions.cs" />
-    <Compile Include="Connection.cs" />
-    <Compile Include="ConnectionListener.cs" />
-    <Compile Include="ConnectionState.cs" />
-    <Compile Include="Crypto\AesGcm.cs" />
-    <Compile Include="Crypto\Const.cs" />
-    <Compile Include="Crypto\CryptoProvider.cs" />
-    <Compile Include="Crypto\DefaultAes.cs" />
-    <Compile Include="Crypto\IAes.cs" />
-    <Compile Include="Crypto\Sha256Stream.cs" />
-    <Compile Include="Crypto\SpanCryptoExtensions.cs" />
-    <Compile Include="Crypto\X25519.cs" />
-    <Compile Include="DataReceivedEventArgs.cs" />
-    <Compile Include="DisconnectedEventArgs.cs" />
-    <Compile Include="Dtls\AesGcmRecordProtection.cs" />
-    <Compile Include="Dtls\DtlsUnityConnection.cs" />
-    <Compile Include="Dtls\DtlsConnectionListener.cs" />
-    <Compile Include="Dtls\Handshake.cs" />
-    <Compile Include="Dtls\IHandshakeCipherSuite.cs" />
-    <Compile Include="Dtls\IRecordProtection.cs" />
-    <Compile Include="Dtls\NullRecordProtection.cs" />
-    <Compile Include="Dtls\PrfSha256.cs" />
-    <Compile Include="Dtls\Record.cs" />
-    <Compile Include="Dtls\ThreadedHmacHelper.cs" />
-    <Compile Include="Dtls\X25519EcdheRsaSha256.cs" />
-    <Compile Include="FewerThreads\HazelThreadPool.cs" />
-    <Compile Include="FewerThreads\ThreadLimitedUdpConnectionListener.cs" />
-    <Compile Include="FewerThreads\ThreadLimitedUdpServerConnection.cs" />
-    <Compile Include="HazelException.cs" />
-    <Compile Include="IPMode.cs" />
-    <Compile Include="IRecyclable.cs" />
-    <Compile Include="MessageReader.cs" />
-    <Compile Include="NetworkConnection.cs" />
-    <Compile Include="NetworkConnectionListener.cs" />
-    <Compile Include="MessageWriter.cs" />
-    <Compile Include="NewConnectionEventArgs.cs" />
-    <Compile Include="ObjectPool.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="SendOption.cs" />
-    <Compile Include="Udp\SendOptionInternal.cs" />
-    <Compile Include="ConnectionStatistics.cs" />
-    <Compile Include="Udp\UdpBroadcaster.cs" />
-    <Compile Include="Udp\UdpBroadcastListener.cs" />
-    <Compile Include="Udp\UnityUdpClientConnection.cs" />
-    <Compile Include="Udp\UdpClientConnection.cs" />
-    <Compile Include="Udp\UdpConnection.cs">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="Udp\UdpConnection.KeepAlive.cs" />
-    <Compile Include="Udp\UdpConnection.Reliable.cs" />
-    <Compile Include="Udp\UdpConnectionListener.cs" />
-    <Compile Include="Udp\UdpServerConnection.cs" />
-    <Compile Include="UPnP\ILogger.cs" />
-    <Compile Include="UPnP\NetUtility.cs" />
-    <Compile Include="UPnP\UPnPHelper.cs" />
-  </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFrameworks>netstandard2.0;net472</TargetFrameworks>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+            <_Parameter1>Hazel.UnitTests</_Parameter1>
+        </AssemblyAttribute>
+    </ItemGroup>
+
 </Project>

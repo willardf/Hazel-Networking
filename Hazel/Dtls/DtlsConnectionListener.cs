@@ -236,7 +236,7 @@ namespace Hazel.Dtls
                 throw new ArgumentException("Certificate must have a private key attached", nameof(certificate));
             }
 
-            RSA privateKey = certificate.PrivateKey as RSA;
+            RSA privateKey = certificate.GetRSAPrivateKey();
             if (privateKey == null)
             {
                 throw new ArgumentException("Certificate must be signed by an RSA key", nameof(certificate));
