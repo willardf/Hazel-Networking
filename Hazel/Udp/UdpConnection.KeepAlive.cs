@@ -136,7 +136,7 @@ namespace Hazel.Udp
         /// <summary>
         ///     Resets the keepalive timer to zero.
         /// </summary>
-        private void ResetKeepAliveTimer()
+        protected void ResetKeepAliveTimer()
         {
             try
             {

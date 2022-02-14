@@ -15,6 +15,11 @@ namespace Hazel.Udp
 
         public static readonly byte[] EmptyDisconnectBytes = new byte[] { (byte)UdpSendOption.Disconnect };
 
+        public UdpConnection() : base()
+        {
+            this.PacketPool = new ObjectPool<Packet>(() => new Packet(this));
+        }
+
         internal static Socket CreateSocket(IPMode ipMode)
         {
             Socket socket;

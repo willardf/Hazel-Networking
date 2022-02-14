@@ -11,6 +11,8 @@ namespace Hazel.Udp
 {
     partial class UdpConnection
     {
+        public readonly ObjectPool<Packet> PacketPool;
+
         /// <summary>
         ///     The starting timeout, in miliseconds, at which data will be resent.
         /// </summary>
@@ -85,19 +87,7 @@ namespace Hazel.Udp
         /// </summary>
         public class Packet : IRecyclable
         {
-            /// <summary>
-            ///     Object pool for this event.
-            /// </summary>
-            public static readonly ObjectPool<Packet> PacketPool = new ObjectPool<Packet>(() => new Packet());
-
-            /// <summary>
-            ///     Returns an instance of this object from the pool.
-            /// </summary>
-            /// <returns></returns>
-            internal static Packet GetObject()
-            {
-                return PacketPool.GetObject();
-            }
+            private readonly UdpConnection owner;
 
             public ushort Id;
             private byte[] Data;
@@ -112,8 +102,9 @@ namespace Hazel.Udp
             public int Retransmissions;
             public Stopwatch Stopwatch = new Stopwatch();
 
-            Packet()
+            internal Packet(UdpConnection owner)
             {
+                this.owner = owner;
             }
 
             internal void Set(ushort id, UdpConnection connection, byte[] data, int length, int timeout, Action ackCallback)
@@ -191,7 +182,7 @@ namespace Hazel.Udp
                 this.Acknowledged = true;
                 this.Connection = null;
 
-                PacketPool.PutObject(this);
+                this.owner.PacketPool.PutObject(this);
             }
         }
 
@@ -228,7 +219,7 @@ namespace Hazel.Udp
             buffer[offset] = (byte)(id >> 8);
             buffer[offset + 1] = (byte)id;
 
-            Packet packet = Packet.GetObject();
+            Packet packet = this.PacketPool.GetObject();
             packet.Set(
                 id,
                 this,
