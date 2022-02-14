@@ -261,7 +261,7 @@ namespace Hazel.Udp
             //Write to connection
             WriteBytesToConnection(bytes, bytes.Length);
 
-            Statistics.LogReliableSend(data.Length, bytes.Length);
+            Statistics.LogReliableSend(data.Length);
         }
 
         /// <summary>

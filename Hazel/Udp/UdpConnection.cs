@@ -74,12 +74,12 @@ namespace Hazel.Udp
 
                     AttachReliableID(buffer, 1);
                     WriteBytesToConnection(buffer, buffer.Length);
-                    Statistics.LogReliableSend(buffer.Length - 3, buffer.Length);
+                    Statistics.LogReliableSend(buffer.Length - 3);
                     break;
 
                 default:
                     WriteBytesToConnection(buffer, buffer.Length);
-                    Statistics.LogUnreliableSend(buffer.Length - 1, buffer.Length);
+                    Statistics.LogUnreliableSend(buffer.Length - 1);
                     break;
             }
         }
@@ -207,7 +207,7 @@ namespace Hazel.Udp
             //Write to connection
             WriteBytesToConnection(bytes, bytes.Length);
 
-            Statistics.LogUnreliableSend(length, bytes.Length);
+            Statistics.LogUnreliableSend(length);
         }
 
         /// <summary>

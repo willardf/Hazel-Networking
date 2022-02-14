@@ -130,7 +130,7 @@ namespace Hazel.Udp
 
             WriteBytesToConnection(bytes, bytes.Length);
 
-            Statistics.LogReliableSend(0, bytes.Length);
+            Statistics.LogReliableSend(0);
         }
 
         /// <summary>

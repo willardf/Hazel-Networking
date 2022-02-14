@@ -194,6 +194,8 @@ namespace Hazel.UnitTests
                 connection.Connect();
 
                 Assert.AreEqual(ConnectionState.Connected, connection.State);
+
+                Console.Write($"Client sent {connection.Statistics.TotalBytesSent} bytes ");
             }
         }
 
@@ -332,7 +334,7 @@ namespace Hazel.UnitTests
         ///     Tests the keepalive functionality from the client,
         /// </summary>
         [TestMethod]
-        public void KeepAliveClientTest()
+        public virtual void KeepAliveClientTest()
         {
             using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
             using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))

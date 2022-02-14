@@ -11,7 +11,7 @@ namespace Hazel.UnitTests
         {
             ConnectionStatistics statistics = new ConnectionStatistics();
 
-            statistics.LogUnreliableSend(10, 11);
+            statistics.LogUnreliableSend(10);
 
             Assert.AreEqual(1, statistics.MessagesSent);
             Assert.AreEqual(1, statistics.UnreliableMessagesSent);
@@ -21,9 +21,8 @@ namespace Hazel.UnitTests
             Assert.AreEqual(0, statistics.HelloMessagesSent);
 
             Assert.AreEqual(10, statistics.DataBytesSent);
-            Assert.AreEqual(11, statistics.TotalBytesSent);
 
-            statistics.LogReliableSend(5, 8);
+            statistics.LogReliableSend(5);
 
             Assert.AreEqual(2, statistics.MessagesSent);
             Assert.AreEqual(1, statistics.UnreliableMessagesSent);
@@ -33,9 +32,8 @@ namespace Hazel.UnitTests
             Assert.AreEqual(0, statistics.HelloMessagesSent);
 
             Assert.AreEqual(15, statistics.DataBytesSent);
-            Assert.AreEqual(19, statistics.TotalBytesSent);
 
-            statistics.LogFragmentedSend(6, 10);
+            statistics.LogFragmentedSend(6);
 
             Assert.AreEqual(3, statistics.MessagesSent);
             Assert.AreEqual(1, statistics.UnreliableMessagesSent);
@@ -45,9 +43,8 @@ namespace Hazel.UnitTests
             Assert.AreEqual(0, statistics.HelloMessagesSent);
 
             Assert.AreEqual(21, statistics.DataBytesSent);
-            Assert.AreEqual(29, statistics.TotalBytesSent);
 
-            statistics.LogAcknowledgementSend(4);
+            statistics.LogAcknowledgementSend();
 
             Assert.AreEqual(4, statistics.MessagesSent);
             Assert.AreEqual(1, statistics.UnreliableMessagesSent);
@@ -57,9 +54,8 @@ namespace Hazel.UnitTests
             Assert.AreEqual(0, statistics.HelloMessagesSent);
 
             Assert.AreEqual(21, statistics.DataBytesSent);
-            Assert.AreEqual(33, statistics.TotalBytesSent);
 
-            statistics.LogHelloSend(7);
+            statistics.LogHelloSend();
 
             Assert.AreEqual(5, statistics.MessagesSent);
             Assert.AreEqual(1, statistics.UnreliableMessagesSent);
@@ -69,7 +65,6 @@ namespace Hazel.UnitTests
             Assert.AreEqual(1, statistics.HelloMessagesSent);
 
             Assert.AreEqual(21, statistics.DataBytesSent);
-            Assert.AreEqual(40, statistics.TotalBytesSent);
             
             Assert.AreEqual(0, statistics.MessagesReceived);
             Assert.AreEqual(0, statistics.UnreliableMessagesReceived);
@@ -80,6 +75,9 @@ namespace Hazel.UnitTests
 
             Assert.AreEqual(0, statistics.DataBytesReceived);
             Assert.AreEqual(0, statistics.TotalBytesReceived);
+
+            statistics.LogPacketSend(11);
+            Assert.AreEqual(11, statistics.TotalBytesSent);
         }
 
         [TestMethod]
