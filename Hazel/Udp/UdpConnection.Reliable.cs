@@ -87,11 +87,9 @@ namespace Hazel.Udp
         /// </summary>
         public class Packet : IRecyclable
         {
-            private readonly UdpConnection owner;
-
             public ushort Id;
             private byte[] Data;
-            private UdpConnection Connection;
+            private readonly UdpConnection Connection;
             private int Length;
 
             public int NextTimeout;
@@ -102,16 +100,15 @@ namespace Hazel.Udp
             public int Retransmissions;
             public Stopwatch Stopwatch = new Stopwatch();
 
-            internal Packet(UdpConnection owner)
+            internal Packet(UdpConnection connection)
             {
-                this.owner = owner;
+                this.Connection = connection;
             }
 
-            internal void Set(ushort id, UdpConnection connection, byte[] data, int length, int timeout, Action ackCallback)
+            internal void Set(ushort id, byte[] data, int length, int timeout, Action ackCallback)
             {
                 this.Id = id;
                 this.Data = data;
-                this.Connection = connection;
                 this.Length = length;
 
                 this.Acknowledged = false;
@@ -180,9 +177,8 @@ namespace Hazel.Udp
             public void Recycle()
             {
                 this.Acknowledged = true;
-                this.Connection = null;
 
-                this.owner.PacketPool.PutObject(this);
+                this.Connection.PacketPool.PutObject(this);
             }
         }
 
@@ -222,7 +218,6 @@ namespace Hazel.Udp
             Packet packet = this.PacketPool.GetObject();
             packet.Set(
                 id,
-                this,
                 buffer,
                 buffer.Length,
                 ResendTimeout > 0 ? ResendTimeout : (int)Math.Min(_pingMs * this.ResendPingMultiplier, 300),
