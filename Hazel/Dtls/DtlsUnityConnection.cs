@@ -1,6 +1,7 @@
 using Hazel.Crypto;
 using Hazel.Udp;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net;
@@ -81,6 +82,13 @@ namespace Hazel.Dtls
             public ByteSpan CertificatePayload;
         }
 
+        struct QueueAppData
+        {
+            public byte[] Bytes;
+            public byte SendOption;
+            public Action AckCallback;
+        }
+
         private readonly object syncRoot = new object();
         private readonly RandomNumberGenerator random = RandomNumberGenerator.Create();
 
@@ -89,7 +97,7 @@ namespace Hazel.Dtls
         private NextEpoch nextEpoch;
         private TimeSpan handshakeResendTimeout = TimeSpan.FromMilliseconds(200);
 
-        private readonly List<ByteSpan> queuedApplicationData = new List<ByteSpan>();
+        private readonly ConcurrentQueue<QueueAppData> queuedApplicationData = new ConcurrentQueue<QueueAppData>();
 
         private X509Certificate2Collection serverCertificates = new X509Certificate2Collection();
 
@@ -184,7 +192,7 @@ namespace Hazel.Dtls
             this.nextEpoch.CertificatePayload = ByteSpan.Empty;
 
             this.epoch = 0;
-            this.queuedApplicationData.Clear();
+            while (this.queuedApplicationData.TryDequeue(out _)) ;
         }
 
         /// <summary>
@@ -243,32 +251,10 @@ namespace Hazel.Dtls
         /// </summary>
         private void FlushQueuedApplicationData()
         {
-            foreach (ByteSpan queuedSpan in this.queuedApplicationData)
+            while(this.queuedApplicationData.TryDequeue(out var queuedData))
             {
-                Record outgoingRecord = new Record();
-                outgoingRecord.ContentType = ContentType.ApplicationData;
-                outgoingRecord.Epoch = this.epoch;
-                outgoingRecord.SequenceNumber = this.currentEpoch.NextOutgoingSequence;
-                outgoingRecord.Length = (ushort)this.currentEpoch.RecordProtection.GetEncryptedSize(queuedSpan.Length);
-                ++this.currentEpoch.NextOutgoingSequence;
-
-                // Encode the record to wire format
-                ByteSpan packet = new byte[Record.Size + outgoingRecord.Length];
-                ByteSpan writer = packet;
-                outgoingRecord.Encode(writer);
-                writer = writer.Slice(Record.Size);
-                queuedSpan.CopyTo(writer);
-
-                // Protect the record
-                this.currentEpoch.RecordProtection.EncryptClientPlaintext(
-                        packet.Slice(Record.Size, outgoingRecord.Length)
-                    , packet.Slice(Record.Size, queuedSpan.Length)
-                    , ref outgoingRecord
-                );
-
-                base.WriteBytesToConnection(packet.GetUnderlyingArray(), packet.Length);
+                base.HandleSend(queuedData.Bytes, queuedData.SendOption, queuedData.AckCallback);
             }
-            this.queuedApplicationData.Clear();
         }
 
         /// <summary>
@@ -286,19 +272,6 @@ namespace Hazel.Dtls
         {
             lock (this.syncRoot)
             {
-                // If we're negotiating a new epoch, queue data
-                if (this.nextEpoch.State != HandshakeState.Established)
-                {
-                    ByteSpan copyOfSpan = new byte[length];
-                    new ByteSpan(bytes, 0, length).CopyTo(copyOfSpan);
-
-                    this.queuedApplicationData.Add(copyOfSpan);
-                    return ByteSpan.Empty;
-                }
-
-                // Send any queued application data now
-                this.FlushQueuedApplicationData();
-
                 Record outgoinRecord = new Record();
                 outgoinRecord.ContentType = ContentType.ApplicationData;
                 outgoinRecord.Epoch = this.epoch;
@@ -315,13 +288,30 @@ namespace Hazel.Dtls
 
                 // Protect the record
                 this.currentEpoch.RecordProtection.EncryptClientPlaintext(
-                        packet.Slice(Record.Size, outgoinRecord.Length)
-                    , packet.Slice(Record.Size, length)
-                    , ref outgoinRecord
-                );
+                    packet.Slice(Record.Size, outgoinRecord.Length),
+                    packet.Slice(Record.Size, length),
+                    ref outgoinRecord);
 
                 return packet;
             }
+        }
+
+        protected override void HandleSend(byte[] data, byte sendOption, Action ackCallback = null)
+        {
+            // If we're negotiating a new epoch, queue data
+            if (this.nextEpoch.State != HandshakeState.Established)
+            {
+                this.queuedApplicationData.Enqueue(new QueueAppData
+                {
+                    Bytes = data,
+                    SendOption = sendOption,
+                    AckCallback = ackCallback
+                });
+
+                return;
+            }
+
+            base.HandleSend(data, sendOption, ackCallback);
         }
 
         /// <inheritdoc />
@@ -330,7 +320,7 @@ namespace Hazel.Dtls
             ByteSpan wireData = this.WriteBytesToConnectionInternal(bytes, length);
             if (wireData.Length > 0)
             {
-                Debug.Assert(wireData.Offset ==  0, "Got a non-zero write data offset");
+                Debug.Assert(wireData.Offset == 0, "Got a non-zero write data offset");
                 base.WriteBytesToConnection(wireData.GetUnderlyingArray(), wireData.Length);
             }
         }
