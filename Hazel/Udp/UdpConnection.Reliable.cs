@@ -18,14 +18,14 @@ namespace Hazel.Udp
         ///     <para>
         ///         For reliable delivery data is resent at specified intervals unless an acknowledgement is received from the 
         ///         receiving device. The ResendTimeout specifies the interval between the packets being resent, each time a packet
-        ///         is resent the interval is increased for that packet until the duration exceeds the <see cref="DisconnectTimeout"/> value.
+        ///         is resent the interval is increased for that packet until the duration exceeds the <see cref="DisconnectTimeoutMs"/> value.
         ///     </para>
         ///     <para>
         ///         Setting this to its default of 0 will mean the timeout is 2 times the value of the average ping, usually 
         ///         resulting in a more dynamic resend that responds to endpoints on slower or faster connections.
         ///     </para>
         /// </remarks>
-        public volatile int ResendTimeout = 0;
+        public volatile int ResendTimeoutMs = 0;
 
         /// <summary>
         /// Max number of times to resend. 0 == no limit
@@ -73,12 +73,12 @@ namespace Hazel.Udp
         ///     The maximum times a message should be resent before marking the endpoint as disconnected.
         /// </summary>
         /// <remarks>
-        ///     Reliable packets will be resent at an interval defined in <see cref="ResendTimeout"/> for the number of times
+        ///     Reliable packets will be resent at an interval defined in <see cref="ResendTimeoutMs"/> for the number of times
         ///     specified here. Once a packet has been retransmitted this number of times and has not been acknowledged the
         ///     connection will be marked as disconnected and the <see cref="Connection.Disconnected">Disconnected</see> event
         ///     will be invoked.
         /// </remarks>
-        public volatile int DisconnectTimeout = 5000;
+        public volatile int DisconnectTimeoutMs = 5000;
 
         /// <summary>
         ///     Class to hold packet data
@@ -104,7 +104,7 @@ namespace Hazel.Udp
             private UdpConnection Connection;
             private int Length;
 
-            public int NextTimeout;
+            public int NextTimeoutMs;
             public volatile bool Acknowledged;
 
             public Action AckCallback;
@@ -124,7 +124,7 @@ namespace Hazel.Udp
                 this.Length = length;
 
                 this.Acknowledged = false;
-                this.NextTimeout = timeout;
+                this.NextTimeoutMs = timeout;
                 this.AckCallback = ackCallback;
                 this.Retransmissions = 0;
 
@@ -137,12 +137,12 @@ namespace Hazel.Udp
                 var connection = this.Connection;
                 if (!this.Acknowledged && connection != null)
                 {
-                    long lifetime = this.Stopwatch.ElapsedMilliseconds;
-                    if (lifetime >= connection.DisconnectTimeout)
+                    long lifetimeMs = this.Stopwatch.ElapsedMilliseconds;
+                    if (lifetimeMs >= connection.DisconnectTimeoutMs)
                     {
                         if (connection.reliableDataPacketsSent.TryRemove(this.Id, out Packet self))
                         {
-                            connection.DisconnectInternal(HazelInternalErrors.ReliablePacketWithoutResponse, $"Reliable packet {self.Id} (size={this.Length}) was not ack'd after {lifetime}ms ({self.Retransmissions} resends)");
+                            connection.DisconnectInternal(HazelInternalErrors.ReliablePacketWithoutResponse, $"Reliable packet {self.Id} (size={this.Length}) was not ack'd after {lifetimeMs}ms ({self.Retransmissions} resends)");
 
                             self.Recycle();
                         }
@@ -150,7 +150,7 @@ namespace Hazel.Udp
                         return 0;
                     }
 
-                    if (lifetime >= this.NextTimeout)
+                    if (lifetimeMs >= this.NextTimeoutMs)
                     {
                         ++this.Retransmissions;
                         if (connection.ResendLimit != 0
@@ -158,7 +158,7 @@ namespace Hazel.Udp
                         {
                             if (connection.reliableDataPacketsSent.TryRemove(this.Id, out Packet self))
                             {
-                                connection.DisconnectInternal(HazelInternalErrors.ReliablePacketWithoutResponse, $"Reliable packet {self.Id} (size={this.Length}) was not ack'd after {self.Retransmissions} resends ({lifetime}ms)");
+                                connection.DisconnectInternal(HazelInternalErrors.ReliablePacketWithoutResponse, $"Reliable packet {self.Id} (size={this.Length}) was not ack'd after {self.Retransmissions} resends ({lifetimeMs}ms)");
 
                                 self.Recycle();
                             }
@@ -166,7 +166,7 @@ namespace Hazel.Udp
                             return 0;
                         }
 
-                        this.NextTimeout += (int)Math.Min(this.NextTimeout * connection.ResendPingMultiplier, 1000);
+                        this.NextTimeoutMs += (int)Math.Min(this.NextTimeoutMs * connection.ResendPingMultiplier, 1000);
                         try
                         {
                             connection.WriteBytesToConnection(this.Data, this.Length);
@@ -234,7 +234,7 @@ namespace Hazel.Udp
                 this,
                 buffer,
                 buffer.Length,
-                ResendTimeout > 0 ? ResendTimeout : (int)Math.Min(_pingMs * this.ResendPingMultiplier, 300),
+                ResendTimeoutMs > 0 ? ResendTimeoutMs : (int)Math.Min(_pingMs * this.ResendPingMultiplier, 300),
                 ackCallback);
 
             if (!reliableDataPacketsSent.TryAdd(id, packet))

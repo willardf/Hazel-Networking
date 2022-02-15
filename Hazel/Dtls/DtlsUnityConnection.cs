@@ -64,7 +64,7 @@ namespace Hazel.Dtls
 
             public ulong NextOutgoingSequence;
 
-            public DateTime NegotationStartTime;
+            public DateTime NegotiationStartTime;
             public DateTime NextPacketResendTime;
             public int PacketResendCount;
 
@@ -177,7 +177,7 @@ namespace Hazel.Dtls
             this.nextEpoch.Epoch = 1;
             this.nextEpoch.State = HandshakeState.Initializing;
             this.nextEpoch.NextOutgoingSequence = 1;
-            this.nextEpoch.NegotationStartTime = DateTime.MinValue;
+            this.nextEpoch.NegotiationStartTime = DateTime.MinValue;
             this.nextEpoch.NextPacketResendTime = DateTime.MinValue;
             this.nextEpoch.SelectedCipherSuite = CipherSuite.TLS_NULL_WITH_NULL_NULL;
             this.nextEpoch.RecordProtection?.Dispose();
@@ -225,13 +225,13 @@ namespace Hazel.Dtls
                     DateTime now = DateTime.UtcNow;
                     if (now >= this.nextEpoch.NextPacketResendTime)
                     {
-                        double negotationDuration = (now - this.nextEpoch.NegotationStartTime).TotalMilliseconds;
+                        double negotiationDurationMs = (now - this.nextEpoch.NegotiationStartTime).TotalMilliseconds;
                         this.nextEpoch.PacketResendCount++;
 
                         if ((this.ResendLimit > 0 && this.nextEpoch.PacketResendCount > this.ResendLimit)
-                            || negotationDuration > this.DisconnectTimeout)
+                            || negotiationDurationMs > this.DisconnectTimeoutMs)
                         {
-                            this.DisconnectInternal(HazelInternalErrors.DtlsNegotiationFailed, $"DTLS negotiation failed after {this.nextEpoch.PacketResendCount} resends ({(int)negotationDuration} ms).");
+                            this.DisconnectInternal(HazelInternalErrors.DtlsNegotiationFailed, $"DTLS negotiation failed after {this.nextEpoch.PacketResendCount} resends ({(int)negotiationDurationMs} ms).");
                         }
                         else
                         {
@@ -841,7 +841,7 @@ namespace Hazel.Dtls
 
                         ++this.nextEpoch.Epoch;
                         this.nextEpoch.State = HandshakeState.Established;
-                        this.nextEpoch.NegotationStartTime = DateTime.MinValue;
+                        this.nextEpoch.NegotiationStartTime = DateTime.MinValue;
                         this.nextEpoch.NextPacketResendTime = DateTime.MinValue;
                         this.nextEpoch.ServerVerification.SecureClear();
                         this.nextEpoch.MasterSecret.SecureClear();
@@ -925,7 +925,7 @@ namespace Hazel.Dtls
             );
 
             this.nextEpoch.State = HandshakeState.ExpectingServerHello;
-            if (this.nextEpoch.NegotationStartTime == DateTime.MinValue) this.nextEpoch.NegotationStartTime = DateTime.UtcNow;
+            if (this.nextEpoch.NegotiationStartTime == DateTime.MinValue) this.nextEpoch.NegotiationStartTime = DateTime.UtcNow;
             this.nextEpoch.NextPacketResendTime = DateTime.UtcNow + this.handshakeResendTimeout;
             base.WriteBytesToConnection(packet.GetUnderlyingArray(), packet.Length);
         }
@@ -986,7 +986,7 @@ namespace Hazel.Dtls
             );
 
             this.nextEpoch.State = HandshakeState.ExpectingServerHello;
-            if (this.nextEpoch.NegotationStartTime == DateTime.MinValue) this.nextEpoch.NegotationStartTime = DateTime.UtcNow;
+            if (this.nextEpoch.NegotiationStartTime == DateTime.MinValue) this.nextEpoch.NegotiationStartTime = DateTime.UtcNow;
             this.nextEpoch.NextPacketResendTime = DateTime.UtcNow + this.handshakeResendTimeout;
             base.WriteBytesToConnection(packet.GetUnderlyingArray(), packet.Length);
         }
