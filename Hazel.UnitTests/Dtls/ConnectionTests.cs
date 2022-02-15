@@ -272,8 +272,6 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         [TestMethod]
         public void TestMalformedConnectionData()
         {
-            Assert.Inconclusive("This test is known to fail because the connection.State remains ConnectionState.Connecting even after we time out.");
-
             IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 27510);
 
             IPEndPoint connectionEndPoint = ep;

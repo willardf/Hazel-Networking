@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Threading;
 
 namespace Hazel.Dtls
 {
@@ -63,7 +64,9 @@ namespace Hazel.Dtls
 
             public ulong NextOutgoingSequence;
 
+            public DateTime NegotationStartTime;
             public DateTime NextPacketResendTime;
+            public int PacketResendCount;
 
             public CipherSuite SelectedCipherSuite;
             public IRecordProtection RecordProtection;
@@ -82,7 +85,7 @@ namespace Hazel.Dtls
             public ByteSpan CertificatePayload;
         }
 
-        struct QueueAppData
+        struct QueuedAppData
         {
             public byte[] Bytes;
             public byte SendOption;
@@ -97,7 +100,7 @@ namespace Hazel.Dtls
         private NextEpoch nextEpoch;
         private TimeSpan handshakeResendTimeout = TimeSpan.FromMilliseconds(200);
 
-        private readonly ConcurrentQueue<QueueAppData> queuedApplicationData = new ConcurrentQueue<QueueAppData>();
+        private readonly ConcurrentQueue<QueuedAppData> queuedApplicationData = new ConcurrentQueue<QueuedAppData>();
 
         private X509Certificate2Collection serverCertificates = new X509Certificate2Collection();
 
@@ -174,6 +177,7 @@ namespace Hazel.Dtls
             this.nextEpoch.Epoch = 1;
             this.nextEpoch.State = HandshakeState.Initializing;
             this.nextEpoch.NextOutgoingSequence = 1;
+            this.nextEpoch.NegotationStartTime = DateTime.MinValue;
             this.nextEpoch.NextPacketResendTime = DateTime.MinValue;
             this.nextEpoch.SelectedCipherSuite = CipherSuite.TLS_NULL_WITH_NULL_NULL;
             this.nextEpoch.RecordProtection?.Dispose();
@@ -221,23 +225,34 @@ namespace Hazel.Dtls
                     DateTime now = DateTime.UtcNow;
                     if (now >= this.nextEpoch.NextPacketResendTime)
                     {
-                        switch (this.nextEpoch.State)
+                        double negotationDuration = (now - this.nextEpoch.NegotationStartTime).TotalMilliseconds;
+                        this.nextEpoch.PacketResendCount++;
+
+                        if ((this.ResendLimit > 0 && this.nextEpoch.PacketResendCount > this.ResendLimit)
+                            || negotationDuration > this.DisconnectTimeout)
                         {
-                            case HandshakeState.ExpectingServerHello:
-                            case HandshakeState.ExpectingCertificate:
-                            case HandshakeState.ExpectingServerKeyExchange:
-                            case HandshakeState.ExpectingServerHelloDone:
-                                this.SendClientHello();
-                                break;
+                            this.DisconnectInternal(HazelInternalErrors.DtlsNegotiationFailed, $"DTLS negotiation failed after {this.nextEpoch.PacketResendCount} resends ({(int)negotationDuration} ms).");
+                        }
+                        else
+                        {
+                            switch (this.nextEpoch.State)
+                            {
+                                case HandshakeState.ExpectingServerHello:
+                                case HandshakeState.ExpectingCertificate:
+                                case HandshakeState.ExpectingServerKeyExchange:
+                                case HandshakeState.ExpectingServerHelloDone:
+                                    this.SendClientHello();
+                                    break;
 
-                            case HandshakeState.ExpectingChangeCipherSpec:
-                            case HandshakeState.ExpectingFinished:
-                                this.SendClientKeyExchangeFlight(true);
-                                break;
+                                case HandshakeState.ExpectingChangeCipherSpec:
+                                case HandshakeState.ExpectingFinished:
+                                    this.SendClientKeyExchangeFlight(true);
+                                    break;
 
-                            case HandshakeState.Established:
-                            default:
-                                break;
+                                case HandshakeState.Established:
+                                default:
+                                    break;
+                            }
                         }
                     }
                 }
@@ -251,7 +266,7 @@ namespace Hazel.Dtls
         /// </summary>
         private void FlushQueuedApplicationData()
         {
-            while(this.queuedApplicationData.TryDequeue(out var queuedData))
+            while (this.queuedApplicationData.TryDequeue(out var queuedData))
             {
                 base.HandleSend(queuedData.Bytes, queuedData.SendOption, queuedData.AckCallback);
             }
@@ -301,7 +316,7 @@ namespace Hazel.Dtls
             // If we're negotiating a new epoch, queue data
             if (this.nextEpoch.State != HandshakeState.Established)
             {
-                this.queuedApplicationData.Enqueue(new QueueAppData
+                this.queuedApplicationData.Enqueue(new QueuedAppData
                 {
                     Bytes = data,
                     SendOption = sendOption,
@@ -826,6 +841,7 @@ namespace Hazel.Dtls
 
                         ++this.nextEpoch.Epoch;
                         this.nextEpoch.State = HandshakeState.Established;
+                        this.nextEpoch.NegotationStartTime = DateTime.MinValue;
                         this.nextEpoch.NextPacketResendTime = DateTime.MinValue;
                         this.nextEpoch.ServerVerification.SecureClear();
                         this.nextEpoch.MasterSecret.SecureClear();
@@ -909,6 +925,7 @@ namespace Hazel.Dtls
             );
 
             this.nextEpoch.State = HandshakeState.ExpectingServerHello;
+            if (this.nextEpoch.NegotationStartTime == DateTime.MinValue) this.nextEpoch.NegotationStartTime = DateTime.UtcNow;
             this.nextEpoch.NextPacketResendTime = DateTime.UtcNow + this.handshakeResendTimeout;
             base.WriteBytesToConnection(packet.GetUnderlyingArray(), packet.Length);
         }
@@ -969,6 +986,7 @@ namespace Hazel.Dtls
             );
 
             this.nextEpoch.State = HandshakeState.ExpectingServerHello;
+            if (this.nextEpoch.NegotationStartTime == DateTime.MinValue) this.nextEpoch.NegotationStartTime = DateTime.UtcNow;
             this.nextEpoch.NextPacketResendTime = DateTime.UtcNow + this.handshakeResendTimeout;
             base.WriteBytesToConnection(packet.GetUnderlyingArray(), packet.Length);
         }
