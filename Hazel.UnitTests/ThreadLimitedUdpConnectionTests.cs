@@ -11,23 +11,17 @@ using System.Collections;
 namespace Hazel.UnitTests
 {
     [TestClass]
-    public class ThreadLimitedUdpConnectionTests : BaseThreadLimitedUdpConnectionTests
+    public class ThreadLimitedUdpConnectionTests
     {
-        protected override ThreadLimitedUdpConnectionListener CreateListener(int numWorkers, IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
+        protected ThreadLimitedUdpConnectionListener CreateListener(int numWorkers, IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
         {
             return new ThreadLimitedUdpConnectionListener(numWorkers, endPoint, logger, ipMode);
         }
 
-        protected override UdpConnection CreateConnection(IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
+        protected UdpConnection CreateConnection(IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
         {
             return new UdpClientConnection(endPoint, ipMode);
         }
-    }
-
-    public abstract class BaseThreadLimitedUdpConnectionTests
-    {
-        protected abstract ThreadLimitedUdpConnectionListener CreateListener(int numWorkers, IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4);
-        protected abstract UdpConnection CreateConnection(IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4);
 
         [TestMethod]
         public void ServerDisposeDisconnectsTest()
