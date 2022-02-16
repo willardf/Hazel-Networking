@@ -115,7 +115,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 Assert.AreEqual(ConnectionState.Connected, connection.State);
                 Assert.IsTrue(
                     connection.Statistics.TotalBytesSent >= 500 &&
-                    connection.Statistics.TotalBytesSent <= 650,
+                    connection.Statistics.TotalBytesSent <= 675,
                     "Sent: " + connection.Statistics.TotalBytesSent
                 );
             }
