@@ -1,13 +1,12 @@
+using Hazel;
 using Hazel.Crypto;
 using Hazel.Udp;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
-using System.Threading;
 
 namespace Hazel.Dtls
 {
@@ -100,7 +99,7 @@ namespace Hazel.Dtls
         private NextEpoch nextEpoch;
         private TimeSpan handshakeResendTimeout = TimeSpan.FromMilliseconds(200);
 
-        private readonly ConcurrentQueue<QueuedAppData> queuedApplicationData = new ConcurrentQueue<QueuedAppData>();
+        private readonly Queue<QueuedAppData> queuedApplicationData = new Queue<QueuedAppData>();
 
         private X509Certificate2Collection serverCertificates = new X509Certificate2Collection();
 
@@ -194,7 +193,7 @@ namespace Hazel.Dtls
             this.nextEpoch.ServerVerification.SecureClear();
             this.nextEpoch.CertificateFragments.Clear();
             this.nextEpoch.CertificatePayload = ByteSpan.Empty;
-
+            
             this.epoch = 0;
             while (this.queuedApplicationData.TryDequeue(out _)) ;
         }
@@ -313,17 +312,20 @@ namespace Hazel.Dtls
 
         protected override void HandleSend(byte[] data, byte sendOption, Action ackCallback = null)
         {
-            // If we're negotiating a new epoch, queue data
-            if (this.nextEpoch.State != HandshakeState.Established)
+            lock (this.syncRoot)
             {
-                this.queuedApplicationData.Enqueue(new QueuedAppData
+                // If we're negotiating a new epoch, queue data
+                if (this.nextEpoch.State != HandshakeState.Established)
                 {
-                    Bytes = data,
-                    SendOption = sendOption,
-                    AckCallback = ackCallback
-                });
+                    this.queuedApplicationData.Enqueue(new QueuedAppData
+                    {
+                        Bytes = data,
+                        SendOption = sendOption,
+                        AckCallback = ackCallback
+                    });
 
-                return;
+                    return;
+                }
             }
 
             base.HandleSend(data, sendOption, ackCallback);
