@@ -130,13 +130,13 @@ namespace Hazel.Udp
 
             WriteBytesToConnection(bytes, bytes.Length);
 
-            Statistics.LogReliableSend(0, bytes.Length);
+            Statistics.LogReliableSend(0);
         }
 
         /// <summary>
         ///     Resets the keepalive timer to zero.
         /// </summary>
-        private void ResetKeepAliveTimer()
+        protected void ResetKeepAliveTimer()
         {
             try
             {

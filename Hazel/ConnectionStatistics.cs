@@ -398,20 +398,21 @@ namespace Hazel
         ///     Logs the sending of an unreliable data packet in the statistics.
         /// </summary>
         /// <param name="dataLength">The number of bytes of data sent.</param>
-        /// <param name="totalLength">The total number of bytes sent.</param>
         /// <remarks>
         ///     This should be called after the data has been sent and should only be called for data that is sent sucessfully.
         /// </remarks>
-        internal void LogUnreliableSend(int dataLength, int totalLength)
+        internal void LogUnreliableSend(int dataLength)
         {
             Interlocked.Increment(ref unreliableMessagesSent);
             Interlocked.Add(ref dataBytesSent, dataLength);
-            Interlocked.Add(ref totalBytesSent, totalLength);
+            
         }
 
+        /// <param name="totalLength">The total number of bytes sent.</param>
         internal void LogPacketSend(int totalLength)
         {
             Interlocked.Increment(ref this.packetsSent);
+            Interlocked.Add(ref totalBytesSent, totalLength);
 
             if (totalLength > ExpectedMTU)
             {
@@ -423,15 +424,13 @@ namespace Hazel
         ///     Logs the sending of a reliable data packet in the statistics.
         /// </summary>
         /// <param name="dataLength">The number of bytes of data sent.</param>
-        /// <param name="totalLength">The total number of bytes sent.</param>
         /// <remarks>
         ///     This should be called after the data has been sent and should only be called for data that is sent sucessfully.
         /// </remarks>
-        internal void LogReliableSend(int dataLength, int totalLength)
+        internal void LogReliableSend(int dataLength)
         {
             Interlocked.Increment(ref reliableMessagesSent);
             Interlocked.Add(ref dataBytesSent, dataLength);
-            Interlocked.Add(ref totalBytesSent, totalLength);
         }
 
         /// <summary>
@@ -442,11 +441,10 @@ namespace Hazel
         /// <remarks>
         ///     This should be called after the data has been sent and should only be called for data that is sent sucessfully.
         /// </remarks>
-        internal void LogFragmentedSend(int dataLength, int totalLength)
+        internal void LogFragmentedSend(int dataLength)
         {
             Interlocked.Increment(ref fragmentedMessagesSent);
             Interlocked.Add(ref dataBytesSent, dataLength);
-            Interlocked.Add(ref totalBytesSent, totalLength);
         }
 
         /// <summary>
@@ -456,10 +454,9 @@ namespace Hazel
         /// <remarks>
         ///     This should be called after the data has been sent and should only be called for data that is sent sucessfully.
         /// </remarks>
-        internal void LogAcknowledgementSend(int totalLength)
+        internal void LogAcknowledgementSend()
         {
             Interlocked.Increment(ref acknowledgementMessagesSent);
-            Interlocked.Add(ref totalBytesSent, totalLength);
         }
 
         /// <summary>
@@ -469,10 +466,9 @@ namespace Hazel
         /// <remarks>
         ///     This should be called after the data has been sent and should only be called for data that is sent sucessfully.
         /// </remarks>
-        internal void LogHelloSend(int totalLength)
+        internal void LogHelloSend()
         {
             Interlocked.Increment(ref helloMessagesSent);
-            Interlocked.Add(ref totalBytesSent, totalLength);
         }
 
         /// <summary>

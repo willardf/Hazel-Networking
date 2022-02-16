@@ -11,6 +11,8 @@ namespace Hazel.Udp
 {
     partial class UdpConnection
     {
+        public readonly ObjectPool<Packet> PacketPool;
+
         /// <summary>
         ///     The starting timeout, in miliseconds, at which data will be resent.
         /// </summary>
@@ -85,23 +87,9 @@ namespace Hazel.Udp
         /// </summary>
         public class Packet : IRecyclable
         {
-            /// <summary>
-            ///     Object pool for this event.
-            /// </summary>
-            public static readonly ObjectPool<Packet> PacketPool = new ObjectPool<Packet>(() => new Packet());
-
-            /// <summary>
-            ///     Returns an instance of this object from the pool.
-            /// </summary>
-            /// <returns></returns>
-            internal static Packet GetObject()
-            {
-                return PacketPool.GetObject();
-            }
-
             public ushort Id;
             private byte[] Data;
-            private UdpConnection Connection;
+            private readonly UdpConnection Connection;
             private int Length;
 
             public int NextTimeoutMs;
@@ -112,15 +100,15 @@ namespace Hazel.Udp
             public int Retransmissions;
             public Stopwatch Stopwatch = new Stopwatch();
 
-            Packet()
+            internal Packet(UdpConnection connection)
             {
+                this.Connection = connection;
             }
 
-            internal void Set(ushort id, UdpConnection connection, byte[] data, int length, int timeout, Action ackCallback)
+            internal void Set(ushort id, byte[] data, int length, int timeout, Action ackCallback)
             {
                 this.Id = id;
                 this.Data = data;
-                this.Connection = connection;
                 this.Length = length;
 
                 this.Acknowledged = false;
@@ -189,9 +177,8 @@ namespace Hazel.Udp
             public void Recycle()
             {
                 this.Acknowledged = true;
-                this.Connection = null;
 
-                PacketPool.PutObject(this);
+                this.Connection.PacketPool.PutObject(this);
             }
         }
 
@@ -228,10 +215,9 @@ namespace Hazel.Udp
             buffer[offset] = (byte)(id >> 8);
             buffer[offset + 1] = (byte)id;
 
-            Packet packet = Packet.GetObject();
+            Packet packet = this.PacketPool.GetObject();
             packet.Set(
                 id,
-                this,
                 buffer,
                 buffer.Length,
                 ResendTimeoutMs > 0 ? ResendTimeoutMs : (int)Math.Min(_pingMs * this.ResendPingMultiplier, 300),
@@ -275,7 +261,7 @@ namespace Hazel.Udp
             //Write to connection
             WriteBytesToConnection(bytes, bytes.Length);
 
-            Statistics.LogReliableSend(data.Length, bytes.Length);
+            Statistics.LogReliableSend(data.Length);
         }
 
         /// <summary>

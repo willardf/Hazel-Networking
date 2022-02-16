@@ -38,6 +38,7 @@ namespace Hazel.Udp
         /// <inheritdoc />
         protected override void WriteBytesToConnection(byte[] bytes, int length)
         {
+            this.Statistics.LogPacketSend(length);
             Listener.SendData(bytes, length, EndPoint);
         }
 

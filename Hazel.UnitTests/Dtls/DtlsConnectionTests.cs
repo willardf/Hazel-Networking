@@ -785,9 +785,6 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             }
         }
 
-        /// <summary>
-        ///     Tests the keepalive functionality from the client,
-        /// </summary>
         [TestMethod]
         public void KeepAliveClientTest()
         {
@@ -803,8 +800,8 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
                 Assert.AreEqual(ConnectionState.Connected, connection.State);
                 Assert.IsTrue(
-                    connection.Statistics.TotalBytesSent >= 30 &&
-                    connection.Statistics.TotalBytesSent <= 50,
+                    connection.Statistics.TotalBytesSent >= 500 &&
+                    connection.Statistics.TotalBytesSent <= 675,
                     "Sent: " + connection.Statistics.TotalBytesSent
                 );
             }

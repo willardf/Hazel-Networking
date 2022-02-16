@@ -45,6 +45,10 @@ namespace Hazel.Udp.FewerThreads
         {
             if (bytes.Length != length) throw new ArgumentException("I made an assumption here. I hope you see this error.");
 
+            // Hrm, well this is inaccurate for DTLS connections because the Listener does the encryption which may change the size.
+            // but I don't want to have a bunch of client references in the send queue...
+            // Does this perhaps mean the encryption is being done in the wrong class?
+            this.Statistics.LogPacketSend(length);
             Listener.SendDataRaw(bytes, EndPoint);
         }
 
@@ -85,7 +89,7 @@ namespace Hazel.Udp.FewerThreads
 
             try
             {
-                Listener.SendDataRaw(bytes, EndPoint);
+                this.WriteBytesToConnection(bytes, bytes.Length);
             }
             catch { }
 

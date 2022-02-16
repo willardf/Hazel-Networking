@@ -8,7 +8,6 @@ namespace Hazel.Udp
 {
     /// <summary>
     /// Unity doesn't always get along with thread pools well, so this interface will hopefully suit that case better.
-    /// Be very careful since this interface is likely unstable or actively changing
     /// </summary>
     /// <inheritdoc/>
     public class UnityUdpClientConnection : UdpConnection
@@ -60,7 +59,6 @@ namespace Hazel.Udp
         protected virtual void ResendPacketsIfNeeded()
         {
         }
-
 
         /// <inheritdoc />
         protected override void WriteBytesToConnection(byte[] bytes, int length)
@@ -195,12 +193,11 @@ namespace Hazel.Udp
                 throw new HazelException("A SocketException occurred while initiating a receive operation.", e);
             }
 
-            this.InitializeKeepAliveTimer();
-
             // Write bytes to the server to tell it hi (and to punch a hole in our NAT, if present)
             // When acknowledged set the state to connected
             SendHello(bytes, () =>
             {
+                this.InitializeKeepAliveTimer();
                 this.State = ConnectionState.Connected;
             });
         }
