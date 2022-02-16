@@ -101,28 +101,6 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         }
 
         [TestMethod]
-        public override void KeepAliveClientTest()
-        {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
-            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
-            {
-                listener.Start();
-
-                connection.Connect();
-                connection.KeepAliveInterval = 100;
-
-                Thread.Sleep(1050);    //Enough time for ~10 keep alive packets
-
-                Assert.AreEqual(ConnectionState.Connected, connection.State);
-                Assert.IsTrue(
-                    connection.Statistics.TotalBytesSent >= 500 &&
-                    connection.Statistics.TotalBytesSent <= 675,
-                    "Sent: " + connection.Statistics.TotalBytesSent
-                );
-            }
-        }
-
-        [TestMethod]
         public void DtlsServerDisposeDisconnectsTest()
         {
             IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 27510);
@@ -807,9 +785,6 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             }
         }
 
-        /// <summary>
-        ///     Tests the keepalive functionality from the client,
-        /// </summary>
         [TestMethod]
         public void KeepAliveClientTest()
         {
@@ -825,8 +800,8 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
                 Assert.AreEqual(ConnectionState.Connected, connection.State);
                 Assert.IsTrue(
-                    connection.Statistics.TotalBytesSent >= 30 &&
-                    connection.Statistics.TotalBytesSent <= 50,
+                    connection.Statistics.TotalBytesSent >= 500 &&
+                    connection.Statistics.TotalBytesSent <= 675,
                     "Sent: " + connection.Statistics.TotalBytesSent
                 );
             }
