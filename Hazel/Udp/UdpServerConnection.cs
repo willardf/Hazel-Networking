@@ -67,7 +67,11 @@ namespace Hazel.Udp
         {
             lock (this)
             {
-                if (this._state != ConnectionState.Connected) return false;
+                if (this._state != ConnectionState.Connected)
+                {
+                    return false;
+                }
+
                 this._state = ConnectionState.NotConnected;
             }
             
