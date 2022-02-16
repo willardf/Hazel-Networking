@@ -101,7 +101,7 @@ namespace Hazel.Udp
         /// <param name="sendOption">The <see cref="SendOption"/> specified as its byte value.</param>
         /// <param name="ackCallback">The callback to invoke when this packet is acknowledged.</param>
         /// <returns>The bytes that should actually be sent.</returns>
-        protected void HandleSend(byte[] data, byte sendOption, Action ackCallback = null)
+        protected virtual void HandleSend(byte[] data, byte sendOption, Action ackCallback = null)
         {
             switch (sendOption)
             {
