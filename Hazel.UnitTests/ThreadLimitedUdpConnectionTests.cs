@@ -416,11 +416,13 @@ namespace Hazel.UnitTests
 
                 connection.Connect();
 
-                mutex.WaitOne();
+                mutex.WaitOne(1000);
+                Assert.AreEqual(ConnectionState.Connected, connection.State);
 
                 connection.Disconnect("Testing");
 
-                mutex2.WaitOne();
+                mutex2.WaitOne(1000);
+                Assert.AreEqual(ConnectionState.NotConnected, connection.State);
             }
         }
 

@@ -27,7 +27,7 @@ namespace Hazel.Dtls
             ExpectingHello,
             ExpectingClientKeyExchange,
             ExpectingChangeCipherSpec,
-            ExpectingFinish,
+            ExpectingFinish
         }
 
         /// <summary>
@@ -94,13 +94,13 @@ namespace Hazel.Dtls
 
             public DateTime StartOfNegotiation;
 
-            public PeerData()
+            public PeerData(ConnectionId connectionId, ulong nextExpectedSequenceNumber)
             {
                 ByteSpan block = new byte[2 * Finished.Size];
                 this.CurrentEpoch.ServerFinishedVerification = block.Slice(0, Finished.Size);
                 this.CurrentEpoch.ExpectedClientFinishedVerification = block.Slice(Finished.Size, Finished.Size);
 
-                ResetPeer(ConnectionId.Create(new IPEndPoint(0,0), 0), 1);
+                ResetPeer(connectionId, nextExpectedSequenceNumber);
             }
 
             public void ResetPeer(ConnectionId connectionId, ulong nextExpectedSequenceNumber)
@@ -296,8 +296,14 @@ namespace Hazel.Dtls
             PeerData peer = null;
             if (!this.existingPeers.TryGetValue(peerAddress, out peer))
             {
-                HandleNonPeerRecord(message, peerAddress);
-                return;
+                lock (this.existingPeers)
+                {
+                    if (!this.existingPeers.TryGetValue(peerAddress, out peer))
+                    {
+                        HandleNonPeerRecord(message, peerAddress);
+                        return;
+                    }
+                }
             }
 
             ConnectionId peerConnectionId;
@@ -407,7 +413,7 @@ namespace Hazel.Dtls
 
                     if (!peer.CurrentEpoch.RecordProtection.DecryptCiphertextFromClient(decryptedPayload, recordPayload, ref record))
                     {
-                        this.Logger.WriteVerbose($"Dropping non-authentic record from `{peerAddress}`");
+                        this.Logger.WriteVerbose($"Dropping non-authentic {record.ContentType} record from `{peerAddress}`");
                         return;
                     }
 
@@ -425,6 +431,9 @@ namespace Hazel.Dtls
                         peer.CurrentEpoch.PreviousSequenceWindowBitmask |= windowMask;
                     }
 
+#if DEBUG
+                    this.Logger.WriteVerbose($"Record type {record.ContentType} ({peer.NextEpoch.State})");
+#endif
                     switch (record.ContentType)
                     {
                         case ContentType.ChangeCipherSpec:
@@ -550,6 +559,9 @@ namespace Hazel.Dtls
                 ByteSpan packet;
                 ByteSpan writer;
 
+#if DEBUG
+                this.Logger.WriteVerbose($"Received handshake {handshake.MessageType} ({peer.NextEpoch.State})");
+#endif
                 switch (handshake.MessageType)
                 {
                     case HandshakeType.ClientHello:
@@ -907,6 +919,10 @@ namespace Hazel.Dtls
                 peer.NextEpoch.ServerRandom.FillWithRandom(this.random);
                 recordMessagesForVerifyData = true;
 
+#if DEBUG
+                this.Logger.WriteVerbose($"ClientRandom: {peer.NextEpoch.ClientRandom} ServerRandom: {peer.NextEpoch.ServerRandom}");
+#endif
+
                 // Copy the original ClientHello
                 // handshake to our verification stream
                 peer.NextEpoch.VerificationStream.AddData(
@@ -1207,15 +1223,9 @@ namespace Hazel.Dtls
             }
 
             // Allocate state for the new peer and register it
-            PeerData peer = new PeerData();
-            peer.ResetPeer(this.AllocateConnectionId(peerAddress), record.SequenceNumber + 1);
-
+            PeerData peer = new PeerData(this.AllocateConnectionId(peerAddress), record.SequenceNumber + 1);
+            this.ProcessHandshake(peer, peerAddress, ref record, originalMessage);
             this.existingPeers[peerAddress] = peer;
-
-            lock (peer)
-            {
-                this.ProcessHandshake(peer, peerAddress, ref record, originalMessage);
-            }
         }
 
         //Send a HelloVerifyRequest handshake message to a peer
