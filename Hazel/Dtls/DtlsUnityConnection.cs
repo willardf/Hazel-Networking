@@ -219,7 +219,7 @@ namespace Hazel.Dtls
             {
                 this.ResetConnectionState();
                 this.nextEpoch.ClientRandom.FillWithRandom(this.random);
-                this.SendClientHello(false);
+                this.SendClientHello(isRetransmit: false);
             }
 
             base.RestartConnection();
@@ -252,12 +252,12 @@ namespace Hazel.Dtls
                                 case HandshakeState.ExpectingCertificate:
                                 case HandshakeState.ExpectingServerKeyExchange:
                                 case HandshakeState.ExpectingServerHelloDone:
-                                    this.SendClientHello(true);
+                                    this.SendClientHello(isRetransmit: true);
                                     break;
 
                                 case HandshakeState.ExpectingChangeCipherSpec:
                                 case HandshakeState.ExpectingFinished:
-                                    this.SendClientKeyExchangeFlight(true);
+                                    this.SendClientKeyExchangeFlight(isRetransmit: true);
                                     break;
 
                                 case HandshakeState.Established:
@@ -607,7 +607,7 @@ namespace Hazel.Dtls
                         this.nextEpoch.ClientRandom.FillWithRandom(this.random);
 
                         // We don't need to resend here. We already have the cookie so we already sent it once.
-                        this.SendClientHello(false);
+                        this.SendClientHello(isRetransmit: false);
 
                         break;
 
@@ -844,7 +844,7 @@ namespace Hazel.Dtls
                         // Append ServerHelloDone to the verification stream
                         this.nextEpoch.VerificationStream.AddData(originalPayload);
 
-                        this.SendClientKeyExchangeFlight(false);
+                        this.SendClientKeyExchangeFlight(isRetransmit: false);
                         break;
 
                     case HandshakeType.Finished:
