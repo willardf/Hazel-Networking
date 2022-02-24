@@ -598,7 +598,6 @@ namespace Hazel.Dtls
                         if (this.nextEpoch.Cookie.Length == helloVerifyRequest.Cookie.Length
                             && Const.ConstantCompareSpans(this.nextEpoch.Cookie, helloVerifyRequest.Cookie) == 1)
                         {
-
                             this.logger.WriteError("Dropping duplicate HelloVerifyRequest handshake message");
                             continue;
                         }

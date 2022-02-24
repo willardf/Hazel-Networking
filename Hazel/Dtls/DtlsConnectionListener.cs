@@ -27,8 +27,7 @@ namespace Hazel.Dtls
             ExpectingHello,
             ExpectingClientKeyExchange,
             ExpectingChangeCipherSpec,
-            ExpectingFinish,
-            Established
+            ExpectingFinish
         }
 
         /// <summary>
@@ -472,7 +471,7 @@ namespace Hazel.Dtls
                             peer.NextEpoch.ClientVerification.CopyTo(peer.CurrentEpoch.ExpectedClientFinishedVerification);
                             peer.NextEpoch.ServerVerification.CopyTo(peer.CurrentEpoch.ServerFinishedVerification);
 
-                            peer.NextEpoch.State = HandshakeState.Established;
+                            peer.NextEpoch.State = HandshakeState.ExpectingHello;
                             peer.NextEpoch.Handshake?.Dispose();
                             peer.NextEpoch.Handshake = null;
                             peer.NextEpoch.NextOutgoingSequence = 1;
@@ -660,7 +659,7 @@ namespace Hazel.Dtls
                         }
                         // Cannot process a Finished message when we
                         // are negotiating the next epoch
-                        else if (peer.NextEpoch.State != HandshakeState.Established)
+                        else if (peer.NextEpoch.State != HandshakeState.ExpectingHello)
                         {
                             this.Logger.WriteError($"Dropping Finished message while negotiating new epoch from `{peerAddress}`");
                             continue;
@@ -1281,7 +1280,7 @@ namespace Hazel.Dtls
             lock (peer)
             {
                 // If we're negotiating a new epoch, queue data
-                if (peer.Epoch == 0 || peer.NextEpoch.State != HandshakeState.Established)
+                if (peer.Epoch == 0 || peer.NextEpoch.State != HandshakeState.ExpectingHello)
                 {
                     ByteSpan copyOfSpan = new byte[span.Length];
                     span.CopyTo(copyOfSpan);
@@ -1355,7 +1354,7 @@ namespace Hazel.Dtls
                 PeerData peer = kvp.Value;
                 lock (peer)
                 {
-                    if (peer.Epoch == 0 || peer.NextEpoch.State != HandshakeState.Established)
+                    if (peer.Epoch == 0 || peer.NextEpoch.State != HandshakeState.ExpectingHello)
                     {
                         TimeSpan negotiationAge = now - peer.StartOfNegotiation;
                         if (negotiationAge > maxAge)
