@@ -21,16 +21,17 @@ namespace Hazel.Dtls
         /// </summary>
         enum HandshakeState
         {
-            Established,
+            Initializing,
 
             ExpectingServerHello,
             ExpectingCertificate,
             ExpectingServerKeyExchange,
             ExpectingServerHelloDone,
+
             ExpectingChangeCipherSpec,
             ExpectingFinished,
 
-            Initializing,
+            Established,
         }
 
         /// <summary>
@@ -102,6 +103,17 @@ namespace Hazel.Dtls
         private readonly Queue<QueuedAppData> queuedApplicationData = new Queue<QueuedAppData>();
 
         private X509Certificate2Collection serverCertificates = new X509Certificate2Collection();
+
+        public bool HandshakeComplete
+        {
+            get
+            {
+                lock (this.syncRoot)
+                {
+                    return this.nextEpoch.State == HandshakeState.Established;
+                }
+            }
+        }
 
         /// <summary>
         /// Create a new instance of the DTLS connection
@@ -193,7 +205,7 @@ namespace Hazel.Dtls
             this.nextEpoch.ServerVerification.SecureClear();
             this.nextEpoch.CertificateFragments.Clear();
             this.nextEpoch.CertificatePayload = ByteSpan.Empty;
-            
+
             this.epoch = 0;
             while (this.queuedApplicationData.TryDequeue(out _)) ;
         }
@@ -207,7 +219,7 @@ namespace Hazel.Dtls
             {
                 this.ResetConnectionState();
                 this.nextEpoch.ClientRandom.FillWithRandom(this.random);
-                this.SendClientHello();
+                this.SendClientHello(false);
             }
 
             base.RestartConnection();
@@ -240,7 +252,7 @@ namespace Hazel.Dtls
                                 case HandshakeState.ExpectingCertificate:
                                 case HandshakeState.ExpectingServerKeyExchange:
                                 case HandshakeState.ExpectingServerHelloDone:
-                                    this.SendClientHello();
+                                    this.SendClientHello(true);
                                     break;
 
                                 case HandshakeState.ExpectingChangeCipherSpec:
@@ -449,6 +461,9 @@ namespace Hazel.Dtls
                     this.currentEpoch.PreviousSequenceWindowBitmask |= windowMask;
                 }
 
+#if DEBUG
+                this.logger.WriteVerbose($"Content type was {record.ContentType} ({this.nextEpoch.State})");
+#endif
                 switch (record.ContentType)
                 {
                     case ContentType.ChangeCipherSpec:
@@ -555,6 +570,9 @@ namespace Hazel.Dtls
                     continue;
                 }
 
+#if DEBUG
+                this.logger.WriteVerbose($"Handshake record was {handshake.MessageType} ({this.nextEpoch.State})");
+#endif
                 switch (handshake.MessageType)
                 {
                     case HandshakeType.HelloVerifyRequest:
@@ -576,13 +594,22 @@ namespace Hazel.Dtls
                             continue;
                         }
 
-                        // Save the cookie
+                        // If the cookie differs, save it and restart the handshake
+                        if (this.nextEpoch.Cookie.Length == helloVerifyRequest.Cookie.Length
+                            && Const.ConstantCompareSpans(this.nextEpoch.Cookie, helloVerifyRequest.Cookie) == 1)
+                        {
+
+                            this.logger.WriteError("Dropping duplicate HelloVerifyRequest handshake message");
+                            continue;
+                        }
+
                         this.nextEpoch.Cookie = new byte[helloVerifyRequest.Cookie.Length];
                         helloVerifyRequest.Cookie.CopyTo(this.nextEpoch.Cookie);
-
-                        // Restart the handshake
                         this.nextEpoch.ClientRandom.FillWithRandom(this.random);
-                        this.SendClientHello();
+
+                        // We don't need to resend here. We already have the cookie so we already sent it once.
+                        this.SendClientHello(false);
+
                         break;
 
                     case HandshakeType.ServerHello:
@@ -621,6 +648,10 @@ namespace Hazel.Dtls
                         this.nextEpoch.State = HandshakeState.ExpectingCertificate;
                         this.nextEpoch.CertificateFragments.Clear();
                         this.nextEpoch.CertificatePayload = ByteSpan.Empty;
+
+#if DEBUG
+                        this.logger.WriteVerbose($"ClientRandom: {this.nextEpoch.ClientRandom} ServerRandom: {this.nextEpoch.ServerRandom}");
+#endif
 
                         // Append ServerHelllo message to the verification stream
                         this.nextEpoch.VerificationStream.AddData(originalPayload);
@@ -872,8 +903,13 @@ namespace Hazel.Dtls
         /// <summary>
         /// Send (resend) a ClientHello message to the server
         /// </summary>
-        protected virtual void SendClientHello()
+        protected virtual void SendClientHello(bool isRetransmit)
         {
+#if DEBUG
+            var verb = isRetransmit ? "Resending" : "Sending";
+            this.logger.WriteVerbose($"{verb} ClientHello in state: {this.nextEpoch.State}. Epoch: {this.epoch} Cookie: {this.nextEpoch.Cookie} Random: {this.nextEpoch.ClientRandom}");
+#endif
+
             // Reset our verification stream
             this.nextEpoch.VerificationStream.Reset();
 
@@ -929,6 +965,7 @@ namespace Hazel.Dtls
             this.nextEpoch.State = HandshakeState.ExpectingServerHello;
             if (this.nextEpoch.NegotiationStartTime == DateTime.MinValue) this.nextEpoch.NegotiationStartTime = DateTime.UtcNow;
             this.nextEpoch.NextPacketResendTime = DateTime.UtcNow + this.handshakeResendTimeout;
+
             base.WriteBytesToConnection(packet.GetUnderlyingArray(), packet.Length);
         }
 
@@ -1000,8 +1037,17 @@ namespace Hazel.Dtls
         /// True if this is a retransmit of the flight. Otherwise,
         /// false
         /// </param>
-        private void SendClientKeyExchangeFlight(bool isRetransmit)
+        protected virtual void SendClientKeyExchangeFlight(bool isRetransmit)
         {
+#if DEBUG
+            var verb = isRetransmit ? "Resending" : "Sending";
+            this.logger.WriteVerbose($"{verb} ClientKeyExchangeFlight in state: {this.nextEpoch.State}");
+#endif
+            if (this.nextEpoch.State == HandshakeState.Established)
+            {
+                return;
+            }
+
             // Describe our flight
             Handshake keyExchangeHandshake = new Handshake();
             keyExchangeHandshake.MessageType = HandshakeType.ClientKeyExchange;

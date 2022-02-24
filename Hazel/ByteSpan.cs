@@ -164,6 +164,11 @@ namespace Hazel
             return result;
         }
 
+        public override string ToString()
+        {
+            return string.Join("", this.ToArray());
+        }
+
         /// <summary>
         /// Implicit conversion from byte[] -> ByteSpan
         /// </summary>

@@ -85,7 +85,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             return clientCertificates;
         }
 
-        protected ThreadLimitedUdpConnectionListener CreateListener(int numWorkers, IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
+        protected DtlsConnectionListener CreateListener(int numWorkers, IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
         {
             DtlsConnectionListener listener = new DtlsConnectionListener(2, endPoint, logger, ipMode);
             listener.SetCertificate(GetCertificateForServer());
@@ -171,7 +171,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
             }
 
-            protected override void SendClientHello()
+            protected override void SendClientHello(bool isResend)
             {
                 Test_SendClientHello(EncodeClientHelloCallback);
             }
@@ -314,6 +314,80 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         }
 
         [TestMethod]
+        public void TestResentClientHelloConnects()
+        {
+            IPEndPoint captureEndPoint = new IPEndPoint(IPAddress.Loopback, 27511);
+            IPEndPoint listenerEndPoint = new IPEndPoint(IPAddress.Loopback, 27510);
+
+            bool serverConnected = false;
+            bool serverDisconnected = false;
+            bool clientDisconnected = false;
+
+            Semaphore signal = new Semaphore(0, int.MaxValue);
+
+            using (SocketCapture capture = new SocketCapture(captureEndPoint, listenerEndPoint))
+            using (DtlsConnectionListener listener = new DtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, listenerEndPoint.Port), new TestLogger("Server")))
+            using (DtlsUnityConnection connection = new DtlsUnityConnection(new TestLogger("Client "), captureEndPoint))
+            {
+                Semaphore listenerToConnectionThrottle = new Semaphore(0, int.MaxValue);
+                capture.SendToLocalSemaphore = listenerToConnectionThrottle;
+                Thread throttleThread = new Thread(() => {
+                    // Trigger resend of HelloVerifyRequest
+                    Thread.Sleep(1000);
+                    listenerToConnectionThrottle.Release(1);
+
+                    // ServerHello, Server Certificate
+                    listenerToConnectionThrottle.Release(1);
+
+                    // ServerHello, ServerCertificate
+                    
+                    listenerToConnectionThrottle.Release(1);
+
+                    // ServerKeyExchange, ServerHelloDone
+                    listenerToConnectionThrottle.Release(1);
+
+                    // Trigger a resend of ServerKeyExchange, ServerHelloDone
+                    Thread.Sleep(1000);
+                    listenerToConnectionThrottle.Release(1);
+
+                    capture.SendToLocalSemaphore = null;
+                });
+                throttleThread.Start();
+
+                listener.SetCertificate(GetCertificateForServer());
+                connection.SetValidServerCertificates(GetCertificateForClient());
+
+                listener.NewConnection += (evt) =>
+                {
+                    serverConnected = true;
+                    signal.Release();
+                    evt.Connection.Disconnected += (o, et) => {
+                        serverDisconnected = true;
+                    };
+                };
+                connection.Disconnected += (o, evt) => {
+                    clientDisconnected = true;
+                    signal.Release();
+                };
+
+                listener.Start();
+                connection.Connect();
+
+                // wait for the client to connect
+                signal.WaitOne(10);
+
+                listener.Dispose();
+
+                // wait for the client to disconnect
+                signal.WaitOne(100);
+
+                Assert.IsTrue(serverConnected);
+                Assert.IsTrue(clientDisconnected);
+                Assert.IsFalse(serverDisconnected);
+            }
+        }
+
+        [TestMethod]
         public void TestResentHandshakeConnects()
         {
             IPEndPoint captureEndPoint = new IPEndPoint(IPAddress.Loopback, 27511);
@@ -326,8 +400,8 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             Semaphore signal = new Semaphore(0, int.MaxValue);
 
             using (SocketCapture capture = new SocketCapture(captureEndPoint, listenerEndPoint))
-            using (DtlsConnectionListener listener = new DtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, listenerEndPoint.Port), new TestLogger()))
-            using (DtlsUnityConnection connection = new DtlsUnityConnection(new TestLogger(), captureEndPoint))
+            using (DtlsConnectionListener listener = new DtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, listenerEndPoint.Port), new TestLogger("Server")))
+            using (DtlsUnityConnection connection = new DtlsUnityConnection(new TestLogger("Client "), captureEndPoint))
             {
                 Semaphore listenerToConnectionThrottle = new Semaphore(0, int.MaxValue);
                 capture.SendToLocalSemaphore = listenerToConnectionThrottle;
@@ -341,7 +415,6 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                     // Trigger a resend of ServerHello, ServerCertificate
                     Thread.Sleep(1000);
                     listenerToConnectionThrottle.Release(1);
-
 
                     // ServerKeyExchange, ServerHelloDone
                     listenerToConnectionThrottle.Release(1);
@@ -556,7 +629,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         ///     Tests the fields on UdpConnection.
         /// </summary>
         [TestMethod]
-        public void UdpFieldTest()
+        public void DtlsFieldTest()
         {
             IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 4296);
 
@@ -578,7 +651,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         }
 
         [TestMethod]
-        public void UdpHandshakeTest()
+        public void DtlsHandshakeTest()
         {
             byte[] TestData = new byte[] { 1, 2, 3, 4, 5, 6 };
             using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
@@ -603,7 +676,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         }
 
         [TestMethod]
-        public void UdpUnreliableMessageSendTest()
+        public void DtlsUnreliableMessageSendTest()
         {
             byte[] TestData = new byte[] { 1, 2, 3, 4, 5, 6 };
             using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
@@ -641,7 +714,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         ///     Tests IPv4 connectivity.
         /// </summary>
         [TestMethod]
-        public void UdpIPv4ConnectionTest()
+        public void DtlsIPv4ConnectionTest()
         {
             using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
             using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
@@ -654,15 +727,45 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             }
         }
 
+        private class MultipleClientHelloDtlsConnection : DtlsUnityConnection
+        {
+            public MultipleClientHelloDtlsConnection(ILogger logger, IPEndPoint remoteEndPoint, IPMode ipMode = IPMode.IPv4) : base(logger, remoteEndPoint, ipMode)
+            {
+            }
+
+            protected override void SendClientHello(bool isRetransmit)
+            {
+                base.SendClientHello(isRetransmit);
+                base.SendClientHello(true);
+            }
+        }
+
+
+        private class MultipleClientKeyExchangeFlightDtlsConnection : DtlsUnityConnection
+        {
+            public MultipleClientKeyExchangeFlightDtlsConnection(ILogger logger, IPEndPoint remoteEndPoint, IPMode ipMode = IPMode.IPv4) : base(logger, remoteEndPoint, ipMode)
+            {
+            }
+
+            protected override void SendClientKeyExchangeFlight(bool isRetransmit)
+            {
+                base.SendClientKeyExchangeFlight(isRetransmit);
+                base.SendClientKeyExchangeFlight(true);
+                base.SendClientKeyExchangeFlight(true);
+            }
+        }
+
         /// <summary>
         ///     Tests IPv4 resilience to multiple hellos.
         /// </summary>
         [TestMethod]
         public void ConnectLikeAJerkTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
-            using (Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
+            using (DtlsConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger("Server")))
+            using (MultipleClientHelloDtlsConnection client = new MultipleClientHelloDtlsConnection(new TestLogger("Client "), new IPEndPoint(IPAddress.Loopback, 4296), IPMode.IPv4))
             {
+                client.SetValidServerCertificates(GetCertificateForClient());
+
                 int connects = 0;
                 listener.NewConnection += (obj) =>
                 {
@@ -670,19 +773,43 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 };
 
                 listener.Start();
+                client.Connect(null, 1000);
 
-                socket.Bind(new IPEndPoint(IPAddress.Any, 0));
-                var bytes = new byte[2];
-                bytes[0] = (byte)UdpSendOption.Hello;
-                for (int i = 0; i < 10; ++i)
+                Thread.Sleep(2000);
+
+                Assert.AreEqual(0, listener.ReceiveQueueLength);
+                Assert.IsTrue(connects <= 1, $"Too many connections: {connects}");
+                Assert.AreEqual(ConnectionState.Connected, client.State);
+                Assert.IsTrue(client.HandshakeComplete);
+            }
+        }
+
+        /// <summary>
+        ///     Tests IPv4 resilience to multiple ClientKeyExchange packets.
+        /// </summary>
+        [TestMethod]
+        public void HandshakeLikeAJerkTest()
+        {
+            using (DtlsConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger("Server")))
+            using (MultipleClientKeyExchangeFlightDtlsConnection client = new MultipleClientKeyExchangeFlightDtlsConnection(new TestLogger("Client "), new IPEndPoint(IPAddress.Loopback, 4296), IPMode.IPv4))
+            {
+                client.SetValidServerCertificates(GetCertificateForClient());
+
+                int connects = 0;
+                listener.NewConnection += (obj) =>
                 {
-                    socket.SendTo(bytes, new IPEndPoint(IPAddress.Loopback, 4296));
-                }
+                    Interlocked.Increment(ref connects);
+                };
+
+                listener.Start();
+                client.Connect();
 
                 Thread.Sleep(500);
 
                 Assert.AreEqual(0, listener.ReceiveQueueLength);
                 Assert.IsTrue(connects <= 1, $"Too many connections: {connects}");
+                Assert.AreEqual(ConnectionState.Connected, client.State);
+                Assert.IsTrue(client.HandshakeComplete);
             }
         }
 
@@ -692,8 +819,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         [TestMethod]
         public void MixedConnectionTest()
         {
-
-            using (ThreadLimitedUdpConnectionListener listener2 = this.CreateListener(4, new IPEndPoint(IPAddress.IPv6Any, 4296), new ConsoleLogger(true), IPMode.IPv6))
+            using (ThreadLimitedUdpConnectionListener listener2 = this.CreateListener(4, new IPEndPoint(IPAddress.IPv6Any, 4296), new TestLogger(), IPMode.IPv6))
             {
                 listener2.Start();
 
@@ -720,7 +846,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         ///     Tests dual mode connectivity.
         /// </summary>
         [TestMethod]
-        public void UdpIPv6ConnectionTest()
+        public void DtlsIPv6ConnectionTest()
         {
             using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.IPv6Any, 4296), new TestLogger(), IPMode.IPv6))
             {
@@ -737,7 +863,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         ///     Tests server to client unreliable communication on the UdpConnection.
         /// </summary>
         [TestMethod]
-        public void UdpUnreliableServerToClientTest()
+        public void DtlsUnreliableServerToClientTest()
         {
             using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
             using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
@@ -750,7 +876,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         ///     Tests server to client reliable communication on the UdpConnection.
         /// </summary>
         [TestMethod]
-        public void UdpReliableServerToClientTest()
+        public void DtlsReliableServerToClientTest()
         {
             using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
             using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
@@ -763,7 +889,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         ///     Tests server to client unreliable communication on the UdpConnection.
         /// </summary>
         [TestMethod]
-        public void UdpUnreliableClientToServerTest()
+        public void DtlsUnreliableClientToServerTest()
         {
             using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
             using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
@@ -776,7 +902,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         ///     Tests server to client reliable communication on the UdpConnection.
         /// </summary>
         [TestMethod]
-        public void UdpReliableClientToServerTest()
+        public void DtlsReliableClientToServerTest()
         {
             using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
             using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
@@ -854,8 +980,8 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         [TestMethod]
         public void ClientDisconnectTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
-            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger("Server")))
+            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger("Client")))
             {
                 ManualResetEvent mutex = new ManualResetEvent(false);
                 ManualResetEvent mutex2 = new ManualResetEvent(false);
@@ -874,11 +1000,14 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
                 connection.Connect();
 
-                mutex.WaitOne();
+                Assert.AreEqual(ConnectionState.Connected, connection.State);
+                mutex.WaitOne(1000);
+                Assert.AreEqual(ConnectionState.Connected, connection.State);
 
                 connection.Disconnect("Testing");
 
-                mutex2.WaitOne();
+                mutex2.WaitOne(1000);
+                Assert.AreEqual(ConnectionState.NotConnected, connection.State);
             }
         }
 
@@ -888,8 +1017,8 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         [TestMethod]
         public void ServerDisconnectTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
-            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger("Server")))
+            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger("Client")))
             {
                 SemaphoreSlim mutex = new SemaphoreSlim(0, 100);
                 ManualResetEventSlim serverMutex = new ManualResetEventSlim(false);

@@ -94,9 +94,9 @@ namespace Hazel.UnitTests
             {
                 IPEndPoint fromEndPoint = new IPEndPoint(IPAddress.Any, 0);
 
-                byte[] buffer = new byte[2000];
                 for (; ; )
                 {
+                    byte[] buffer = new byte[2000];
                     EndPoint endPoint = fromEndPoint;
                     int read = this.captureSocket.ReceiveFrom(buffer, ref endPoint);
                     if (read > 0)

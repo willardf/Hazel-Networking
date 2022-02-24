@@ -28,6 +28,7 @@ namespace Hazel.Dtls
             ExpectingClientKeyExchange,
             ExpectingChangeCipherSpec,
             ExpectingFinish,
+            Established
         }
 
         /// <summary>
@@ -94,13 +95,13 @@ namespace Hazel.Dtls
 
             public DateTime StartOfNegotiation;
 
-            public PeerData()
+            public PeerData(ConnectionId connectionId, ulong nextExpectedSequenceNumber)
             {
                 ByteSpan block = new byte[2 * Finished.Size];
                 this.CurrentEpoch.ServerFinishedVerification = block.Slice(0, Finished.Size);
                 this.CurrentEpoch.ExpectedClientFinishedVerification = block.Slice(Finished.Size, Finished.Size);
 
-                ResetPeer(ConnectionId.Create(new IPEndPoint(0,0), 0), 1);
+                ResetPeer(connectionId, nextExpectedSequenceNumber);
             }
 
             public void ResetPeer(ConnectionId connectionId, ulong nextExpectedSequenceNumber)
@@ -296,8 +297,14 @@ namespace Hazel.Dtls
             PeerData peer = null;
             if (!this.existingPeers.TryGetValue(peerAddress, out peer))
             {
-                HandleNonPeerRecord(message, peerAddress);
-                return;
+                lock (this.existingPeers)
+                {
+                    if (!this.existingPeers.TryGetValue(peerAddress, out peer))
+                    {
+                        HandleNonPeerRecord(message, peerAddress);
+                        return;
+                    }
+                }
             }
 
             ConnectionId peerConnectionId;
@@ -407,7 +414,7 @@ namespace Hazel.Dtls
 
                     if (!peer.CurrentEpoch.RecordProtection.DecryptCiphertextFromClient(decryptedPayload, recordPayload, ref record))
                     {
-                        this.Logger.WriteVerbose($"Dropping non-authentic record from `{peerAddress}`");
+                        this.Logger.WriteVerbose($"Dropping non-authentic {record.ContentType} record from `{peerAddress}`");
                         return;
                     }
 
@@ -425,6 +432,9 @@ namespace Hazel.Dtls
                         peer.CurrentEpoch.PreviousSequenceWindowBitmask |= windowMask;
                     }
 
+#if DEBUG
+                    this.Logger.WriteVerbose($"Record type {record.ContentType} ({peer.NextEpoch.State})");
+#endif
                     switch (record.ContentType)
                     {
                         case ContentType.ChangeCipherSpec:
@@ -462,7 +472,7 @@ namespace Hazel.Dtls
                             peer.NextEpoch.ClientVerification.CopyTo(peer.CurrentEpoch.ExpectedClientFinishedVerification);
                             peer.NextEpoch.ServerVerification.CopyTo(peer.CurrentEpoch.ServerFinishedVerification);
 
-                            peer.NextEpoch.State = HandshakeState.ExpectingHello;
+                            peer.NextEpoch.State = HandshakeState.Established;
                             peer.NextEpoch.Handshake?.Dispose();
                             peer.NextEpoch.Handshake = null;
                             peer.NextEpoch.NextOutgoingSequence = 1;
@@ -550,6 +560,9 @@ namespace Hazel.Dtls
                 ByteSpan packet;
                 ByteSpan writer;
 
+#if DEBUG
+                this.Logger.WriteVerbose($"Received handshake {handshake.MessageType} ({peer.NextEpoch.State})");
+#endif
                 switch (handshake.MessageType)
                 {
                     case HandshakeType.ClientHello:
@@ -647,7 +660,7 @@ namespace Hazel.Dtls
                         }
                         // Cannot process a Finished message when we
                         // are negotiating the next epoch
-                        else if (peer.NextEpoch.State != HandshakeState.ExpectingHello)
+                        else if (peer.NextEpoch.State != HandshakeState.Established)
                         {
                             this.Logger.WriteError($"Dropping Finished message while negotiating new epoch from `{peerAddress}`");
                             continue;
@@ -906,6 +919,10 @@ namespace Hazel.Dtls
                 clientHello.Random.CopyTo(peer.NextEpoch.ClientRandom);
                 peer.NextEpoch.ServerRandom.FillWithRandom(this.random);
                 recordMessagesForVerifyData = true;
+
+#if DEBUG
+                this.Logger.WriteVerbose($"ClientRandom: {peer.NextEpoch.ClientRandom} ServerRandom: {peer.NextEpoch.ServerRandom}");
+#endif
 
                 // Copy the original ClientHello
                 // handshake to our verification stream
@@ -1207,15 +1224,9 @@ namespace Hazel.Dtls
             }
 
             // Allocate state for the new peer and register it
-            PeerData peer = new PeerData();
-            peer.ResetPeer(this.AllocateConnectionId(peerAddress), record.SequenceNumber + 1);
-
+            PeerData peer = new PeerData(this.AllocateConnectionId(peerAddress), record.SequenceNumber + 1);
+            this.ProcessHandshake(peer, peerAddress, ref record, originalMessage);
             this.existingPeers[peerAddress] = peer;
-
-            lock (peer)
-            {
-                this.ProcessHandshake(peer, peerAddress, ref record, originalMessage);
-            }
         }
 
         //Send a HelloVerifyRequest handshake message to a peer
@@ -1270,7 +1281,7 @@ namespace Hazel.Dtls
             lock (peer)
             {
                 // If we're negotiating a new epoch, queue data
-                if (peer.Epoch == 0 || peer.NextEpoch.State != HandshakeState.ExpectingHello)
+                if (peer.Epoch == 0 || peer.NextEpoch.State != HandshakeState.Established)
                 {
                     ByteSpan copyOfSpan = new byte[span.Length];
                     span.CopyTo(copyOfSpan);
@@ -1344,7 +1355,7 @@ namespace Hazel.Dtls
                 PeerData peer = kvp.Value;
                 lock (peer)
                 {
-                    if (peer.Epoch == 0 || peer.NextEpoch.State != HandshakeState.ExpectingHello)
+                    if (peer.Epoch == 0 || peer.NextEpoch.State != HandshakeState.Established)
                     {
                         TimeSpan negotiationAge = now - peer.StartOfNegotiation;
                         if (negotiationAge > maxAge)

@@ -140,7 +140,7 @@ namespace Hazel.Udp
         {
             try
             {
-                keepAliveTimer.Change(keepAliveInterval, keepAliveInterval);
+                keepAliveTimer?.Change(keepAliveInterval, keepAliveInterval);
             }
             catch { }
         }
