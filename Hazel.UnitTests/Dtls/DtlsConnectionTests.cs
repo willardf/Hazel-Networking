@@ -93,7 +93,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
         }
 
-        protected UdpConnection CreateConnection(IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
+        protected DtlsUnityConnection CreateConnection(IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
         {
             DtlsUnityConnection connection = new DtlsUnityConnection(logger, endPoint, ipMode);
             connection.SetValidServerCertificates(GetCertificateForClient());
@@ -980,8 +980,8 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         [TestMethod]
         public void ClientDisconnectTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger("Server")))
-            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger("Client")))
+            using (var listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger("Server")))
+            using (var connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger("Client")))
             {
                 ManualResetEvent mutex = new ManualResetEvent(false);
                 ManualResetEvent mutex2 = new ManualResetEvent(false);

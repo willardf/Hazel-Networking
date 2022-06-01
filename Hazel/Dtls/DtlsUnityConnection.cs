@@ -1,4 +1,3 @@
-using Hazel;
 using Hazel.Crypto;
 using Hazel.Udp;
 using System;
@@ -461,9 +460,8 @@ namespace Hazel.Dtls
                     this.currentEpoch.PreviousSequenceWindowBitmask |= windowMask;
                 }
 
-#if DEBUG
-                this.logger.WriteVerbose($"Content type was {record.ContentType} ({this.nextEpoch.State})");
-#endif
+                // This is handy for debugging, but too verbose even for verbose.
+                // this.logger.WriteVerbose($"Content type was {record.ContentType} ({this.nextEpoch.State})");
                 switch (record.ContentType)
                 {
                     case ContentType.ChangeCipherSpec:
@@ -552,26 +550,41 @@ namespace Hazel.Dtls
                 }
                 message = message.Slice(Handshake.Size);
 
-                if (message.Length < handshake.Length)
+                // Check for fragmented messages
+                if (handshake.FragmentOffset != 0 || handshake.FragmentLength != handshake.Length)
                 {
-                    this.logger.WriteError($"Dropping malformed handshake message: AvailableBytes({message.Length}) Size({handshake.Length})");
-                    return false;
+                    // We only support fragmentation on Certificate messages
+                    if (handshake.MessageType != HandshakeType.Certificate)
+                    {
+                        this.logger.WriteError($"Dropping fragmented handshake message Type({handshake.MessageType}) Offset({handshake.FragmentOffset}) FragmentLength({handshake.FragmentLength}) Length({handshake.Length})");
+                        continue;
+                    }
+
+                    if (message.Length < handshake.FragmentLength)
+                    {
+                        this.logger.WriteError($"Dropping malformed fragmented handshake message: AvailableBytes({message.Length}) Size({handshake.FragmentLength})");
+                        return false;
+                    }
+
+                    originalPayload = originalPayload.Slice(0, (int)(Handshake.Size + handshake.FragmentLength));
+                    message = message.Slice((int)handshake.FragmentLength);
+                }
+                else
+                {
+                    if (message.Length < handshake.Length)
+                    {
+                        this.logger.WriteError($"Dropping malformed handshake message: AvailableBytes({message.Length}) Size({handshake.Length})");
+                        return false;
+                    }
+
+                    originalPayload = originalPayload.Slice(0, (int)(Handshake.Size + handshake.Length));                    
+                    message = message.Slice((int)handshake.Length);
                 }
 
-                originalPayload = originalPayload.Slice(0, (int)(Handshake.Size + handshake.Length));
                 ByteSpan payload = originalPayload.Slice(Handshake.Size);
-                message = message.Slice((int)handshake.Length);
-
-                // We only support fragmented Certificate messages
-                // from the server
-                if (handshake.MessageType != HandshakeType.Certificate && (handshake.FragmentOffset != 0 || handshake.FragmentLength != handshake.Length))
-                {
-                    this.logger.WriteError($"Dropping fragmented handshake message Type({handshake.MessageType}) Offset({handshake.FragmentOffset}) FragmentLength({handshake.FragmentLength}) Length({handshake.Length})");
-                    continue;
-                }
 
 #if DEBUG
-                this.logger.WriteVerbose($"Handshake record was {handshake.MessageType} ({this.nextEpoch.State})");
+                this.logger.WriteVerbose($"Handshake record was {handshake.MessageType} (Frag: {handshake.FragmentOffset}) ({this.nextEpoch.State})");
 #endif
                 switch (handshake.MessageType)
                 {
@@ -740,7 +753,7 @@ namespace Hazel.Dtls
                         fullCertificateHandhake.FragmentOffset = 0;
                         fullCertificateHandhake.FragmentLength = fullCertificateHandhake.Length;
 
-                        byte[] serializedCertificateHandshake = new byte[Handshake.Size];
+                        ByteSpan serializedCertificateHandshake = new byte[Handshake.Size];
                         fullCertificateHandhake.Encode(serializedCertificateHandshake);
                         this.nextEpoch.VerificationStream.AddData(serializedCertificateHandshake);
                         this.nextEpoch.VerificationStream.AddData(payload);

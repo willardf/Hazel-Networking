@@ -2,15 +2,16 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
 using System.Threading;
-
 
 namespace Hazel.Udp
 {
     partial class UdpConnection
     {
+        private const int MinResendDelayMs = 50;
+        private const int MaxInitialResendDelayMs = 300;
+        private const int MaxAdditionalResendDelayMs = 1000;
+
         public readonly ObjectPool<Packet> PacketPool;
 
         /// <summary>
@@ -154,7 +155,7 @@ namespace Hazel.Udp
                             return 0;
                         }
 
-                        this.NextTimeoutMs += (int)Math.Min(this.NextTimeoutMs * connection.ResendPingMultiplier, 1000);
+                        this.NextTimeoutMs += (int)Math.Min(this.NextTimeoutMs * connection.ResendPingMultiplier, MaxAdditionalResendDelayMs);
                         try
                         {
                             connection.WriteBytesToConnection(this.Data, this.Length);
@@ -215,12 +216,18 @@ namespace Hazel.Udp
             buffer[offset] = (byte)(id >> 8);
             buffer[offset + 1] = (byte)id;
 
+            int resendDelayMs = this.ResendTimeoutMs;
+            if (resendDelayMs <= 0)
+            {
+                resendDelayMs = (_pingMs * this.ResendPingMultiplier).ClampToInt(MinResendDelayMs, MaxInitialResendDelayMs);
+            }
+
             Packet packet = this.PacketPool.GetObject();
             packet.Set(
                 id,
                 buffer,
                 buffer.Length,
-                ResendTimeoutMs > 0 ? ResendTimeoutMs : (int)Math.Min(_pingMs * this.ResendPingMultiplier, 300),
+                resendDelayMs,
                 ackCallback);
 
             if (!reliableDataPacketsSent.TryAdd(id, packet))
@@ -417,7 +424,7 @@ namespace Hazel.Udp
 
                 lock (PingLock)
                 {
-                    this._pingMs = Math.Max(50, this._pingMs * .7f + rt * .3f);
+                    this._pingMs = this._pingMs * .7f + rt * .3f;
                 }
             }
             else if (this.activePingPackets.TryRemove(id, out PingPacket pingPkt))
@@ -428,7 +435,7 @@ namespace Hazel.Udp
 
                 lock (PingLock)
                 {
-                    this._pingMs = Math.Max(50, this._pingMs * .7f + rt * .3f);
+                    this._pingMs = this._pingMs * .7f + rt * .3f;
                 }
             }
         }
