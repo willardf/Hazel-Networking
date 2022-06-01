@@ -17,7 +17,7 @@ namespace Hazel.Dtls
     /// <inheritdoc />
     public class DtlsConnectionListener : ThreadLimitedUdpConnectionListener
     {
-        const int MaxDatagramSize = 1200;
+        private const int MaxCertFragmentSize = 600;
 
         /// <summary>
         /// Current state of handshake sequence
@@ -255,8 +255,8 @@ namespace Hazel.Dtls
             //  * ServerHello payload
             //  * Certificate header
             int padding = Record.Size + Handshake.Size + ServerHello.Size + Handshake.Size;
-            this.encodedCertificates.Add(certificateData.Slice(0, Math.Min(certificateData.Length, MaxDatagramSize - padding)));
-            certificateData = certificateData.Slice(Math.Min(certificateData.Length, MaxDatagramSize - padding));
+            this.encodedCertificates.Add(certificateData.Slice(0, Math.Min(certificateData.Length, MaxCertFragmentSize - padding)));
+            certificateData = certificateData.Slice(Math.Min(certificateData.Length, MaxCertFragmentSize - padding));
 
             // Subsequent certificate data needs to leave room for
             //  * Record header
@@ -264,8 +264,8 @@ namespace Hazel.Dtls
             padding = Record.Size + Handshake.Size;
             while (certificateData.Length > 0)
             {
-                this.encodedCertificates.Add(certificateData.Slice(0, Math.Min(certificateData.Length, MaxDatagramSize - padding)));
-                certificateData = certificateData.Slice(Math.Min(certificateData.Length, MaxDatagramSize - padding));
+                this.encodedCertificates.Add(certificateData.Slice(0, Math.Min(certificateData.Length, MaxCertFragmentSize - padding)));
+                certificateData = certificateData.Slice(Math.Min(certificateData.Length, MaxCertFragmentSize - padding));
             }
         }
 
@@ -432,7 +432,7 @@ namespace Hazel.Dtls
                     }
 
 #if DEBUG
-                    this.Logger.WriteVerbose($"Record type {record.ContentType} ({peer.NextEpoch.State})");
+                    // this.Logger.WriteVerbose($"Record type {record.ContentType} ({peer.NextEpoch.State})");
 #endif
                     switch (record.ContentType)
                     {
@@ -1024,7 +1024,7 @@ namespace Hazel.Dtls
                 writer = writer.Slice(Handshake.Size);
                 serverHello.Encode(writer);
                 writer = writer.Slice(ServerHello.Size);
-                certificateHandshake.Encode(writer);
+                fullCeritficateHandshake.Encode(writer);
                 writer = writer.Slice(Handshake.Size);
 
                 peer.NextEpoch.VerificationStream.AddData(packet);

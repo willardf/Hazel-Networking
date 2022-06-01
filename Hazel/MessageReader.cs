@@ -154,7 +154,6 @@ namespace Hazel
 
             var output = MessageReader.GetSized(len);
 
-            output.Parent = this;
             Array.Copy(this.Buffer, this.readHead, output.Buffer, 0, len);
 
             output.Length = len;
