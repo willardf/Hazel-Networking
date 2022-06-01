@@ -1,4 +1,3 @@
-using Hazel;
 using Hazel.Crypto;
 using Hazel.Udp;
 using System;
@@ -461,9 +460,8 @@ namespace Hazel.Dtls
                     this.currentEpoch.PreviousSequenceWindowBitmask |= windowMask;
                 }
 
-#if DEBUG
-                this.logger.WriteVerbose($"Content type was {record.ContentType} ({this.nextEpoch.State})");
-#endif
+                // This is handy for debugging, but too verbose even for verbose.
+                // this.logger.WriteVerbose($"Content type was {record.ContentType} ({this.nextEpoch.State})");
                 switch (record.ContentType)
                 {
                     case ContentType.ChangeCipherSpec:

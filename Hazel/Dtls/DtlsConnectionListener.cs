@@ -17,7 +17,7 @@ namespace Hazel.Dtls
     /// <inheritdoc />
     public class DtlsConnectionListener : ThreadLimitedUdpConnectionListener
     {
-        private const int MaxCertFragmentSize = 600;
+        private const int MaxCertFragmentSize = 550; // Rounded down from 576, min MTU.
 
         /// <summary>
         /// Current state of handshake sequence
@@ -431,9 +431,8 @@ namespace Hazel.Dtls
                         peer.CurrentEpoch.PreviousSequenceWindowBitmask |= windowMask;
                     }
 
-#if DEBUG
+                    // This is handy for debugging, but too verbose even for verbose.
                     // this.Logger.WriteVerbose($"Record type {record.ContentType} ({peer.NextEpoch.State})");
-#endif
                     switch (record.ContentType)
                     {
                         case ContentType.ChangeCipherSpec:
