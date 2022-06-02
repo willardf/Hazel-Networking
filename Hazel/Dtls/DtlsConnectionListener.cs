@@ -159,7 +159,6 @@ namespace Hazel.Dtls
 
         // Private key component of certificate's public key
         private ByteSpan encodedCertificate;
-        private uint encodedCertificatesTotalSize;
         private RSA certificatePrivateKey;
 
         // HMAC key to validate ClientHello cookie
@@ -250,7 +249,6 @@ namespace Hazel.Dtls
 
             // Pre-fragment the certificate data
             this.encodedCertificate = Certificate.Encode(certificate);
-            this.encodedCertificatesTotalSize = (uint)encodedCertificate.Length;
         }
 
         /// <summary>
@@ -970,7 +968,7 @@ namespace Hazel.Dtls
 
             Handshake certificateHandshake = new Handshake();
             certificateHandshake.MessageType = HandshakeType.Certificate;
-            certificateHandshake.Length = this.encodedCertificatesTotalSize;
+            certificateHandshake.Length = (uint)certificateData.Length;
             certificateHandshake.MessageSequence = 2;
             certificateHandshake.FragmentOffset = 0;
             certificateHandshake.FragmentLength = (uint)certInitialFragmentSize;
