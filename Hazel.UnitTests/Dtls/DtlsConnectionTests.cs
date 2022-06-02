@@ -727,6 +727,21 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             }
         }
 
+        [TestMethod]
+        public void DtlsSessionV0ConnectionTest()
+        {
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (DtlsUnityConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
+            {
+                connection.HazelSessionVersion = 0;
+                listener.Start();
+
+                connection.Connect();
+
+                Assert.AreEqual(ConnectionState.Connected, connection.State);
+            }
+        }
+
         private class MultipleClientHelloDtlsConnection : DtlsUnityConnection
         {
             public MultipleClientHelloDtlsConnection(ILogger logger, IPEndPoint remoteEndPoint, IPMode ipMode = IPMode.IPv4) : base(logger, remoteEndPoint, ipMode)

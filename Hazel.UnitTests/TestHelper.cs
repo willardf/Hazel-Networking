@@ -196,12 +196,12 @@ namespace Hazel.UnitTests
             //Connect
             connection.Connect();
 
-            mutex.WaitOne();
+            Assert.IsTrue(mutex.WaitOne(100), "Timeout while connecting");
 
             connection.SendBytes(data, sendOption);
 
             //Wait until data is received
-            mutex2.WaitOne();
+            Assert.IsTrue(mutex2.WaitOne(100), "Timeout while sending data");
 
             Assert.AreEqual(data.Length, result.Value.Message.Length);
 

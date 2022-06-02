@@ -153,13 +153,14 @@ namespace Hazel.Dtls
     {
         public ByteSpan Random;
         public ByteSpan Cookie;
+        public HazelDtlsSessionInfo Session;
         public ByteSpan CipherSuites;
         public ByteSpan SupportedCurves;
 
         public const int MinSize = 0
             + 2 // client_version
             + Dtls.Random.Size // random
-            + 1 // session_id (size)
+            + 1 // session_id (size header included)
             + 1 // cookie (size)
             + 2 // cipher_suites (size)
             + 1 // compression_methods (size)
@@ -180,6 +181,7 @@ namespace Hazel.Dtls
         public int CalculateSize()
         {
             return MinSize
+                + this.Session.PayloadSize
                 + this.Cookie.Length
                 + this.CipherSuites.Length
                 + this.SupportedCurves.Length
@@ -208,13 +210,12 @@ namespace Hazel.Dtls
             result.Random = span.Slice(0, Dtls.Random.Size);
             span = span.Slice(Dtls.Random.Size);
 
-            ///NOTE(mendsley): We ignore session id
-            byte sessionIdSize = span[0];
-            if (span.Length < 1 + sessionIdSize)
+            if (!HazelDtlsSessionInfo.Parse(out result.Session, span))
             {
                 return false;
             }
-            span = span.Slice(1 + sessionIdSize);
+
+            span = span.Slice(result.Session.FullSize);
 
             byte cookieSize = span[0];
             if (span.Length < 1 + cookieSize)
@@ -378,8 +379,8 @@ namespace Hazel.Dtls
             span = span.Slice(Dtls.Random.Size);
 
             // Do not encode session ids
-            span[0] = (byte)0;
-            span = span.Slice(1);
+            this.Session.Encode(span);
+            span = span.Slice(this.Session.FullSize);
 
             span[0] = (byte)this.Cookie.Length;
             this.Cookie.CopyTo(span.Slice(1));
@@ -402,6 +403,67 @@ namespace Hazel.Dtls
             span.WriteBigEndian16((ushort)(2 + this.SupportedCurves.Length), 2);
             span.WriteBigEndian16((ushort)this.SupportedCurves.Length, 4);
             this.SupportedCurves.CopyTo(span.Slice(6));
+        }
+    }
+
+    /// <summary>
+    /// Encode/Decode session information in ClientHello
+    /// </summary>
+    public struct HazelDtlsSessionInfo
+    {
+        public const byte CurrentClientSessionSize = 1;
+        public const byte CurrentClientSessionVersion = 1;
+
+        public byte FullSize => (byte)(1 + this.PayloadSize);
+        public byte PayloadSize;
+        public byte Version;
+
+        public HazelDtlsSessionInfo(byte version)
+        {
+            this.Version = version;
+            switch (version)
+            {
+                case 0: // Does not write version byte
+                    this.PayloadSize = 0;
+                    return;
+                case 1: // Writes version byte only
+                    this.PayloadSize = 1;
+                    return;
+            }
+
+            throw new ArgumentOutOfRangeException("Unimplemented Hazel session version");
+        }
+
+        public void Encode(ByteSpan writer)
+        {
+            writer[0] = this.PayloadSize;
+
+            if (this.Version > 0)
+            {
+                writer[1] = this.Version;
+            }
+        }
+
+        public static bool Parse(out HazelDtlsSessionInfo result, ByteSpan reader)
+        {
+            result = new HazelDtlsSessionInfo();
+            if (reader.Length < 1)
+            {
+                return false;
+            }
+
+            result.PayloadSize = reader[0];
+
+            // Back compat, length may be zero, version defaults to 0.
+            if (result.PayloadSize == 0)
+            {
+                result.Version = 0;
+                return true;
+            }
+
+            // Forward compat, if length > 1, ignore the rest
+            result.Version = reader[1];
+            return true;
         }
     }
 
@@ -518,8 +580,9 @@ namespace Hazel.Dtls
         //public ProtocolVersion ServerVersion;
         public ByteSpan Random;
         public CipherSuite CipherSuite;
+        public HazelDtlsSessionInfo Session;
 
-        public const int Size = 0
+        public const int MinSize = 0
             + 2 // server_version
             + Dtls.Random.Size // random
             + 1 // session_id (size)
@@ -537,7 +600,7 @@ namespace Hazel.Dtls
         public static bool Parse(out ServerHello result, ByteSpan span)
         {
             result = new ServerHello();
-            if (span.Length < Size)
+            if (span.Length < MinSize)
             {
                 return false;
             }
@@ -548,8 +611,12 @@ namespace Hazel.Dtls
             result.Random = span.Slice(0, Dtls.Random.Size);
             span = span.Slice(Dtls.Random.Size);
 
-            byte sessionKeySize = span[0];
-            span = span.Slice(1 + sessionKeySize);
+            if (!HazelDtlsSessionInfo.Parse(out result.Session, span))
+            {
+                return false;
+            }
+
+            span = span.Slice(result.Session.FullSize);
 
             result.CipherSuite = (CipherSuite)span.ReadBigEndian16();
             span = span.Slice(2);
@@ -576,8 +643,8 @@ namespace Hazel.Dtls
             this.Random.CopyTo(span);
             span = span.Slice(Dtls.Random.Size);
 
-            span[0] = 0;
-            span = span.Slice(1);
+            this.Session.Encode(span);
+            span = span.Slice(this.Session.FullSize);
 
             span.WriteBigEndian16((ushort)this.CipherSuite);
             span = span.Slice(2);
