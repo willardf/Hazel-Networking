@@ -160,7 +160,7 @@ namespace Hazel.Dtls
         public const int MinSize = 0
             + 2 // client_version
             + Dtls.Random.Size // random
-            + 1 // session_id (size header included)
+            + 1 // session_id (size)
             + 1 // cookie (size)
             + 2 // cipher_suites (size)
             + 1 // compression_methods (size)
@@ -378,7 +378,6 @@ namespace Hazel.Dtls
             this.Random.CopyTo(span);
             span = span.Slice(Dtls.Random.Size);
 
-            // Do not encode session ids
             this.Session.Encode(span);
             span = span.Slice(this.Session.FullSize);
 
