@@ -589,6 +589,8 @@ namespace Hazel.Dtls
             + 1 // compression_method
             ;
 
+        public int Size => MinSize + Session.PayloadSize;
+
         /// <summary>
         /// Parse a Handshake ServerHello payload from wire format
         /// </summary>

@@ -313,6 +313,82 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             }
         }
 
+
+        [TestMethod]
+        public void TestReorderedCertFragmentsConnects()
+        {
+            IPEndPoint captureEndPoint = new IPEndPoint(IPAddress.Loopback, 27511);
+            IPEndPoint listenerEndPoint = new IPEndPoint(IPAddress.Loopback, 27510);
+
+            bool serverConnected = false;
+            bool serverDisconnected = false;
+            bool clientDisconnected = false;
+
+            Semaphore signal = new Semaphore(0, int.MaxValue);
+
+            var logger = new TestLogger("Throttle");
+
+            using (SocketCapture capture = new SocketCapture(captureEndPoint, listenerEndPoint, logger))
+            using (DtlsConnectionListener listener = new DtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, listenerEndPoint.Port), new TestLogger("Server")))
+            using (DtlsUnityConnection connection = new DtlsUnityConnection(new TestLogger("Client "), captureEndPoint))
+            {
+                Semaphore listenerToConnectionThrottle = new Semaphore(0, int.MaxValue);
+                capture.DelayBeforeDiscardingMs = -1;
+                capture.SendToLocalSemaphore = listenerToConnectionThrottle;
+                Thread throttleThread = new Thread(() => {
+                    // HelloVerifyRequest
+                    while (capture.RemoteToLocalCount == 0) Thread.Sleep(10);
+                    Assert.AreEqual(1, capture.RemoteToLocalCount);
+                    listenerToConnectionThrottle.Release(1);
+
+                    // ServerHello, Server Certificate (Fragment)
+                    // Server Cert
+                    // ServerKeyExchange, ServerHelloDone
+                    while (capture.RemoteToLocalCount < 3) Thread.Sleep(10);
+                    Assert.AreEqual(3, capture.RemoteToLocalCount);
+                    capture.ReversePacketsForLocal();
+                    listenerToConnectionThrottle.Release(3);
+
+                    // From here, either we recover or we don't.
+                    capture.SendToLocalSemaphore = null;
+                    listenerToConnectionThrottle.Release(int.MaxValue);
+                });
+                throttleThread.Start();
+
+                listener.SetCertificate(GetCertificateForServer());
+                connection.SetValidServerCertificates(GetCertificateForClient());
+
+                listener.NewConnection += (evt) =>
+                {
+                    serverConnected = true;
+                    signal.Release();
+                    evt.Connection.Disconnected += (o, et) => {
+                        serverDisconnected = true;
+                    };
+                };
+                connection.Disconnected += (o, evt) => {
+                    clientDisconnected = true;
+                    signal.Release();
+                };
+
+                listener.Start();
+                connection.Connect();
+
+                // wait for the client to connect
+                signal.WaitOne(10);
+
+                listener.Dispose();
+
+                // wait for the client to disconnect
+                signal.WaitOne(100);
+
+                Assert.IsTrue(serverConnected);
+                Assert.IsTrue(clientDisconnected);
+                Assert.IsFalse(serverDisconnected);
+            }
+        }
+
+
         [TestMethod]
         public void TestResentClientHelloConnects()
         {

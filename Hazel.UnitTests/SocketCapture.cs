@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -14,6 +16,8 @@ namespace Hazel.UnitTests
     /// </summary>
     public class SocketCapture : IDisposable
     {
+        public int DelayBeforeDiscardingMs = 100;
+
         private IPEndPoint localEndPoint;
         private readonly IPEndPoint remoteEndPoint;
 
@@ -23,8 +27,13 @@ namespace Hazel.UnitTests
         private Thread forLocalThread;
         private Thread forRemoteThread;
 
+        private ILogger logger;
+
         private readonly BlockingCollection<ByteSpan> forLocal = new BlockingCollection<ByteSpan>();
         private readonly BlockingCollection<ByteSpan> forRemote = new BlockingCollection<ByteSpan>();
+
+        public int RemoteToLocalCount => this.forLocal.Count;
+        public int LocalToRemoteCount => this.forRemote.Count;
 
         public Semaphore SendToLocalSemaphore = null;
         public Semaphore SendToRemoteSemaphore = null;
@@ -32,8 +41,9 @@ namespace Hazel.UnitTests
         private CancellationTokenSource cancellationSource = new CancellationTokenSource();
         private readonly CancellationToken cancellationToken;
 
-        public SocketCapture(IPEndPoint captureEndpoint, IPEndPoint remoteEndPoint)
+        public SocketCapture(IPEndPoint captureEndpoint, IPEndPoint remoteEndPoint, ILogger logger = null)
         {
+            this.logger = logger ?? new NullLogger();
             this.cancellationToken = this.cancellationSource.Token;
 
             this.remoteEndPoint = remoteEndPoint;
@@ -126,44 +136,50 @@ namespace Hazel.UnitTests
 
         private void SendToRemoteLoop()
         {
-            foreach (ByteSpan packet in this.forRemote.GetConsumingEnumerable())
+            while (!this.cancellationToken.IsCancellationRequested)
             {
-                if (this.cancellationToken.IsCancellationRequested)
-                {
-                    break;
-                }
-
                 if (this.SendToRemoteSemaphore != null)
                 {
-                    if (!this.SendToRemoteSemaphore.WaitOne(100))
+                    if (!this.SendToRemoteSemaphore.WaitOne(this.DelayBeforeDiscardingMs))
                     {
                         continue;
                     }
                 }
 
-                this.captureSocket.SendTo(packet.GetUnderlyingArray(), packet.Offset, packet.Length, SocketFlags.None, this.remoteEndPoint);
+                if (this.forRemote.TryTake(out var packet))
+                {
+                    this.logger.WriteInfo($"Passed 1 packet of {packet.Length} bytes to remote");
+                    this.captureSocket.SendTo(packet.GetUnderlyingArray(), packet.Offset, packet.Length, SocketFlags.None, this.remoteEndPoint);
+                }
             }
         }
 
         private void SendToLocalLoop()
         {
-            foreach (ByteSpan packet in this.forLocal.GetConsumingEnumerable())
+            while (!this.cancellationToken.IsCancellationRequested)
             {
-                if (this.cancellationToken.IsCancellationRequested)
-                {
-                    break;
-                }
 
                 if (this.SendToLocalSemaphore != null)
                 {
-                    if (!this.SendToLocalSemaphore.WaitOne(100))
+                    if (!this.SendToLocalSemaphore.WaitOne(this.DelayBeforeDiscardingMs))
                     {
                         continue;
                     }
                 }
 
-                this.captureSocket.SendTo(packet.GetUnderlyingArray(), packet.Offset, packet.Length, SocketFlags.None, this.localEndPoint);
+                if (this.forLocal.TryTake(out var packet))
+                {
+                    this.logger.WriteInfo($"Passed 1 packet of {packet.Length} bytes to local");
+                    this.captureSocket.SendTo(packet.GetUnderlyingArray(), packet.Offset, packet.Length, SocketFlags.None, this.localEndPoint);
+                }
             }
+        }
+
+        public void ReversePacketsForLocal()
+        {
+            Stack<ByteSpan> buffer = new Stack<ByteSpan>();
+            while (this.forLocal.TryTake(out var pkt)) buffer.Push(pkt);
+            while (buffer.Count > 0) this.forLocal.Add(buffer.Pop());
         }
     }
 }
