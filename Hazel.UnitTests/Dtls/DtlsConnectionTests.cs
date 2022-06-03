@@ -333,19 +333,18 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             using (DtlsUnityConnection connection = new DtlsUnityConnection(new TestLogger("Client "), captureEndPoint))
             {
                 Semaphore listenerToConnectionThrottle = new Semaphore(0, int.MaxValue);
-                capture.DelayBeforeDiscardingMs = -1;
                 capture.SendToLocalSemaphore = listenerToConnectionThrottle;
                 Thread throttleThread = new Thread(() => {
                     // HelloVerifyRequest
-                    while (capture.RemoteToLocalCount == 0) Thread.Sleep(10);
-                    Assert.AreEqual(1, capture.RemoteToLocalCount);
+                    while (capture.PacketsForLocalCount == 0) Thread.Sleep(10);
+                    Assert.AreEqual(1, capture.PacketsForLocalCount);
                     listenerToConnectionThrottle.Release(1);
 
                     // ServerHello, Server Certificate (Fragment)
                     // Server Cert
                     // ServerKeyExchange, ServerHelloDone
-                    while (capture.RemoteToLocalCount < 3) Thread.Sleep(10);
-                    Assert.AreEqual(3, capture.RemoteToLocalCount);
+                    while (capture.PacketsForLocalCount < 3) Thread.Sleep(10);
+                    Assert.AreEqual(3, capture.PacketsForLocalCount);
                     capture.ReversePacketsForLocal();
                     listenerToConnectionThrottle.Release(3);
 
@@ -401,7 +400,9 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
             Semaphore signal = new Semaphore(0, int.MaxValue);
 
-            using (SocketCapture capture = new SocketCapture(captureEndPoint, listenerEndPoint))
+            var logger = new TestLogger("Throttle");
+
+            using (SocketCapture capture = new SocketCapture(captureEndPoint, listenerEndPoint, logger))
             using (DtlsConnectionListener listener = new DtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, listenerEndPoint.Port), new TestLogger("Server")))
             using (DtlsUnityConnection connection = new DtlsUnityConnection(new TestLogger("Client "), captureEndPoint))
             {
@@ -409,24 +410,26 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 capture.SendToLocalSemaphore = listenerToConnectionThrottle;
                 Thread throttleThread = new Thread(() => {
                     // Trigger resend of HelloVerifyRequest
+                    capture.DiscardPacketForLocal();
                     Thread.Sleep(1000);
-                    listenerToConnectionThrottle.Release(1);
+                    listenerToConnectionThrottle.Release(capture.PacketsForLocalCount); // We don't know how many resends we'll get, flush them all.
 
                     // ServerHello, Server Certificate
                     listenerToConnectionThrottle.Release(1);
 
-                    // ServerHello, ServerCertificate
-                    
+                    // ServerHello, ServerCertificate                    
                     listenerToConnectionThrottle.Release(1);
 
                     // ServerKeyExchange, ServerHelloDone
                     listenerToConnectionThrottle.Release(1);
 
                     // Trigger a resend of ServerKeyExchange, ServerHelloDone
+                    capture.DiscardPacketForLocal();
                     Thread.Sleep(1000);
-                    listenerToConnectionThrottle.Release(1);
-
+                    
+                    // From here, flush everything. We recover or not.
                     capture.SendToLocalSemaphore = null;
+                    listenerToConnectionThrottle.Release(1);
                 });
                 throttleThread.Start();
 
@@ -489,17 +492,18 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                     listenerToConnectionThrottle.Release(1);
 
                     // Trigger a resend of ServerHello, ServerCertificate
+                    capture.DiscardPacketForLocal();
                     Thread.Sleep(1000);
-                    listenerToConnectionThrottle.Release(1);
+                    listenerToConnectionThrottle.Release(capture.PacketsForLocalCount);
 
                     // ServerKeyExchange, ServerHelloDone
                     listenerToConnectionThrottle.Release(1);
 
                     // Trigger a resend of ServerKeyExchange, ServerHelloDone
                     Thread.Sleep(1000);
-                    listenerToConnectionThrottle.Release(1);
 
                     capture.SendToLocalSemaphore = null;
+                    listenerToConnectionThrottle.Release(1);
                 });
                 throttleThread.Start();
 

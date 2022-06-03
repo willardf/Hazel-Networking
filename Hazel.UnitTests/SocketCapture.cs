@@ -16,8 +16,6 @@ namespace Hazel.UnitTests
     /// </summary>
     public class SocketCapture : IDisposable
     {
-        public int DelayBeforeDiscardingMs = 100;
-
         private IPEndPoint localEndPoint;
         private readonly IPEndPoint remoteEndPoint;
 
@@ -32,8 +30,8 @@ namespace Hazel.UnitTests
         private readonly BlockingCollection<ByteSpan> forLocal = new BlockingCollection<ByteSpan>();
         private readonly BlockingCollection<ByteSpan> forRemote = new BlockingCollection<ByteSpan>();
 
-        public int RemoteToLocalCount => this.forLocal.Count;
-        public int LocalToRemoteCount => this.forRemote.Count;
+        public int PacketsForLocalCount => this.forLocal.Count;
+        public int PacketsForRemoteCount => this.forRemote.Count;
 
         public Semaphore SendToLocalSemaphore = null;
         public Semaphore SendToRemoteSemaphore = null;
@@ -140,7 +138,7 @@ namespace Hazel.UnitTests
             {
                 if (this.SendToRemoteSemaphore != null)
                 {
-                    if (!this.SendToRemoteSemaphore.WaitOne(this.DelayBeforeDiscardingMs))
+                    if (!this.SendToRemoteSemaphore.WaitOne(100))
                     {
                         continue;
                     }
@@ -158,10 +156,9 @@ namespace Hazel.UnitTests
         {
             while (!this.cancellationToken.IsCancellationRequested)
             {
-
                 if (this.SendToLocalSemaphore != null)
                 {
-                    if (!this.SendToLocalSemaphore.WaitOne(this.DelayBeforeDiscardingMs))
+                    if (!this.SendToLocalSemaphore.WaitOne(100))
                     {
                         continue;
                     }
@@ -173,6 +170,16 @@ namespace Hazel.UnitTests
                     this.captureSocket.SendTo(packet.GetUnderlyingArray(), packet.Offset, packet.Length, SocketFlags.None, this.localEndPoint);
                 }
             }
+        }
+
+        public void DiscardPacketForLocal()
+        {
+            this.forLocal.Take();
+        }
+
+        public void DiscardPacketForRemote()
+        {
+            this.forRemote.Take();
         }
 
         public void ReversePacketsForLocal()
