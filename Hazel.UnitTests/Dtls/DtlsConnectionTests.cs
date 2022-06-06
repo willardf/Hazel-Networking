@@ -336,13 +336,13 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 capture.SendToLocalSemaphore = listenerToConnectionThrottle;
                 Thread throttleThread = new Thread(() => {
                     // HelloVerifyRequest
-                    capture.AssertPacketsToLocal(1);
+                    capture.AssertPacketsToLocalCountEquals(1);
                     listenerToConnectionThrottle.Release(1);
 
                     // ServerHello, Server Certificate (Fragment)
                     // Server Cert
                     // ServerKeyExchange, ServerHelloDone
-                    capture.AssertPacketsToLocal(3);
+                    capture.AssertPacketsToLocalCountEquals(3);
                     capture.ReorderPacketsForLocal(list => list.Swap(0, 1));
                     listenerToConnectionThrottle.Release(3);
 
@@ -410,13 +410,13 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                     // Trigger resend of HelloVerifyRequest
                     capture.DiscardPacketForLocal();
 
-                    capture.AssertPacketsToLocal(1);
+                    capture.AssertPacketsToLocalCountEquals(1);
                     listenerToConnectionThrottle.Release(1);
 
                     // ServerHello, ServerCertificate
                     // ServerCertificate
                     // ServerKeyExchange, ServerHelloDone
-                    capture.AssertPacketsToLocal(3);
+                    capture.AssertPacketsToLocalCountEquals(3);
                     listenerToConnectionThrottle.Release(3);
 
                     // Trigger a resend of ServerKeyExchange, ServerHelloDone
@@ -481,18 +481,18 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 capture.SendToLocalSemaphore = listenerToConnectionThrottle;
                 Thread throttleThread = new Thread(() => {
                     // HelloVerifyRequest
-                    capture.AssertPacketsToLocal(1);
+                    capture.AssertPacketsToLocalCountEquals(1);
                     listenerToConnectionThrottle.Release(1);
 
                     // ServerHello, Server Certificate
                     // Server Certificate
                     // ServerKeyExchange, ServerHelloDone
-                    capture.AssertPacketsToLocal(3);
+                    capture.AssertPacketsToLocalCountEquals(3);
                     capture.DiscardPacketForLocal();
                     listenerToConnectionThrottle.Release(2);
 
                     // Wait for the resends and recover
-                    capture.AssertPacketsToLocal(3);
+                    capture.AssertPacketsToLocalCountEquals(3);
 
                     capture.SendToLocalSemaphore = null;
                     listenerToConnectionThrottle.Release(3);

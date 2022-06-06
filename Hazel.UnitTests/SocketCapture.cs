@@ -32,12 +32,12 @@ namespace Hazel.UnitTests
         private readonly BlockingCollection<ByteSpan> forRemote = new BlockingCollection<ByteSpan>();
 
         /// <summary>
-        /// Useful for debug logging, prefer <see cref="AssertPacketsToLocal(int)"/> for assertions
+        /// Useful for debug logging, prefer <see cref="AssertPacketsToLocalCountEquals(int)"/> for assertions
         /// </summary>
         public int PacketsForLocalCount => this.forLocal.Count;
 
         /// <summary>
-        /// Useful for debug logging, prefer <see cref="AssertPacketsToRemote(int)"/> for assertions
+        /// Useful for debug logging, prefer <see cref="AssertPacketsToRemoteCountEquals(int)"/> for assertions
         /// </summary>
         public int PacketsForRemoteCount => this.forRemote.Count;
 
@@ -180,7 +180,7 @@ namespace Hazel.UnitTests
             }
         }
 
-        public void AssertPacketsToLocal(int pktCnt)
+        public void AssertPacketsToLocalCountEquals(int pktCnt)
         {
             DateTime start = DateTime.UtcNow;
             while (this.forLocal.Count != pktCnt)
@@ -194,7 +194,7 @@ namespace Hazel.UnitTests
             }
         }
 
-        public void AssertPacketsToRemote(int pktCnt)
+        public void AssertPacketsToRemoteCountEquals(int pktCnt)
         {
             DateTime start = DateTime.UtcNow;
             while (this.forRemote.Count != pktCnt)
