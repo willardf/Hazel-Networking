@@ -18,7 +18,9 @@ namespace Hazel.Dtls
     public class DtlsConnectionListener : ThreadLimitedUdpConnectionListener
     {
         private const int MaxCertFragmentSizeV0 = 1200;
-        private const int MaxCertFragmentSizeV1 = 550; // Rounded down from 576, min MTU.
+
+        // Min MTU - UDP+IP header - 1 (for good measure. :))
+        private const int MaxCertFragmentSizeV1 = 576 - 32 - 1;
 
         /// <summary>
         /// Current state of handshake sequence
@@ -247,7 +249,6 @@ namespace Hazel.Dtls
             this.certificatePrivateKey?.Dispose();
             this.certificatePrivateKey = privateKey;
 
-            // Pre-fragment the certificate data
             this.encodedCertificate = Certificate.Encode(certificate);
         }
 
@@ -963,8 +964,8 @@ namespace Hazel.Dtls
             //  * Certificate header
 
             var certificateData = this.encodedCertificate;
-            const int InitialCertPadding = Record.Size + Handshake.Size + ServerHello.MinSize + Handshake.Size;
-            int certInitialFragmentSize = Math.Min(certificateData.Length, maxCertFragmentSize - InitialCertPadding);
+            int initialCertPadding = Record.Size + Handshake.Size + serverHello.Size + Handshake.Size;
+            int certInitialFragmentSize = Math.Min(certificateData.Length, maxCertFragmentSize - initialCertPadding);
 
             Handshake certificateHandshake = new Handshake();
             certificateHandshake.MessageType = HandshakeType.Certificate;
@@ -974,7 +975,7 @@ namespace Hazel.Dtls
             certificateHandshake.FragmentLength = (uint)certInitialFragmentSize;
 
             int initialRecordPayloadSize = 0
-                + Handshake.Size + ServerHello.MinSize
+                + Handshake.Size + serverHello.Size
                 + Handshake.Size + (int)certificateHandshake.FragmentLength
                 ;
             Record initialRecord = new Record();
