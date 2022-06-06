@@ -336,16 +336,14 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 capture.SendToLocalSemaphore = listenerToConnectionThrottle;
                 Thread throttleThread = new Thread(() => {
                     // HelloVerifyRequest
-                    while (capture.PacketsForLocalCount == 0) Thread.Sleep(10);
-                    Assert.AreEqual(1, capture.PacketsForLocalCount);
+                    capture.AssertPacketsToLocal(1);
                     listenerToConnectionThrottle.Release(1);
 
                     // ServerHello, Server Certificate (Fragment)
                     // Server Cert
                     // ServerKeyExchange, ServerHelloDone
-                    while (capture.PacketsForLocalCount < 3) Thread.Sleep(10);
-                    Assert.AreEqual(3, capture.PacketsForLocalCount);
-                    capture.ReversePacketsForLocal();
+                    capture.AssertPacketsToLocal(3);
+                    capture.ReorderPacketsForLocal(list => list.Swap(0, 1));
                     listenerToConnectionThrottle.Release(3);
 
                     // From here, either we recover or we don't.
@@ -411,21 +409,18 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 Thread throttleThread = new Thread(() => {
                     // Trigger resend of HelloVerifyRequest
                     capture.DiscardPacketForLocal();
-                    Thread.Sleep(1000);
-                    listenerToConnectionThrottle.Release(capture.PacketsForLocalCount); // We don't know how many resends we'll get, flush them all.
 
-                    // ServerHello, Server Certificate
+                    capture.AssertPacketsToLocal(1);
                     listenerToConnectionThrottle.Release(1);
 
-                    // ServerHello, ServerCertificate                    
-                    listenerToConnectionThrottle.Release(1);
-
+                    // ServerHello, ServerCertificate
+                    // ServerCertificate
                     // ServerKeyExchange, ServerHelloDone
-                    listenerToConnectionThrottle.Release(1);
+                    capture.AssertPacketsToLocal(3);
+                    listenerToConnectionThrottle.Release(3);
 
                     // Trigger a resend of ServerKeyExchange, ServerHelloDone
                     capture.DiscardPacketForLocal();
-                    Thread.Sleep(1000);
                     
                     // From here, flush everything. We recover or not.
                     capture.SendToLocalSemaphore = null;
@@ -467,7 +462,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         }
 
         [TestMethod]
-        public void TestResentHandshakeConnects()
+        public void TestResentServerHelloConnects()
         {
             IPEndPoint captureEndPoint = new IPEndPoint(IPAddress.Loopback, 27511);
             IPEndPoint listenerEndPoint = new IPEndPoint(IPAddress.Loopback, 27510);
@@ -486,24 +481,21 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 capture.SendToLocalSemaphore = listenerToConnectionThrottle;
                 Thread throttleThread = new Thread(() => {
                     // HelloVerifyRequest
+                    capture.AssertPacketsToLocal(1);
                     listenerToConnectionThrottle.Release(1);
 
                     // ServerHello, Server Certificate
-                    listenerToConnectionThrottle.Release(1);
-
-                    // Trigger a resend of ServerHello, ServerCertificate
-                    capture.DiscardPacketForLocal();
-                    Thread.Sleep(1000);
-                    listenerToConnectionThrottle.Release(capture.PacketsForLocalCount);
-
+                    // Server Certificate
                     // ServerKeyExchange, ServerHelloDone
-                    listenerToConnectionThrottle.Release(1);
+                    capture.AssertPacketsToLocal(3);
+                    capture.DiscardPacketForLocal();
+                    listenerToConnectionThrottle.Release(2);
 
-                    // Trigger a resend of ServerKeyExchange, ServerHelloDone
-                    Thread.Sleep(1000);
+                    // Wait for the resends and recover
+                    capture.AssertPacketsToLocal(3);
 
                     capture.SendToLocalSemaphore = null;
-                    listenerToConnectionThrottle.Release(1);
+                    listenerToConnectionThrottle.Release(3);
                 });
                 throttleThread.Start();
 

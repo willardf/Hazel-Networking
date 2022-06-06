@@ -4,6 +4,13 @@ namespace Hazel
 {
     public static class Extensions
     {
+        public static void Swap<T>(this IList<T> self, int idx0, int idx1)
+        {
+            var temp = self[idx0];
+            self[idx0] = self[idx1];
+            self[idx1] = temp;
+        }
+
         public static int ClampToInt(this float value, int min, int max)
         {
             int output = (int)value;

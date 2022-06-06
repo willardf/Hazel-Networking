@@ -1,3 +1,4 @@
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
@@ -30,7 +31,14 @@ namespace Hazel.UnitTests
         private readonly BlockingCollection<ByteSpan> forLocal = new BlockingCollection<ByteSpan>();
         private readonly BlockingCollection<ByteSpan> forRemote = new BlockingCollection<ByteSpan>();
 
+        /// <summary>
+        /// Useful for debug logging, prefer <see cref="AssertPacketsToLocal(int)"/> for assertions
+        /// </summary>
         public int PacketsForLocalCount => this.forLocal.Count;
+
+        /// <summary>
+        /// Useful for debug logging, prefer <see cref="AssertPacketsToRemote(int)"/> for assertions
+        /// </summary>
         public int PacketsForRemoteCount => this.forRemote.Count;
 
         public Semaphore SendToLocalSemaphore = null;
@@ -172,21 +180,59 @@ namespace Hazel.UnitTests
             }
         }
 
-        public void DiscardPacketForLocal()
+        public void AssertPacketsToLocal(int pktCnt)
         {
-            this.forLocal.Take();
+            DateTime start = DateTime.UtcNow;
+            while (this.forLocal.Count != pktCnt)
+            {
+                if ((DateTime.UtcNow - start).TotalSeconds >= 5)
+                {
+                    Assert.AreEqual(pktCnt, this.forLocal.Count);
+                }
+
+                Thread.Yield();
+            }
         }
 
-        public void DiscardPacketForRemote()
+        public void AssertPacketsToRemote(int pktCnt)
         {
-            this.forRemote.Take();
+            DateTime start = DateTime.UtcNow;
+            while (this.forRemote.Count != pktCnt)
+            {
+                if ((DateTime.UtcNow - start).TotalSeconds >= 5)
+                {
+                    Assert.AreEqual(pktCnt, this.forRemote.Count);
+                }
+
+                Thread.Yield();
+            }
         }
 
-        public void ReversePacketsForLocal()
+        public void DiscardPacketForLocal(int numToDiscard = 1)
         {
-            Stack<ByteSpan> buffer = new Stack<ByteSpan>();
-            while (this.forLocal.TryTake(out var pkt)) buffer.Push(pkt);
-            while (buffer.Count > 0) this.forLocal.Add(buffer.Pop());
+            for (int i = 0; i < numToDiscard; ++i)
+            {
+                this.forLocal.Take();
+            }
+        }
+
+        public void DiscardPacketForRemote(int numToDiscard = 1)
+        {
+            for (int i = 0; i < numToDiscard; ++i)
+            {
+                this.forRemote.Take();
+            }
+        }
+
+        public void ReorderPacketsForLocal(Action<List<ByteSpan>> reorderCallback)
+        {
+            List<ByteSpan> buffer = new List<ByteSpan>();
+            while (this.forLocal.TryTake(out var pkt)) buffer.Add(pkt);
+            reorderCallback(buffer);
+            foreach (var item in buffer)
+            {
+                this.forLocal.Add(item);
+            }
         }
     }
 }
