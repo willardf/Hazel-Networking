@@ -1,5 +1,8 @@
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using System.Collections;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -23,8 +26,20 @@ namespace Hazel.UnitTests
         private Thread forLocalThread;
         private Thread forRemoteThread;
 
+        private ILogger logger;
+
         private readonly BlockingCollection<ByteSpan> forLocal = new BlockingCollection<ByteSpan>();
         private readonly BlockingCollection<ByteSpan> forRemote = new BlockingCollection<ByteSpan>();
+
+        /// <summary>
+        /// Useful for debug logging, prefer <see cref="AssertPacketsToLocalCountEquals(int)"/> for assertions
+        /// </summary>
+        public int PacketsForLocalCount => this.forLocal.Count;
+
+        /// <summary>
+        /// Useful for debug logging, prefer <see cref="AssertPacketsToRemoteCountEquals(int)"/> for assertions
+        /// </summary>
+        public int PacketsForRemoteCount => this.forRemote.Count;
 
         public Semaphore SendToLocalSemaphore = null;
         public Semaphore SendToRemoteSemaphore = null;
@@ -32,8 +47,9 @@ namespace Hazel.UnitTests
         private CancellationTokenSource cancellationSource = new CancellationTokenSource();
         private readonly CancellationToken cancellationToken;
 
-        public SocketCapture(IPEndPoint captureEndpoint, IPEndPoint remoteEndPoint)
+        public SocketCapture(IPEndPoint captureEndpoint, IPEndPoint remoteEndPoint, ILogger logger = null)
         {
+            this.logger = logger ?? new NullLogger();
             this.cancellationToken = this.cancellationSource.Token;
 
             this.remoteEndPoint = remoteEndPoint;
@@ -126,13 +142,8 @@ namespace Hazel.UnitTests
 
         private void SendToRemoteLoop()
         {
-            foreach (ByteSpan packet in this.forRemote.GetConsumingEnumerable())
+            while (!this.cancellationToken.IsCancellationRequested)
             {
-                if (this.cancellationToken.IsCancellationRequested)
-                {
-                    break;
-                }
-
                 if (this.SendToRemoteSemaphore != null)
                 {
                     if (!this.SendToRemoteSemaphore.WaitOne(100))
@@ -141,19 +152,18 @@ namespace Hazel.UnitTests
                     }
                 }
 
-                this.captureSocket.SendTo(packet.GetUnderlyingArray(), packet.Offset, packet.Length, SocketFlags.None, this.remoteEndPoint);
+                if (this.forRemote.TryTake(out var packet))
+                {
+                    this.logger.WriteInfo($"Passed 1 packet of {packet.Length} bytes to remote");
+                    this.captureSocket.SendTo(packet.GetUnderlyingArray(), packet.Offset, packet.Length, SocketFlags.None, this.remoteEndPoint);
+                }
             }
         }
 
         private void SendToLocalLoop()
         {
-            foreach (ByteSpan packet in this.forLocal.GetConsumingEnumerable())
+            while (!this.cancellationToken.IsCancellationRequested)
             {
-                if (this.cancellationToken.IsCancellationRequested)
-                {
-                    break;
-                }
-
                 if (this.SendToLocalSemaphore != null)
                 {
                     if (!this.SendToLocalSemaphore.WaitOne(100))
@@ -162,7 +172,66 @@ namespace Hazel.UnitTests
                     }
                 }
 
-                this.captureSocket.SendTo(packet.GetUnderlyingArray(), packet.Offset, packet.Length, SocketFlags.None, this.localEndPoint);
+                if (this.forLocal.TryTake(out var packet))
+                {
+                    this.logger.WriteInfo($"Passed 1 packet of {packet.Length} bytes to local");
+                    this.captureSocket.SendTo(packet.GetUnderlyingArray(), packet.Offset, packet.Length, SocketFlags.None, this.localEndPoint);
+                }
+            }
+        }
+
+        public void AssertPacketsToLocalCountEquals(int pktCnt)
+        {
+            DateTime start = DateTime.UtcNow;
+            while (this.forLocal.Count != pktCnt)
+            {
+                if ((DateTime.UtcNow - start).TotalSeconds >= 5)
+                {
+                    Assert.AreEqual(pktCnt, this.forLocal.Count);
+                }
+
+                Thread.Yield();
+            }
+        }
+
+        public void AssertPacketsToRemoteCountEquals(int pktCnt)
+        {
+            DateTime start = DateTime.UtcNow;
+            while (this.forRemote.Count != pktCnt)
+            {
+                if ((DateTime.UtcNow - start).TotalSeconds >= 5)
+                {
+                    Assert.AreEqual(pktCnt, this.forRemote.Count);
+                }
+
+                Thread.Yield();
+            }
+        }
+
+        public void DiscardPacketForLocal(int numToDiscard = 1)
+        {
+            for (int i = 0; i < numToDiscard; ++i)
+            {
+                this.forLocal.Take();
+            }
+        }
+
+        public void DiscardPacketForRemote(int numToDiscard = 1)
+        {
+            for (int i = 0; i < numToDiscard; ++i)
+            {
+                this.forRemote.Take();
+            }
+        }
+
+        public void ReorderPacketsForLocal(Action<List<ByteSpan>> reorderCallback)
+        {
+            List<ByteSpan> buffer = new List<ByteSpan>();
+            while (this.forLocal.TryTake(out var pkt)) buffer.Add(pkt);
+            reorderCallback(buffer);
+            foreach (var item in buffer)
+            {
+                this.forLocal.Add(item);
             }
         }
     }

@@ -91,6 +91,8 @@ namespace Hazel.Dtls
             public Action AckCallback;
         }
 
+        internal byte HazelSessionVersion = HazelDtlsSessionInfo.CurrentClientSessionVersion;
+
         private readonly object syncRoot = new object();
         private readonly RandomNumberGenerator random = RandomNumberGenerator.Create();
 
@@ -929,6 +931,7 @@ namespace Hazel.Dtls
             ClientHello clientHello = new ClientHello();
             clientHello.Random = this.nextEpoch.ClientRandom;
             clientHello.Cookie = this.nextEpoch.Cookie;
+            clientHello.Session = new HazelDtlsSessionInfo(this.HazelSessionVersion);
             clientHello.CipherSuites = new byte[2];
             clientHello.CipherSuites.WriteBigEndian16((ushort)CipherSuite.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256);
             clientHello.SupportedCurves = new byte[2];

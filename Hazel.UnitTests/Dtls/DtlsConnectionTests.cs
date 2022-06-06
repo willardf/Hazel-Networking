@@ -313,6 +313,79 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             }
         }
 
+
+        [TestMethod]
+        public void TestReorderedCertFragmentsConnects()
+        {
+            IPEndPoint captureEndPoint = new IPEndPoint(IPAddress.Loopback, 27511);
+            IPEndPoint listenerEndPoint = new IPEndPoint(IPAddress.Loopback, 27510);
+
+            bool serverConnected = false;
+            bool serverDisconnected = false;
+            bool clientDisconnected = false;
+
+            Semaphore signal = new Semaphore(0, int.MaxValue);
+
+            var logger = new TestLogger("Throttle");
+
+            using (SocketCapture capture = new SocketCapture(captureEndPoint, listenerEndPoint, logger))
+            using (DtlsConnectionListener listener = new DtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, listenerEndPoint.Port), new TestLogger("Server")))
+            using (DtlsUnityConnection connection = new DtlsUnityConnection(new TestLogger("Client "), captureEndPoint))
+            {
+                Semaphore listenerToConnectionThrottle = new Semaphore(0, int.MaxValue);
+                capture.SendToLocalSemaphore = listenerToConnectionThrottle;
+                Thread throttleThread = new Thread(() => {
+                    // HelloVerifyRequest
+                    capture.AssertPacketsToLocalCountEquals(1);
+                    listenerToConnectionThrottle.Release(1);
+
+                    // ServerHello, Server Certificate (Fragment)
+                    // Server Cert
+                    // ServerKeyExchange, ServerHelloDone
+                    capture.AssertPacketsToLocalCountEquals(3);
+                    capture.ReorderPacketsForLocal(list => list.Swap(0, 1));
+                    listenerToConnectionThrottle.Release(3);
+
+                    // From here, either we recover or we don't.
+                    capture.SendToLocalSemaphore = null;
+                    listenerToConnectionThrottle.Release(int.MaxValue);
+                });
+                throttleThread.Start();
+
+                listener.SetCertificate(GetCertificateForServer());
+                connection.SetValidServerCertificates(GetCertificateForClient());
+
+                listener.NewConnection += (evt) =>
+                {
+                    serverConnected = true;
+                    signal.Release();
+                    evt.Connection.Disconnected += (o, et) => {
+                        serverDisconnected = true;
+                    };
+                };
+                connection.Disconnected += (o, evt) => {
+                    clientDisconnected = true;
+                    signal.Release();
+                };
+
+                listener.Start();
+                connection.Connect();
+
+                // wait for the client to connect
+                signal.WaitOne(10);
+
+                listener.Dispose();
+
+                // wait for the client to disconnect
+                signal.WaitOne(100);
+
+                Assert.IsTrue(serverConnected);
+                Assert.IsTrue(clientDisconnected);
+                Assert.IsFalse(serverDisconnected);
+            }
+        }
+
+
         [TestMethod]
         public void TestResentClientHelloConnects()
         {
@@ -325,7 +398,9 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
             Semaphore signal = new Semaphore(0, int.MaxValue);
 
-            using (SocketCapture capture = new SocketCapture(captureEndPoint, listenerEndPoint))
+            var logger = new TestLogger("Throttle");
+
+            using (SocketCapture capture = new SocketCapture(captureEndPoint, listenerEndPoint, logger))
             using (DtlsConnectionListener listener = new DtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, listenerEndPoint.Port), new TestLogger("Server")))
             using (DtlsUnityConnection connection = new DtlsUnityConnection(new TestLogger("Client "), captureEndPoint))
             {
@@ -333,24 +408,23 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 capture.SendToLocalSemaphore = listenerToConnectionThrottle;
                 Thread throttleThread = new Thread(() => {
                     // Trigger resend of HelloVerifyRequest
-                    Thread.Sleep(1000);
-                    listenerToConnectionThrottle.Release(1);
+                    capture.DiscardPacketForLocal();
 
-                    // ServerHello, Server Certificate
+                    capture.AssertPacketsToLocalCountEquals(1);
                     listenerToConnectionThrottle.Release(1);
 
                     // ServerHello, ServerCertificate
-                    
-                    listenerToConnectionThrottle.Release(1);
-
+                    // ServerCertificate
                     // ServerKeyExchange, ServerHelloDone
-                    listenerToConnectionThrottle.Release(1);
+                    capture.AssertPacketsToLocalCountEquals(3);
+                    listenerToConnectionThrottle.Release(3);
 
                     // Trigger a resend of ServerKeyExchange, ServerHelloDone
-                    Thread.Sleep(1000);
-                    listenerToConnectionThrottle.Release(1);
-
+                    capture.DiscardPacketForLocal();
+                    
+                    // From here, flush everything. We recover or not.
                     capture.SendToLocalSemaphore = null;
+                    listenerToConnectionThrottle.Release(1);
                 });
                 throttleThread.Start();
 
@@ -388,7 +462,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         }
 
         [TestMethod]
-        public void TestResentHandshakeConnects()
+        public void TestResentServerHelloConnects()
         {
             IPEndPoint captureEndPoint = new IPEndPoint(IPAddress.Loopback, 27511);
             IPEndPoint listenerEndPoint = new IPEndPoint(IPAddress.Loopback, 27510);
@@ -407,23 +481,21 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 capture.SendToLocalSemaphore = listenerToConnectionThrottle;
                 Thread throttleThread = new Thread(() => {
                     // HelloVerifyRequest
+                    capture.AssertPacketsToLocalCountEquals(1);
                     listenerToConnectionThrottle.Release(1);
 
                     // ServerHello, Server Certificate
-                    listenerToConnectionThrottle.Release(1);
-
-                    // Trigger a resend of ServerHello, ServerCertificate
-                    Thread.Sleep(1000);
-                    listenerToConnectionThrottle.Release(1);
-
+                    // Server Certificate
                     // ServerKeyExchange, ServerHelloDone
-                    listenerToConnectionThrottle.Release(1);
+                    capture.AssertPacketsToLocalCountEquals(3);
+                    capture.DiscardPacketForLocal();
+                    listenerToConnectionThrottle.Release(2);
 
-                    // Trigger a resend of ServerKeyExchange, ServerHelloDone
-                    Thread.Sleep(1000);
-                    listenerToConnectionThrottle.Release(1);
+                    // Wait for the resends and recover
+                    capture.AssertPacketsToLocalCountEquals(3);
 
                     capture.SendToLocalSemaphore = null;
+                    listenerToConnectionThrottle.Release(3);
                 });
                 throttleThread.Start();
 
@@ -719,6 +791,21 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
             using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
+                listener.Start();
+
+                connection.Connect();
+
+                Assert.AreEqual(ConnectionState.Connected, connection.State);
+            }
+        }
+
+        [TestMethod]
+        public void DtlsSessionV0ConnectionTest()
+        {
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (DtlsUnityConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
+            {
+                connection.HazelSessionVersion = 0;
                 listener.Start();
 
                 connection.Connect();

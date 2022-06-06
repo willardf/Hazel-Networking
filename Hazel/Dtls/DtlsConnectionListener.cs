@@ -17,7 +17,10 @@ namespace Hazel.Dtls
     /// <inheritdoc />
     public class DtlsConnectionListener : ThreadLimitedUdpConnectionListener
     {
-        private const int MaxCertFragmentSize = 550; // Rounded down from 576, min MTU.
+        private const int MaxCertFragmentSizeV0 = 1200;
+
+        // Min MTU - UDP+IP header - 1 (for good measure. :))
+        private const int MaxCertFragmentSizeV1 = 576 - 32 - 1;
 
         /// <summary>
         /// Current state of handshake sequence
@@ -83,6 +86,8 @@ namespace Hazel.Dtls
         {
             public ushort Epoch;
             public bool CanHandleApplicationData;
+
+            public HazelDtlsSessionInfo Session;
 
             public CurrentEpoch CurrentEpoch;
             public NextEpoch  NextEpoch;
@@ -155,8 +160,7 @@ namespace Hazel.Dtls
         private RandomNumberGenerator random;
 
         // Private key component of certificate's public key
-        private readonly List<ByteSpan> encodedCertificates = new List<ByteSpan>();
-        private uint encodedCertificatesTotalSize;
+        private ByteSpan encodedCertificate;
         private RSA certificatePrivateKey;
 
         // HMAC key to validate ClientHello cookie
@@ -245,28 +249,7 @@ namespace Hazel.Dtls
             this.certificatePrivateKey?.Dispose();
             this.certificatePrivateKey = privateKey;
 
-            // Pre-fragment the certificate data
-            ByteSpan certificateData = Certificate.Encode(certificate);
-            this.encodedCertificatesTotalSize = (uint)certificateData.Length;
-
-            // The first certificate data needs to leave room for
-            //  * Record header
-            //  * ServerHello header
-            //  * ServerHello payload
-            //  * Certificate header
-            int padding = Record.Size + Handshake.Size + ServerHello.Size + Handshake.Size;
-            this.encodedCertificates.Add(certificateData.Slice(0, Math.Min(certificateData.Length, MaxCertFragmentSize - padding)));
-            certificateData = certificateData.Slice(Math.Min(certificateData.Length, MaxCertFragmentSize - padding));
-
-            // Subsequent certificate data needs to leave room for
-            //  * Record header
-            //  * Certificate header
-            padding = Record.Size + Handshake.Size;
-            while (certificateData.Length > 0)
-            {
-                this.encodedCertificates.Add(certificateData.Slice(0, Math.Min(certificateData.Length, MaxCertFragmentSize - padding)));
-                certificateData = certificateData.Slice(Math.Min(certificateData.Length, MaxCertFragmentSize - padding));
-            }
+            this.encodedCertificate = Certificate.Encode(certificate);
         }
 
         /// <summary>
@@ -909,6 +892,8 @@ namespace Hazel.Dtls
                         return false;
                 }
 
+                peer.Session = clientHello.Session;
+
                 // Update the state of our epoch transition
                 peer.NextEpoch.Epoch = (ushort)(record.Epoch + 1);
                 peer.NextEpoch.State = HandshakeState.ExpectingClientKeyExchange;
@@ -965,20 +950,32 @@ namespace Hazel.Dtls
 
             Handshake serverHelloHandshake = new Handshake();
             serverHelloHandshake.MessageType = HandshakeType.ServerHello;
-            serverHelloHandshake.Length = ServerHello.Size;
+            serverHelloHandshake.Length = ServerHello.MinSize;
             serverHelloHandshake.MessageSequence = 1;
             serverHelloHandshake.FragmentOffset = 0;
             serverHelloHandshake.FragmentLength = serverHelloHandshake.Length;
 
+            int maxCertFragmentSize = peer.Session.Version == 0 ? MaxCertFragmentSizeV0 : MaxCertFragmentSizeV1;
+
+            // The first certificate data needs to leave room for
+            //  * Record header
+            //  * ServerHello header
+            //  * ServerHello payload
+            //  * Certificate header
+
+            var certificateData = this.encodedCertificate;
+            int initialCertPadding = Record.Size + Handshake.Size + serverHello.Size + Handshake.Size;
+            int certInitialFragmentSize = Math.Min(certificateData.Length, maxCertFragmentSize - initialCertPadding);
+
             Handshake certificateHandshake = new Handshake();
             certificateHandshake.MessageType = HandshakeType.Certificate;
-            certificateHandshake.Length = this.encodedCertificatesTotalSize;
+            certificateHandshake.Length = (uint)certificateData.Length;
             certificateHandshake.MessageSequence = 2;
             certificateHandshake.FragmentOffset = 0;
-            certificateHandshake.FragmentLength = (uint)this.encodedCertificates[0].Length;
+            certificateHandshake.FragmentLength = (uint)certInitialFragmentSize;
 
             int initialRecordPayloadSize = 0
-                + Handshake.Size + ServerHello.Size
+                + Handshake.Size + serverHello.Size
                 + Handshake.Size + (int)certificateHandshake.FragmentLength
                 ;
             Record initialRecord = new Record();
@@ -997,10 +994,11 @@ namespace Hazel.Dtls
             serverHelloHandshake.Encode(writer);
             writer = writer.Slice(Handshake.Size);
             serverHello.Encode(writer);
-            writer = writer.Slice(ServerHello.Size);
+            writer = writer.Slice(ServerHello.MinSize);
             certificateHandshake.Encode(writer);
             writer = writer.Slice(Handshake.Size);
-            this.encodedCertificates[0].CopyTo(writer);
+            certificateData.Slice(0, certInitialFragmentSize).CopyTo(writer);
+            certificateData = certificateData.Slice(certInitialFragmentSize);
 
             // Protect initial record of the flight
             peer.CurrentEpoch.RecordProtection.EncryptServerPlaintext(
@@ -1017,27 +1015,30 @@ namespace Hazel.Dtls
                 Handshake fullCeritficateHandshake = certificateHandshake;
                 fullCeritficateHandshake.FragmentLength = fullCeritficateHandshake.Length;
 
-                packet = new byte[Handshake.Size + ServerHello.Size + Handshake.Size];
+                packet = new byte[Handshake.Size + ServerHello.MinSize + Handshake.Size];
                 writer = packet;
                 serverHelloHandshake.Encode(writer);
                 writer = writer.Slice(Handshake.Size);
                 serverHello.Encode(writer);
-                writer = writer.Slice(ServerHello.Size);
+                writer = writer.Slice(ServerHello.MinSize);
                 fullCeritficateHandshake.Encode(writer);
                 writer = writer.Slice(Handshake.Size);
 
                 peer.NextEpoch.VerificationStream.AddData(packet);
-                foreach (ByteSpan span in this.encodedCertificates)
-                {
-                    peer.NextEpoch.VerificationStream.AddData(span);
-                }
+                peer.NextEpoch.VerificationStream.AddData(this.encodedCertificate);
             }
 
             // Process additional certificate records
-            for (int ii = 1, nn = this.encodedCertificates.Count; ii != nn; ++ii)
+            // Subsequent certificate data needs to leave room for
+            //  * Record header
+            //  * Certificate header
+            const int CertPadding = Record.Size + Handshake.Size;
+            while (certificateData.Length > 0)
             {
+                int certFragmentSize = Math.Min(certificateData.Length, maxCertFragmentSize - CertPadding);
+
                 certificateHandshake.FragmentOffset += certificateHandshake.FragmentLength;
-                certificateHandshake.FragmentLength = (uint)this.encodedCertificates[ii].Length;
+                certificateHandshake.FragmentLength = (uint)certFragmentSize;
 
                 int additionalRecordPayloadSize = Handshake.Size + (int)certificateHandshake.FragmentLength;
                 Record additionalRecord = new Record();
@@ -1054,7 +1055,9 @@ namespace Hazel.Dtls
                 writer = writer.Slice(Record.Size);
                 certificateHandshake.Encode(writer);
                 writer = writer.Slice(Handshake.Size);
-                this.encodedCertificates[ii].CopyTo(writer);
+                certificateData.Slice(0, certFragmentSize).CopyTo(writer);
+
+                certificateData = certificateData.Slice(certFragmentSize);
 
                 // Protect record
                 peer.CurrentEpoch.RecordProtection.EncryptServerPlaintext(
