@@ -348,7 +348,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
                     // From here, either we recover or we don't.
                     capture.SendToLocalSemaphore = null;
-                    listenerToConnectionThrottle.Release(int.MaxValue);
+                    listenerToConnectionThrottle.Release(1);
                 });
                 throttleThread.Start();
 
