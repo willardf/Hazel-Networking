@@ -692,7 +692,15 @@ namespace Hazel.Dtls
                                 this.nextEpoch.CertificateFragments.Clear();
                             }
 
-                            // Add this fragment
+                            // Should we add this fragment?
+                            // According to the RFC 9147 Section 5.5, we are supposed to be tolerant of overlapping segments
+                            // But if we... weren't... Hazel isn't going to change the fragment sizes. So would it really hurt?
+                            // So let's just ignore that and assume that the sender always wants to send the same fragments.
+                            if (IsFragmentOverlapping(this.nextEpoch.CertificateFragments, handshake.FragmentOffset, handshake.FragmentLength))
+                            {
+                                continue;
+                            }
+
                             payload.CopyTo(this.nextEpoch.CertificatePayload.Slice((int)handshake.FragmentOffset, (int)handshake.FragmentLength));
                             this.nextEpoch.CertificateFragments.Add(new FragmentRange {Offset = (int)handshake.FragmentOffset, Length = (int)handshake.FragmentLength });
                             this.nextEpoch.CertificateFragments.Sort((FragmentRange lhs, FragmentRange rhs) => {
@@ -914,6 +922,28 @@ namespace Hazel.Dtls
             return true;
         }
 
+        private bool IsFragmentOverlapping(List<FragmentRange> fragments, uint newOffset, uint newLength)
+        {
+            foreach (var frag in fragments)
+            {
+                // New fragment overlaps an existing one
+                if (newOffset <= frag.Offset
+                    && frag.Offset < newOffset + newLength)
+                {
+                    return true;
+                }
+
+                // Existing fragment overlaps this new one
+                if (frag.Offset <= newOffset
+                    && newOffset < frag.Offset + frag.Length)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         /// <summary>
         /// Send (resend) a ClientHello message to the server
         /// </summary>
@@ -923,9 +953,6 @@ namespace Hazel.Dtls
             var verb = isRetransmit ? "Resending" : "Sending";
             this.logger.WriteVerbose($"{verb} ClientHello in state: {this.nextEpoch.State}. Epoch: {this.epoch} Cookie: {this.nextEpoch.Cookie} Random: {this.nextEpoch.ClientRandom}");
 #endif
-
-            // Reset our verification stream
-            this.nextEpoch.VerificationStream.Reset();
 
             // Describe our ClientHello flight
             ClientHello clientHello = new ClientHello();
@@ -962,13 +989,23 @@ namespace Hazel.Dtls
             writer = writer.Slice(Handshake.Size);
             clientHello.Encode(writer);
 
-            // Write ClientHello to the verification stream
-            this.nextEpoch.VerificationStream.AddData(
-                packet.Slice(
-                      Record.Size
-                    , Handshake.Size + (int)handshake.Length
-                )
-            );
+            // If this is our first valid attempt at contacting the server:
+            // - Reset our verification stream
+            // - Write ClientHello to the verification stream
+            // - We next expect a ServerHello
+            //
+            // ClientHello+Cookie triggers many sequential packets in response
+            // It's important to make forward progress as the packets may be reordered in-flight
+            // But with enough resends, we will read them all in an appropriate order
+            if (!isRetransmit)
+            {
+                this.nextEpoch.VerificationStream.Reset();
+                this.nextEpoch.VerificationStream.AddData(
+                    packet.Slice(Record.Size, Handshake.Size + (int)handshake.Length)
+                    );
+
+                this.nextEpoch.State = HandshakeState.ExpectingServerHello;
+            }
 
             // Protect the record
             this.currentEpoch.RecordProtection.EncryptClientPlaintext(
@@ -977,7 +1014,6 @@ namespace Hazel.Dtls
                 , ref outgoingRecord
             );
 
-            this.nextEpoch.State = HandshakeState.ExpectingServerHello;
             if (this.nextEpoch.NegotiationStartTime == DateTime.MinValue) this.nextEpoch.NegotiationStartTime = DateTime.UtcNow;
             this.nextEpoch.NextPacketResendTime = DateTime.UtcNow + this.handshakeResendTimeout;
 

@@ -315,7 +315,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
 
         [TestMethod]
-        public void TestReorderedCertFragmentsConnects()
+        public void TestReorderedHandshakePacketsConnects()
         {
             IPEndPoint captureEndPoint = new IPEndPoint(IPAddress.Loopback, 27511);
             IPEndPoint listenerEndPoint = new IPEndPoint(IPAddress.Loopback, 27510);
@@ -345,10 +345,20 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                     capture.AssertPacketsToLocalCountEquals(3);
                     capture.ReorderPacketsForLocal(list => list.Swap(0, 1));
                     listenerToConnectionThrottle.Release(3);
+                    capture.AssertPacketsToLocalCountEquals(0);
 
-                    // From here, either we recover or we don't.
+                    // Same flight, let's swap the ServerKeyExchange to the front
+                    capture.AssertPacketsToLocalCountEquals(3);
+                    capture.ReorderPacketsForLocal(list => list.Swap(0, 2));
+                    listenerToConnectionThrottle.Release(3);
+                    capture.AssertPacketsToLocalCountEquals(0);
+
+                    // Same flight, no swap we do matters as long as the ServerKeyExchange gets through.
+                    capture.AssertPacketsToLocalCountEquals(3);
+                    capture.ReorderPacketsForLocal(list => list.Reverse());
+
                     capture.SendToLocalSemaphore = null;
-                    listenerToConnectionThrottle.Release(int.MaxValue);
+                    listenerToConnectionThrottle.Release(1);
                 });
                 throttleThread.Start();
 
