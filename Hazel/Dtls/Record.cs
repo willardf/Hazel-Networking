@@ -6,6 +6,11 @@ namespace Hazel.Dtls
     public enum ProtocolVersion : ushort
     {
         /// <summary>
+        /// Use to obfuscate DTLS as regular UDP packets
+        /// </summary>
+        UDP = 0,
+
+        /// <summary>
         /// DTLS 1.2
         /// </summary>
         DTLS1_2 = 0xFEFD,
@@ -38,7 +43,7 @@ namespace Hazel.Dtls
         /// Parse a DTLS record from wire format
         /// </summary>
         /// <returns>True if we successfully parse the record header. Otherwise false</returns>
-        public static bool Parse(out Record record, ByteSpan span)
+        public static bool Parse(out Record record, ProtocolVersion? expectedProtocolVersion, ByteSpan span)
         {
             record = new Record();
 
@@ -53,7 +58,7 @@ namespace Hazel.Dtls
             record.SequenceNumber = span.ReadBigEndian48(5);
             record.Length = span.ReadBigEndian16(11);
 
-            if (version != ProtocolVersion.DTLS1_2)
+            if (expectedProtocolVersion.HasValue && version != expectedProtocolVersion.Value)
             {
                 return false;
             }
@@ -64,10 +69,10 @@ namespace Hazel.Dtls
         /// <summary>
         /// Encode a DTLS record to wire format
         /// </summary>
-        public void Encode(ByteSpan span)
+        public void Encode(ByteSpan span, ProtocolVersion protocolVersion)
         {
             span[0] = (byte)this.ContentType;
-            span.WriteBigEndian16((ushort)ProtocolVersion.DTLS1_2, 1);
+            span.WriteBigEndian16((ushort)protocolVersion, 1);
             span.WriteBigEndian16(this.Epoch, 3);
             span.WriteBigEndian48(this.SequenceNumber, 5);
             span.WriteBigEndian16(this.Length, 11);

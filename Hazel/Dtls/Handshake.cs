@@ -192,19 +192,22 @@ namespace Hazel.Dtls
         /// Parse a Handshake ClientHello payload from wire format
         /// </summary>
         /// <returns>True if we successfully decode the ClientHello message. Otherwise false</returns>
-        public static bool Parse(out ClientHello result, ByteSpan span)
+        public static bool Parse(out ClientHello result, out ProtocolVersion clientVersion, ProtocolVersion? expectedProtocolVersion, ByteSpan span)
         {
+            clientVersion = ProtocolVersion.UDP;
+
             result = new ClientHello();
             if (span.Length < MinSize)
             {
                 return false;
             }
 
-            ProtocolVersion clientVersion = (ProtocolVersion)span.ReadBigEndian16();
-            if (clientVersion != ProtocolVersion.DTLS1_2)
+            clientVersion = (ProtocolVersion)span.ReadBigEndian16();
+            if (expectedProtocolVersion.HasValue && clientVersion != expectedProtocolVersion.Value)
             {
                 return false;
             }
+
             span = span.Slice(2);
 
             result.Random = span.Slice(0, Dtls.Random.Size);
@@ -369,9 +372,9 @@ namespace Hazel.Dtls
         /// <summary>
         /// Encode Handshake ClientHello payload to wire format
         /// </summary>
-        public void Encode(ByteSpan span)
+        public void Encode(ByteSpan span, ProtocolVersion protocolVersion)
         {
-            span.WriteBigEndian16((ushort)ProtocolVersion.DTLS1_2);
+            span.WriteBigEndian16((ushort)protocolVersion);
             span = span.Slice(2);
 
             Debug.Assert(this.Random.Length == Dtls.Random.Size);
@@ -488,7 +491,7 @@ namespace Hazel.Dtls
         /// True if we successfully decode the HelloVerifyRequest
         /// message. Otherwise false.
         /// </returns>
-        public static bool Parse(out HelloVerifyRequest result, ByteSpan span)
+        public static bool Parse(out HelloVerifyRequest result, ProtocolVersion? expectedProtocolVersion, ByteSpan span)
         {
             result = new HelloVerifyRequest();
             if (span.Length < 3)
@@ -497,7 +500,7 @@ namespace Hazel.Dtls
             }
 
             ProtocolVersion serverVersion = (ProtocolVersion)span.ReadBigEndian16(0);
-            if (serverVersion != ProtocolVersion.DTLS1_2)
+            if (expectedProtocolVersion.HasValue && serverVersion != expectedProtocolVersion.Value)
             {
                 return false;
             }
@@ -519,11 +522,11 @@ namespace Hazel.Dtls
         /// </summary>
         /// <param name="peerAddress">Address of the remote peer</param>
         /// <param name="hmac">Listener HMAC signature provider</param>
-        public static void Encode(ByteSpan span, EndPoint peerAddress, HMAC hmac)
+        public static void Encode(ByteSpan span, EndPoint peerAddress, HMAC hmac, ProtocolVersion protocolVersion)
         {
             ByteSpan cookie = ComputeAddressMac(peerAddress, hmac);
 
-            span.WriteBigEndian16((ushort)ProtocolVersion.DTLS1_2);
+            span.WriteBigEndian16((ushort)protocolVersion);
             span[2] = (byte)CookieSize;
             cookie.CopyTo(span.Slice(3));
         }
@@ -634,11 +637,11 @@ namespace Hazel.Dtls
         /// <summary>
         /// Encode Handshake ServerHello to wire format
         /// </summary>
-        public void Encode(ByteSpan span)
+        public void Encode(ByteSpan span, ProtocolVersion protocolVersion)
         {
             Debug.Assert(this.Random.Length == Dtls.Random.Size);
 
-            span.WriteBigEndian16((ushort)ProtocolVersion.DTLS1_2, 0);
+            span.WriteBigEndian16((ushort)protocolVersion, 0);
             span = span.Slice(2);
 
             this.Random.CopyTo(span);

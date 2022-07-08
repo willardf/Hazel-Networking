@@ -42,10 +42,10 @@ namespace Hazel.UnitTests.Dtls
                 record.Length = (ushort)recordProtection.GetEncryptedSize(messageAsBytes.Length);
 
                 ByteSpan encrypted = new byte[record.Length];
-                recordProtection.EncryptServerPlaintext(encrypted, messageAsBytes, ref record);
+                recordProtection.EncryptServerPlaintext(encrypted, messageAsBytes, ref record, ProtocolVersion.DTLS1_2);
 
                 ByteSpan plaintext = new byte[recordProtection.GetDecryptedSize(encrypted.Length)];
-                bool couldDecrypt = recordProtection.DecryptCiphertextFromServer(plaintext, encrypted, ref record);
+                bool couldDecrypt = recordProtection.DecryptCiphertextFromServer(plaintext, encrypted, ref record, ProtocolVersion.DTLS1_2);
                 Assert.IsTrue(couldDecrypt);
                 Assert.AreEqual(messageAsBytes.Length, plaintext.Length);
                 Assert.AreEqual(TestMessage, Encoding.UTF8.GetString(plaintext.GetUnderlyingArray(), plaintext.Offset, plaintext.Length));
@@ -66,10 +66,10 @@ namespace Hazel.UnitTests.Dtls
                 record.Length = (ushort)recordProtection.GetEncryptedSize(messageAsBytes.Length);
 
                 ByteSpan encrypted = new byte[record.Length];
-                recordProtection.EncryptClientPlaintext(encrypted, messageAsBytes, ref record);
+                recordProtection.EncryptClientPlaintext(encrypted, messageAsBytes, ref record, ProtocolVersion.DTLS1_2);
 
                 ByteSpan plaintext = new byte[recordProtection.GetDecryptedSize(encrypted.Length)];
-                bool couldDecrypt = recordProtection.DecryptCiphertextFromClient(plaintext, encrypted, ref record);
+                bool couldDecrypt = recordProtection.DecryptCiphertextFromClient(plaintext, encrypted, ref record, ProtocolVersion.DTLS1_2);
                 Assert.IsTrue(couldDecrypt);
                 Assert.AreEqual(messageAsBytes.Length, plaintext.Length);
                 Assert.AreEqual(TestMessage, Encoding.UTF8.GetString(plaintext.GetUnderlyingArray(), plaintext.Offset, plaintext.Length));
@@ -90,23 +90,23 @@ namespace Hazel.UnitTests.Dtls
                 originalRecord.Length = (ushort)recordProtection.GetEncryptedSize(messageAsBytes.Length);
 
                 ByteSpan encrypted = new byte[originalRecord.Length];
-                recordProtection.EncryptServerPlaintext(encrypted, messageAsBytes, ref originalRecord);
+                recordProtection.EncryptServerPlaintext(encrypted, messageAsBytes, ref originalRecord, ProtocolVersion.DTLS1_2);
 
                 ByteSpan plaintext = new byte[recordProtection.GetDecryptedSize(encrypted.Length)];
 
                 Record record = originalRecord;
                 record.ContentType = ContentType.Handshake;
-                bool couldDecrypt = recordProtection.DecryptCiphertextFromServer(plaintext, encrypted, ref record);
+                bool couldDecrypt = recordProtection.DecryptCiphertextFromServer(plaintext, encrypted, ref record, ProtocolVersion.DTLS1_2);
                 Assert.IsFalse(couldDecrypt);
 
                 record = originalRecord;
                 record.Epoch++;
-                couldDecrypt = recordProtection.DecryptCiphertextFromServer(plaintext, encrypted, ref record);
+                couldDecrypt = recordProtection.DecryptCiphertextFromServer(plaintext, encrypted, ref record, ProtocolVersion.DTLS1_2);
                 Assert.IsFalse(couldDecrypt);
 
                 record = originalRecord;
                 record.SequenceNumber++;
-                couldDecrypt = recordProtection.DecryptCiphertextFromServer(plaintext, encrypted, ref record);
+                couldDecrypt = recordProtection.DecryptCiphertextFromServer(plaintext, encrypted, ref record, ProtocolVersion.DTLS1_2);
                 Assert.IsFalse(couldDecrypt);
             }
         }
@@ -125,23 +125,23 @@ namespace Hazel.UnitTests.Dtls
                 originalRecord.Length = (ushort)recordProtection.GetEncryptedSize(messageAsBytes.Length);
 
                 ByteSpan encrypted = new byte[originalRecord.Length];
-                recordProtection.EncryptClientPlaintext(encrypted, messageAsBytes, ref originalRecord);
+                recordProtection.EncryptClientPlaintext(encrypted, messageAsBytes, ref originalRecord, ProtocolVersion.DTLS1_2);
 
                 ByteSpan plaintext = new byte[recordProtection.GetDecryptedSize(encrypted.Length)];
 
                 Record record = originalRecord;
                 record.ContentType = ContentType.Handshake;
-                bool couldDecrypt = recordProtection.DecryptCiphertextFromClient(plaintext, encrypted, ref record);
+                bool couldDecrypt = recordProtection.DecryptCiphertextFromClient(plaintext, encrypted, ref record, ProtocolVersion.DTLS1_2);
                 Assert.IsFalse(couldDecrypt);
 
                 record = originalRecord;
                 record.Epoch++;
-                couldDecrypt = recordProtection.DecryptCiphertextFromClient(plaintext, encrypted, ref record);
+                couldDecrypt = recordProtection.DecryptCiphertextFromClient(plaintext, encrypted, ref record, ProtocolVersion.DTLS1_2);
                 Assert.IsFalse(couldDecrypt);
 
                 record = originalRecord;
                 record.SequenceNumber++;
-                couldDecrypt = recordProtection.DecryptCiphertextFromClient(plaintext, encrypted, ref record);
+                couldDecrypt = recordProtection.DecryptCiphertextFromClient(plaintext, encrypted, ref record, ProtocolVersion.DTLS1_2);
                 Assert.IsFalse(couldDecrypt);
             }
         }
@@ -161,10 +161,10 @@ namespace Hazel.UnitTests.Dtls
 
                 ByteSpan encrypted = new byte[record.Length];
                 messageAsBytes.CopyTo(encrypted);
-                recordProtection.EncryptServerPlaintext(encrypted, encrypted.Slice(0, messageAsBytes.Length), ref record);
+                recordProtection.EncryptServerPlaintext(encrypted, encrypted.Slice(0, messageAsBytes.Length), ref record, ProtocolVersion.DTLS1_2);
 
                 ByteSpan plaintext = encrypted.Slice(0, recordProtection.GetDecryptedSize(record.Length));
-                bool couldDecrypt = recordProtection.DecryptCiphertextFromServer(plaintext, encrypted, ref record);
+                bool couldDecrypt = recordProtection.DecryptCiphertextFromServer(plaintext, encrypted, ref record, ProtocolVersion.DTLS1_2);
                 Assert.IsTrue(couldDecrypt);
                 Assert.AreEqual(messageAsBytes.Length, plaintext.Length);
                 Assert.AreEqual(TestMessage, Encoding.UTF8.GetString(plaintext.GetUnderlyingArray(), plaintext.Offset, plaintext.Length));
@@ -186,10 +186,10 @@ namespace Hazel.UnitTests.Dtls
 
                 ByteSpan encrypted = new byte[record.Length];
                 messageAsBytes.CopyTo(encrypted);
-                recordProtection.EncryptClientPlaintext(encrypted, encrypted.Slice(0, messageAsBytes.Length), ref record);
+                recordProtection.EncryptClientPlaintext(encrypted, encrypted.Slice(0, messageAsBytes.Length), ref record, ProtocolVersion.DTLS1_2);
 
                 ByteSpan plaintext = encrypted.Slice(0, recordProtection.GetDecryptedSize(record.Length));
-                bool couldDecrypt = recordProtection.DecryptCiphertextFromClient(plaintext, encrypted, ref record);
+                bool couldDecrypt = recordProtection.DecryptCiphertextFromClient(plaintext, encrypted, ref record, ProtocolVersion.DTLS1_2);
                 Assert.IsTrue(couldDecrypt);
                 Assert.AreEqual(messageAsBytes.Length, plaintext.Length);
                 Assert.AreEqual(TestMessage, Encoding.UTF8.GetString(plaintext.GetUnderlyingArray(), plaintext.Offset, plaintext.Length));

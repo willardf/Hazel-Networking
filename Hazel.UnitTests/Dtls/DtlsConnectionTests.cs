@@ -259,7 +259,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 record.Length = (ushort)data.Length;
 
                 ByteSpan encoded = new byte[Record.Size + data.Length];
-                record.Encode(encoded);
+                record.Encode(encoded, ProtocolVersion.DTLS1_2);
                 data.CopyTo(encoded.Slice(Record.Size));
 
                 listener.InjectPacket(encoded, connectionEndPoint, connectionId);

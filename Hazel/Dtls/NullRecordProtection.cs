@@ -27,23 +27,23 @@ namespace Hazel.Dtls
             return dataSize;
         }
 
-        public void EncryptServerPlaintext(ByteSpan output, ByteSpan input, ref Record record)
+        public void EncryptServerPlaintext(ByteSpan output, ByteSpan input, ref Record record, ProtocolVersion protocolVersion)
         {
             CopyMaybeOverlappingSpans(output, input);
         }
 
-        public void EncryptClientPlaintext(ByteSpan output, ByteSpan input, ref Record record)
+        public void EncryptClientPlaintext(ByteSpan output, ByteSpan input, ref Record record, ProtocolVersion protocolVersion)
         {
             CopyMaybeOverlappingSpans(output, input);
         }
 
-        public bool DecryptCiphertextFromServer(ByteSpan output, ByteSpan input, ref Record record)
+        public bool DecryptCiphertextFromServer(ByteSpan output, ByteSpan input, ref Record record, ProtocolVersion protocolVersion)
         {
             CopyMaybeOverlappingSpans(output, input);
             return true;
         }
 
-        public bool DecryptCiphertextFromClient(ByteSpan output, ByteSpan input, ref Record record)
+        public bool DecryptCiphertextFromClient(ByteSpan output, ByteSpan input, ref Record record, ProtocolVersion protocolVersion)
         {
             CopyMaybeOverlappingSpans(output, input);
             return true;

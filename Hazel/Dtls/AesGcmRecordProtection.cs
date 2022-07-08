@@ -83,18 +83,18 @@ namespace Hazel.Dtls
         }
 
         /// <inheritdoc />
-        public void EncryptServerPlaintext(ByteSpan output, ByteSpan input, ref Record record)
+        public void EncryptServerPlaintext(ByteSpan output, ByteSpan input, ref Record record, ProtocolVersion protocolVersion)
         {
-            EncryptPlaintext(output, input, ref record, this.serverWriteCipher, this.serverWriteIV);
+            EncryptPlaintext(output, input, ref record, this.serverWriteCipher, this.serverWriteIV, protocolVersion);
         }
 
         /// <inheritdoc />
-        public void EncryptClientPlaintext(ByteSpan output, ByteSpan input, ref Record record)
+        public void EncryptClientPlaintext(ByteSpan output, ByteSpan input, ref Record record, ProtocolVersion protocolVersion)
         {
-            EncryptPlaintext(output, input, ref record, this.clientWriteCipher, this.clientWriteIV);
+            EncryptPlaintext(output, input, ref record, this.clientWriteCipher, this.clientWriteIV, protocolVersion);
         }
 
-        private static void EncryptPlaintext(ByteSpan output, ByteSpan input, ref Record record, Aes128Gcm cipher, ByteSpan writeIV)
+        private static void EncryptPlaintext(ByteSpan output, ByteSpan input, ref Record record, Aes128Gcm cipher, ByteSpan writeIV, ProtocolVersion protocolVersion)
         {
             Debug.Assert(output.Length >= GetEncryptedSizeImpl(input.Length));
 
@@ -108,24 +108,24 @@ namespace Hazel.Dtls
             Record plaintextRecord = record;
             plaintextRecord.Length = (ushort)input.Length;
             ByteSpan associatedData = new byte[Record.Size];
-            plaintextRecord.Encode(associatedData);
+            plaintextRecord.Encode(associatedData, protocolVersion);
 
             cipher.Seal(output, nonce, input, associatedData);
         }
 
         /// <inheritdoc />
-        public bool DecryptCiphertextFromServer(ByteSpan output, ByteSpan input, ref Record record)
+        public bool DecryptCiphertextFromServer(ByteSpan output, ByteSpan input, ref Record record, ProtocolVersion protocolVersion)
         {
-            return DecryptCiphertext(output, input, ref record, this.serverWriteCipher, this.serverWriteIV);
+            return DecryptCiphertext(output, input, ref record, this.serverWriteCipher, this.serverWriteIV, protocolVersion);
         }
 
         /// <inheritdoc />
-        public bool DecryptCiphertextFromClient(ByteSpan output, ByteSpan input, ref Record record)
+        public bool DecryptCiphertextFromClient(ByteSpan output, ByteSpan input, ref Record record, ProtocolVersion protocolVersion)
         {
-            return DecryptCiphertext(output, input, ref record, this.clientWriteCipher, this.clientWriteIV);
+            return DecryptCiphertext(output, input, ref record, this.clientWriteCipher, this.clientWriteIV, protocolVersion);
         }
 
-        private static bool DecryptCiphertext(ByteSpan output, ByteSpan input, ref Record record, Aes128Gcm cipher, ByteSpan writeIV)
+        private static bool DecryptCiphertext(ByteSpan output, ByteSpan input, ref Record record, Aes128Gcm cipher, ByteSpan writeIV, ProtocolVersion protocolVersion)
         {
             Debug.Assert(output.Length >= GetDecryptedSizeImpl(input.Length));
 
@@ -139,7 +139,7 @@ namespace Hazel.Dtls
             Record plaintextRecord = record;
             plaintextRecord.Length = (ushort)GetDecryptedSizeImpl(input.Length);
             ByteSpan associatedData = new byte[Record.Size];
-            plaintextRecord.Encode(associatedData);
+            plaintextRecord.Encode(associatedData, protocolVersion);
 
             return cipher.Open(output, nonce, input, associatedData);
         }
