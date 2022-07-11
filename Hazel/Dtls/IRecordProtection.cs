@@ -29,7 +29,7 @@ namespace Hazel.Dtls
         /// <param name="output">Output ciphertext</param>
         /// <param name="input">Input plaintext</param>
         /// <param name="record">Parent DTLS record</param>
-        void EncryptServerPlaintext(ByteSpan output, ByteSpan input, ref Record record, ProtocolVersion protocolVersion);
+        void EncryptServerPlaintext(ByteSpan output, ByteSpan input, ref Record record);
 
         /// <summary>
         /// Encrypt a plaintext intput with client keys
@@ -39,7 +39,7 @@ namespace Hazel.Dtls
         /// <param name="output">Output ciphertext</param>
         /// <param name="input">Input plaintext</param>
         /// <param name="record">Parent DTLS record</param>
-        void EncryptClientPlaintext(ByteSpan output, ByteSpan input, ref Record record, ProtocolVersion protocolVersion);
+        void EncryptClientPlaintext(ByteSpan output, ByteSpan input, ref Record record);
 
         /// <summary>
         /// Decrypt a ciphertext intput with server keys
@@ -50,7 +50,7 @@ namespace Hazel.Dtls
         /// <param name="input">Input ciphertext</param>
         /// <param name="record">Parent DTLS record</param>
         /// <returns>True if the input was authenticated and decrypted. Otherwise false</returns>
-        bool DecryptCiphertextFromServer(ByteSpan output, ByteSpan input, ref Record record, ProtocolVersion protocolVersion);
+        bool DecryptCiphertextFromServer(ByteSpan output, ByteSpan input, ref Record record);
 
         /// <summary>
         /// Decrypt a ciphertext intput with client keys
@@ -61,7 +61,7 @@ namespace Hazel.Dtls
         /// <param name="input">Input ciphertext</param>
         /// <param name="record">Parent DTLS record</param>
         /// <returns>True if the input was authenticated and decrypted. Otherwise false</returns>
-        bool DecryptCiphertextFromClient(ByteSpan output, ByteSpan input, ref Record record, ProtocolVersion protocolVersion);
+        bool DecryptCiphertextFromClient(ByteSpan output, ByteSpan input, ref Record record);
     }
 
     /// <summary>

@@ -254,12 +254,13 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
                 Record record = new Record();
                 record.ContentType = ContentType.ApplicationData;
+                record.ProtocolVersion = ProtocolVersion.DTLS1_2;
                 record.Epoch = 1;
                 record.SequenceNumber = 10;
                 record.Length = (ushort)data.Length;
 
                 ByteSpan encoded = new byte[Record.Size + data.Length];
-                record.Encode(encoded, ProtocolVersion.DTLS1_2);
+                record.Encode(encoded);
                 data.CopyTo(encoded.Slice(Record.Size));
 
                 listener.InjectPacket(encoded, connectionEndPoint, connectionId);

@@ -303,6 +303,7 @@ namespace Hazel.Dtls
             {
                 Record outgoinRecord = new Record();
                 outgoinRecord.ContentType = ContentType.ApplicationData;
+                outgoinRecord.ProtocolVersion = DtlsVersion;
                 outgoinRecord.Epoch = this.epoch;
                 outgoinRecord.SequenceNumber = this.currentEpoch.NextOutgoingSequence;
                 outgoinRecord.Length = (ushort)this.currentEpoch.RecordProtection.GetEncryptedSize(length);
@@ -311,7 +312,7 @@ namespace Hazel.Dtls
                 // Encode the record to wire format
                 ByteSpan packet = new byte[Record.Size + outgoinRecord.Length];
                 ByteSpan writer = packet;
-                outgoinRecord.Encode(writer, DtlsVersion);
+                outgoinRecord.Encode(writer);
                 writer = writer.Slice(Record.Size);
                 new ByteSpan(bytes, 0, length).CopyTo(writer);
 
@@ -319,8 +320,7 @@ namespace Hazel.Dtls
                 this.currentEpoch.RecordProtection.EncryptClientPlaintext(
                     packet.Slice(Record.Size, outgoinRecord.Length),
                     packet.Slice(Record.Size, length),
-                    ref outgoinRecord,
-                    DtlsVersion
+                    ref outgoinRecord
                 );
 
                 return packet;
@@ -446,7 +446,7 @@ namespace Hazel.Dtls
                 int decryptedSize = this.currentEpoch.RecordProtection.GetDecryptedSize(recordPayload.Length);
                 ByteSpan decryptedPayload = recordPayload.ReuseSpanIfPossible(decryptedSize);
 
-                if (!this.currentEpoch.RecordProtection.DecryptCiphertextFromServer(decryptedPayload, recordPayload, ref record, DtlsVersion))
+                if (!this.currentEpoch.RecordProtection.DecryptCiphertextFromServer(decryptedPayload, recordPayload, ref record))
                 {
                     this.logger.WriteError("Dropping non-authentic record");
                     return;
@@ -979,6 +979,7 @@ namespace Hazel.Dtls
             int plaintextLength = (int)(Handshake.Size + handshake.Length);
             Record outgoingRecord = new Record();
             outgoingRecord.ContentType = ContentType.Handshake;
+            outgoingRecord.ProtocolVersion = DtlsVersion;
             outgoingRecord.Epoch = this.epoch;
             outgoingRecord.SequenceNumber = this.currentEpoch.NextOutgoingSequence;
             outgoingRecord.Length = (ushort)this.currentEpoch.RecordProtection.GetEncryptedSize(plaintextLength);
@@ -987,7 +988,7 @@ namespace Hazel.Dtls
             // Convert the record to wire format
             ByteSpan packet = new byte[Record.Size + outgoingRecord.Length];
             ByteSpan writer = packet;
-            outgoingRecord.Encode(packet, DtlsVersion);
+            outgoingRecord.Encode(packet);
             writer = writer.Slice(Record.Size);
             handshake.Encode(writer);
             writer = writer.Slice(Handshake.Size);
@@ -1015,8 +1016,7 @@ namespace Hazel.Dtls
             this.currentEpoch.RecordProtection.EncryptClientPlaintext(
                 packet.Slice(Record.Size, outgoingRecord.Length),
                 packet.Slice(Record.Size, plaintextLength),
-                ref outgoingRecord,
-                DtlsVersion
+                ref outgoingRecord
             );
 
             if (this.nextEpoch.NegotiationStartTime == DateTime.MinValue) this.nextEpoch.NegotiationStartTime = DateTime.UtcNow;
@@ -1050,6 +1050,7 @@ namespace Hazel.Dtls
             int plaintextLength = (int)(Handshake.Size + handshake.Length);
             Record outgoingRecord = new Record();
             outgoingRecord.ContentType = ContentType.Handshake;
+            outgoingRecord.ProtocolVersion = DtlsVersion;
             outgoingRecord.Epoch = this.epoch;
             outgoingRecord.SequenceNumber = this.currentEpoch.NextOutgoingSequence;
             outgoingRecord.Length = (ushort)this.currentEpoch.RecordProtection.GetEncryptedSize(plaintextLength);
@@ -1058,7 +1059,7 @@ namespace Hazel.Dtls
             // Convert the record to wire format
             ByteSpan packet = new byte[Record.Size + outgoingRecord.Length];
             ByteSpan writer = packet;
-            outgoingRecord.Encode(packet, DtlsVersion);
+            outgoingRecord.Encode(packet);
             writer = writer.Slice(Record.Size);
             handshake.Encode(writer);
             writer = writer.Slice(Handshake.Size);
@@ -1077,8 +1078,7 @@ namespace Hazel.Dtls
             this.currentEpoch.RecordProtection.EncryptClientPlaintext(
                 packet.Slice(Record.Size, outgoingRecord.Length),
                 packet.Slice(Record.Size, plaintextLength),
-                ref outgoingRecord,
-                DtlsVersion
+                ref outgoingRecord
             );
 
             this.nextEpoch.State = HandshakeState.ExpectingServerHello;
@@ -1115,6 +1115,7 @@ namespace Hazel.Dtls
 
             Record keyExchangeRecord = new Record();
             keyExchangeRecord.ContentType = ContentType.Handshake;
+            keyExchangeRecord.ProtocolVersion = DtlsVersion;
             keyExchangeRecord.Epoch = this.epoch;
             keyExchangeRecord.SequenceNumber = this.currentEpoch.NextOutgoingSequence;
             keyExchangeRecord.Length = (ushort)this.currentEpoch.RecordProtection.GetEncryptedSize(Handshake.Size + (int)keyExchangeHandshake.Length);
@@ -1122,6 +1123,7 @@ namespace Hazel.Dtls
 
             Record changeCipherSpecRecord = new Record();
             changeCipherSpecRecord.ContentType = ContentType.ChangeCipherSpec;
+            changeCipherSpecRecord.ProtocolVersion = DtlsVersion;
             changeCipherSpecRecord.Epoch = this.epoch;
             changeCipherSpecRecord.SequenceNumber = this.currentEpoch.NextOutgoingSequence;
             changeCipherSpecRecord.Length = (ushort)this.currentEpoch.RecordProtection.GetEncryptedSize(ChangeCipherSpec.Size);
@@ -1136,6 +1138,7 @@ namespace Hazel.Dtls
 
             Record finishedRecord = new Record();
             finishedRecord.ContentType = ContentType.Handshake;
+            finishedRecord.ProtocolVersion = DtlsVersion;
             finishedRecord.Epoch = this.nextEpoch.Epoch;
             finishedRecord.SequenceNumber = this.nextEpoch.NextOutgoingSequence;
             finishedRecord.Length = (ushort)this.nextEpoch.RecordProtection.GetEncryptedSize(Handshake.Size + (int)finishedHandshake.Length);
@@ -1150,7 +1153,7 @@ namespace Hazel.Dtls
             ByteSpan packet = new byte[packetLength];
             ByteSpan writer = packet;
 
-            keyExchangeRecord.Encode(writer, DtlsVersion);
+            keyExchangeRecord.Encode(writer);
             writer = writer.Slice(Record.Size);
             keyExchangeHandshake.Encode(writer);
             writer = writer.Slice(Handshake.Size);
@@ -1158,14 +1161,14 @@ namespace Hazel.Dtls
 
             ByteSpan startOfChangeCipherSpecRecord = packet.Slice(Record.Size + keyExchangeRecord.Length);
             writer = startOfChangeCipherSpecRecord;
-            changeCipherSpecRecord.Encode(writer, DtlsVersion);
+            changeCipherSpecRecord.Encode(writer);
             writer = writer.Slice(Record.Size);
             ChangeCipherSpec.Encode(writer);
             writer = writer.Slice(ChangeCipherSpec.Size);
 
             ByteSpan startOfFinishedRecord = startOfChangeCipherSpecRecord.Slice(Record.Size + changeCipherSpecRecord.Length);
             writer = startOfFinishedRecord;
-            finishedRecord.Encode(writer, DtlsVersion);
+            finishedRecord.Encode(writer);
             writer = writer.Slice(Record.Size);
             finishedHandshake.Encode(writer);
             writer = writer.Slice(Handshake.Size);
@@ -1206,24 +1209,21 @@ namespace Hazel.Dtls
             this.currentEpoch.RecordProtection.EncryptClientPlaintext(
                 packet.Slice(Record.Size, keyExchangeRecord.Length),
                 packet.Slice(Record.Size, Handshake.Size + (int)keyExchangeHandshake.Length),
-                ref keyExchangeRecord,
-                DtlsVersion
+                ref keyExchangeRecord
             );
 
             // Protect the ChangeCipherSpec record
             this.currentEpoch.RecordProtection.EncryptClientPlaintext(
                 startOfChangeCipherSpecRecord.Slice(Record.Size, changeCipherSpecRecord.Length),
                 startOfChangeCipherSpecRecord.Slice(Record.Size, ChangeCipherSpec.Size),
-                ref changeCipherSpecRecord,
-                DtlsVersion
+                ref changeCipherSpecRecord
             );
 
             // Protect the Finished record
             this.nextEpoch.RecordProtection.EncryptClientPlaintext(
                 startOfFinishedRecord.Slice(Record.Size, finishedRecord.Length),
                 startOfFinishedRecord.Slice(Record.Size, Handshake.Size + (int)finishedHandshake.Length),
-                ref finishedRecord,
-                DtlsVersion
+                ref finishedRecord
             );
 
             this.nextEpoch.State = HandshakeState.ExpectingChangeCipherSpec;
