@@ -960,6 +960,7 @@ namespace Hazel.Dtls
 
             // Describe our ClientHello flight
             ClientHello clientHello = new ClientHello();
+            clientHello.ClientProtocolVersion = DtlsVersion;
             clientHello.Random = this.nextEpoch.ClientRandom;
             clientHello.Cookie = this.nextEpoch.Cookie;
             clientHello.Session = new HazelDtlsSessionInfo(this.HazelSessionVersion);
@@ -992,7 +993,7 @@ namespace Hazel.Dtls
             writer = writer.Slice(Record.Size);
             handshake.Encode(writer);
             writer = writer.Slice(Handshake.Size);
-            clientHello.Encode(writer, DtlsVersion);
+            clientHello.Encode(writer);
 
             // If this is our first valid attempt at contacting the server:
             // - Reset our verification stream

@@ -151,6 +151,7 @@ namespace Hazel.Dtls
     /// </summary>
     public struct ClientHello
     {
+        public ProtocolVersion ClientProtocolVersion;
         public ByteSpan Random;
         public ByteSpan Cookie;
         public HazelDtlsSessionInfo Session;
@@ -192,18 +193,16 @@ namespace Hazel.Dtls
         /// Parse a Handshake ClientHello payload from wire format
         /// </summary>
         /// <returns>True if we successfully decode the ClientHello message. Otherwise false</returns>
-        public static bool Parse(out ClientHello result, out ProtocolVersion clientVersion, ProtocolVersion? expectedProtocolVersion, ByteSpan span)
+        public static bool Parse(out ClientHello result, ProtocolVersion? expectedProtocolVersion, ByteSpan span)
         {
-            clientVersion = ProtocolVersion.UDP;
-
             result = new ClientHello();
             if (span.Length < MinSize)
             {
                 return false;
             }
 
-            clientVersion = (ProtocolVersion)span.ReadBigEndian16();
-            if (expectedProtocolVersion.HasValue && clientVersion != expectedProtocolVersion.Value)
+            result.ClientProtocolVersion = (ProtocolVersion)span.ReadBigEndian16();
+            if (expectedProtocolVersion.HasValue && result.ClientProtocolVersion != expectedProtocolVersion.Value)
             {
                 return false;
             }
@@ -372,9 +371,9 @@ namespace Hazel.Dtls
         /// <summary>
         /// Encode Handshake ClientHello payload to wire format
         /// </summary>
-        public void Encode(ByteSpan span, ProtocolVersion protocolVersion)
+        public void Encode(ByteSpan span)
         {
-            span.WriteBigEndian16((ushort)protocolVersion);
+            span.WriteBigEndian16((ushort)this.ClientProtocolVersion);
             span = span.Slice(2);
 
             Debug.Assert(this.Random.Length == Dtls.Random.Size);
@@ -481,6 +480,7 @@ namespace Hazel.Dtls
             + CookieSize // cookie (data)
             ;
 
+        public ProtocolVersion ServerProtocolVersion;
         public ByteSpan Cookie;
 
         /// <summary>
@@ -499,8 +499,8 @@ namespace Hazel.Dtls
                 return false;
             }
 
-            ProtocolVersion serverVersion = (ProtocolVersion)span.ReadBigEndian16(0);
-            if (expectedProtocolVersion.HasValue && serverVersion != expectedProtocolVersion.Value)
+            result.ServerProtocolVersion = (ProtocolVersion)span.ReadBigEndian16(0);
+            if (expectedProtocolVersion.HasValue && result.ServerProtocolVersion != expectedProtocolVersion.Value)
             {
                 return false;
             }
@@ -579,7 +579,7 @@ namespace Hazel.Dtls
     /// </summary>
     public struct ServerHello
     {
-        //public ProtocolVersion ServerVersion;
+        public ProtocolVersion ServerProtocolVersion;
         public ByteSpan Random;
         public CipherSuite CipherSuite;
         public HazelDtlsSessionInfo Session;
@@ -609,7 +609,7 @@ namespace Hazel.Dtls
                 return false;
             }
 
-            ProtocolVersion serverVersion = (ProtocolVersion)span.ReadBigEndian16();
+            result.ServerProtocolVersion = (ProtocolVersion)span.ReadBigEndian16();
             span = span.Slice(2);
 
             result.Random = span.Slice(0, Dtls.Random.Size);
@@ -637,11 +637,11 @@ namespace Hazel.Dtls
         /// <summary>
         /// Encode Handshake ServerHello to wire format
         /// </summary>
-        public void Encode(ByteSpan span, ProtocolVersion protocolVersion)
+        public void Encode(ByteSpan span)
         {
             Debug.Assert(this.Random.Length == Dtls.Random.Size);
 
-            span.WriteBigEndian16((ushort)protocolVersion, 0);
+            span.WriteBigEndian16((ushort)this.ServerProtocolVersion, 0);
             span = span.Slice(2);
 
             this.Random.CopyTo(span);

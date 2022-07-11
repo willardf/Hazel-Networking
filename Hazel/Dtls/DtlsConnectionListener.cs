@@ -820,7 +820,7 @@ namespace Hazel.Dtls
             }
 
             ProtocolVersion protocolVersion = peer.ProtocolVersion;
-            if (!ClientHello.Parse(out ClientHello clientHello, out _, protocolVersion, payload))
+            if (!ClientHello.Parse(out ClientHello clientHello, protocolVersion, payload))
             {
                 this.Logger.WriteError($"Dropping malformed ClientHello Handshake message from `{peerAddress}`");
                 return false;
@@ -952,6 +952,7 @@ namespace Hazel.Dtls
 
             // Describe first record of the flight
             ServerHello serverHello = new ServerHello();
+            serverHello.ServerProtocolVersion = protocolVersion;
             serverHello.Random = peer.NextEpoch.ServerRandom;
             serverHello.CipherSuite = selectedCipherSuite;
 
@@ -1001,7 +1002,7 @@ namespace Hazel.Dtls
             writer = writer.Slice(Record.Size);
             serverHelloHandshake.Encode(writer);
             writer = writer.Slice(Handshake.Size);
-            serverHello.Encode(writer, protocolVersion);
+            serverHello.Encode(writer);
             writer = writer.Slice(ServerHello.MinSize);
             certificateHandshake.Encode(writer);
             writer = writer.Slice(Handshake.Size);
@@ -1027,7 +1028,7 @@ namespace Hazel.Dtls
                 writer = packet;
                 serverHelloHandshake.Encode(writer);
                 writer = writer.Slice(Handshake.Size);
-                serverHello.Encode(writer, protocolVersion);
+                serverHello.Encode(writer);
                 writer = writer.Slice(ServerHello.MinSize);
                 fullCeritficateHandshake.Encode(writer);
                 writer = writer.Slice(Handshake.Size);
@@ -1211,7 +1212,7 @@ namespace Hazel.Dtls
             }
             message = message.Slice(Handshake.Size);
 
-            if (!ClientHello.Parse(out ClientHello clientHello, out ProtocolVersion protocolVersion, expectedProtocolVersion: null, message))
+            if (!ClientHello.Parse(out ClientHello clientHello, expectedProtocolVersion: null, message))
             {
                 this.Logger.WriteError($"Dropping malformed ClientHello message from non-peer `{peerAddress}`");
                 return;
@@ -1228,13 +1229,13 @@ namespace Hazel.Dtls
 #else
                     Interlocked.Increment(ref this.NonPeerVerifyHelloRequests);
 #endif
-                    this.SendHelloVerifyRequest(peerAddress, 1, 0, NullRecordProtection.Instance, protocolVersion);
+                    this.SendHelloVerifyRequest(peerAddress, 1, 0, NullRecordProtection.Instance, clientHello.ClientProtocolVersion);
                     return;
                 }
             }
 
             // Allocate state for the new peer and register it
-            PeerData peer = new PeerData(this.AllocateConnectionId(peerAddress), record.SequenceNumber + 1, protocolVersion);
+            PeerData peer = new PeerData(this.AllocateConnectionId(peerAddress), record.SequenceNumber + 1, clientHello.ClientProtocolVersion);
             this.ProcessHandshake(peer, peerAddress, ref record, originalMessage);
             this.existingPeers[peerAddress] = peer;
         }
