@@ -254,6 +254,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
                 Record record = new Record();
                 record.ContentType = ContentType.ApplicationData;
+                record.ProtocolVersion = ProtocolVersion.DTLS1_2;
                 record.Epoch = 1;
                 record.SequenceNumber = 10;
                 record.Length = (ushort)data.Length;

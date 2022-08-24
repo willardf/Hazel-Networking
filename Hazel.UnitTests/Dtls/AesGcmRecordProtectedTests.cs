@@ -37,6 +37,7 @@ namespace Hazel.UnitTests.Dtls
 
                 Record record = new Record();
                 record.ContentType = ContentType.ApplicationData;
+                record.ProtocolVersion = ProtocolVersion.DTLS1_2;
                 record.Epoch = 1;
                 record.SequenceNumber = 124;
                 record.Length = (ushort)recordProtection.GetEncryptedSize(messageAsBytes.Length);
@@ -61,6 +62,7 @@ namespace Hazel.UnitTests.Dtls
 
                 Record record = new Record();
                 record.ContentType = ContentType.ApplicationData;
+                record.ProtocolVersion = ProtocolVersion.DTLS1_2;
                 record.Epoch = 1;
                 record.SequenceNumber = 124;
                 record.Length = (ushort)recordProtection.GetEncryptedSize(messageAsBytes.Length);
@@ -85,6 +87,7 @@ namespace Hazel.UnitTests.Dtls
 
                 Record originalRecord = new Record();
                 originalRecord.ContentType = ContentType.ApplicationData;
+                originalRecord.ProtocolVersion = ProtocolVersion.DTLS1_2;
                 originalRecord.Epoch = 1;
                 originalRecord.SequenceNumber = 124;
                 originalRecord.Length = (ushort)recordProtection.GetEncryptedSize(messageAsBytes.Length);
@@ -120,6 +123,7 @@ namespace Hazel.UnitTests.Dtls
 
                 Record originalRecord = new Record();
                 originalRecord.ContentType = ContentType.ApplicationData;
+                originalRecord.ProtocolVersion = ProtocolVersion.DTLS1_2;
                 originalRecord.Epoch = 1;
                 originalRecord.SequenceNumber = 124;
                 originalRecord.Length = (ushort)recordProtection.GetEncryptedSize(messageAsBytes.Length);
@@ -155,6 +159,7 @@ namespace Hazel.UnitTests.Dtls
 
                 Record record = new Record();
                 record.ContentType = ContentType.ApplicationData;
+                record.ProtocolVersion = ProtocolVersion.DTLS1_2;
                 record.Epoch = 1;
                 record.SequenceNumber = 124;
                 record.Length = (ushort)recordProtection.GetEncryptedSize(messageAsBytes.Length);
@@ -180,6 +185,7 @@ namespace Hazel.UnitTests.Dtls
 
                 Record record = new Record();
                 record.ContentType = ContentType.ApplicationData;
+                record.ProtocolVersion = ProtocolVersion.DTLS1_2;
                 record.Epoch = 1;
                 record.SequenceNumber = 124;
                 record.Length = (ushort)recordProtection.GetEncryptedSize(messageAsBytes.Length);

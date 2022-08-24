@@ -91,6 +91,8 @@ namespace Hazel.Dtls
             public Action AckCallback;
         }
 
+        private const ProtocolVersion DtlsVersion = ProtocolVersion.UDP;
+
         internal byte HazelSessionVersion = HazelDtlsSessionInfo.CurrentClientSessionVersion;
 
         private readonly object syncRoot = new object();
@@ -301,6 +303,7 @@ namespace Hazel.Dtls
             {
                 Record outgoinRecord = new Record();
                 outgoinRecord.ContentType = ContentType.ApplicationData;
+                outgoinRecord.ProtocolVersion = DtlsVersion;
                 outgoinRecord.Epoch = this.epoch;
                 outgoinRecord.SequenceNumber = this.currentEpoch.NextOutgoingSequence;
                 outgoinRecord.Length = (ushort)this.currentEpoch.RecordProtection.GetEncryptedSize(length);
@@ -317,7 +320,8 @@ namespace Hazel.Dtls
                 this.currentEpoch.RecordProtection.EncryptClientPlaintext(
                     packet.Slice(Record.Size, outgoinRecord.Length),
                     packet.Slice(Record.Size, length),
-                    ref outgoinRecord);
+                    ref outgoinRecord
+                );
 
                 return packet;
             }
@@ -389,7 +393,7 @@ namespace Hazel.Dtls
             while (span.Length > 0)
             {
                 Record record;
-                if (!Record.Parse(out record, span))
+                if (!Record.Parse(out record, DtlsVersion, span))
                 {
                     this.logger.WriteError("Dropping malformed record");
                     return;
@@ -603,7 +607,7 @@ namespace Hazel.Dtls
                         }
 
                         HelloVerifyRequest helloVerifyRequest;
-                        if (!HelloVerifyRequest.Parse(out helloVerifyRequest, payload))
+                        if (!HelloVerifyRequest.Parse(out helloVerifyRequest, DtlsVersion, payload))
                         {
                             this.logger.WriteError("Dropping malformed HelloVerifyRequest handshake message");
                             continue;
@@ -956,6 +960,7 @@ namespace Hazel.Dtls
 
             // Describe our ClientHello flight
             ClientHello clientHello = new ClientHello();
+            clientHello.ClientProtocolVersion = DtlsVersion;
             clientHello.Random = this.nextEpoch.ClientRandom;
             clientHello.Cookie = this.nextEpoch.Cookie;
             clientHello.Session = new HazelDtlsSessionInfo(this.HazelSessionVersion);
@@ -975,6 +980,7 @@ namespace Hazel.Dtls
             int plaintextLength = (int)(Handshake.Size + handshake.Length);
             Record outgoingRecord = new Record();
             outgoingRecord.ContentType = ContentType.Handshake;
+            outgoingRecord.ProtocolVersion = DtlsVersion;
             outgoingRecord.Epoch = this.epoch;
             outgoingRecord.SequenceNumber = this.currentEpoch.NextOutgoingSequence;
             outgoingRecord.Length = (ushort)this.currentEpoch.RecordProtection.GetEncryptedSize(plaintextLength);
@@ -1009,9 +1015,9 @@ namespace Hazel.Dtls
 
             // Protect the record
             this.currentEpoch.RecordProtection.EncryptClientPlaintext(
-                  packet.Slice(Record.Size, outgoingRecord.Length)
-                , packet.Slice(Record.Size, plaintextLength)
-                , ref outgoingRecord
+                packet.Slice(Record.Size, outgoingRecord.Length),
+                packet.Slice(Record.Size, plaintextLength),
+                ref outgoingRecord
             );
 
             if (this.nextEpoch.NegotiationStartTime == DateTime.MinValue) this.nextEpoch.NegotiationStartTime = DateTime.UtcNow;
@@ -1045,6 +1051,7 @@ namespace Hazel.Dtls
             int plaintextLength = (int)(Handshake.Size + handshake.Length);
             Record outgoingRecord = new Record();
             outgoingRecord.ContentType = ContentType.Handshake;
+            outgoingRecord.ProtocolVersion = DtlsVersion;
             outgoingRecord.Epoch = this.epoch;
             outgoingRecord.SequenceNumber = this.currentEpoch.NextOutgoingSequence;
             outgoingRecord.Length = (ushort)this.currentEpoch.RecordProtection.GetEncryptedSize(plaintextLength);
@@ -1070,9 +1077,9 @@ namespace Hazel.Dtls
 
             // Protect the record
             this.currentEpoch.RecordProtection.EncryptClientPlaintext(
-                  packet.Slice(Record.Size, outgoingRecord.Length)
-                , packet.Slice(Record.Size, plaintextLength)
-                , ref outgoingRecord
+                packet.Slice(Record.Size, outgoingRecord.Length),
+                packet.Slice(Record.Size, plaintextLength),
+                ref outgoingRecord
             );
 
             this.nextEpoch.State = HandshakeState.ExpectingServerHello;
@@ -1109,6 +1116,7 @@ namespace Hazel.Dtls
 
             Record keyExchangeRecord = new Record();
             keyExchangeRecord.ContentType = ContentType.Handshake;
+            keyExchangeRecord.ProtocolVersion = DtlsVersion;
             keyExchangeRecord.Epoch = this.epoch;
             keyExchangeRecord.SequenceNumber = this.currentEpoch.NextOutgoingSequence;
             keyExchangeRecord.Length = (ushort)this.currentEpoch.RecordProtection.GetEncryptedSize(Handshake.Size + (int)keyExchangeHandshake.Length);
@@ -1116,6 +1124,7 @@ namespace Hazel.Dtls
 
             Record changeCipherSpecRecord = new Record();
             changeCipherSpecRecord.ContentType = ContentType.ChangeCipherSpec;
+            changeCipherSpecRecord.ProtocolVersion = DtlsVersion;
             changeCipherSpecRecord.Epoch = this.epoch;
             changeCipherSpecRecord.SequenceNumber = this.currentEpoch.NextOutgoingSequence;
             changeCipherSpecRecord.Length = (ushort)this.currentEpoch.RecordProtection.GetEncryptedSize(ChangeCipherSpec.Size);
@@ -1130,6 +1139,7 @@ namespace Hazel.Dtls
 
             Record finishedRecord = new Record();
             finishedRecord.ContentType = ContentType.Handshake;
+            finishedRecord.ProtocolVersion = DtlsVersion;
             finishedRecord.Epoch = this.nextEpoch.Epoch;
             finishedRecord.SequenceNumber = this.nextEpoch.NextOutgoingSequence;
             finishedRecord.Length = (ushort)this.nextEpoch.RecordProtection.GetEncryptedSize(Handshake.Size + (int)finishedHandshake.Length);
@@ -1198,23 +1208,23 @@ namespace Hazel.Dtls
 
             // Protect the ClientKeyExchange record
             this.currentEpoch.RecordProtection.EncryptClientPlaintext(
-                  packet.Slice(Record.Size, keyExchangeRecord.Length)
-                , packet.Slice(Record.Size, Handshake.Size + (int)keyExchangeHandshake.Length)
-                , ref keyExchangeRecord
+                packet.Slice(Record.Size, keyExchangeRecord.Length),
+                packet.Slice(Record.Size, Handshake.Size + (int)keyExchangeHandshake.Length),
+                ref keyExchangeRecord
             );
 
             // Protect the ChangeCipherSpec record
             this.currentEpoch.RecordProtection.EncryptClientPlaintext(
-                  startOfChangeCipherSpecRecord.Slice(Record.Size, changeCipherSpecRecord.Length)
-                , startOfChangeCipherSpecRecord.Slice(Record.Size, ChangeCipherSpec.Size)
-                , ref changeCipherSpecRecord
+                startOfChangeCipherSpecRecord.Slice(Record.Size, changeCipherSpecRecord.Length),
+                startOfChangeCipherSpecRecord.Slice(Record.Size, ChangeCipherSpec.Size),
+                ref changeCipherSpecRecord
             );
 
             // Protect the Finished record
             this.nextEpoch.RecordProtection.EncryptClientPlaintext(
-                  startOfFinishedRecord.Slice(Record.Size, finishedRecord.Length)
-                , startOfFinishedRecord.Slice(Record.Size, Handshake.Size + (int)finishedHandshake.Length)
-                , ref finishedRecord
+                startOfFinishedRecord.Slice(Record.Size, finishedRecord.Length),
+                startOfFinishedRecord.Slice(Record.Size, Handshake.Size + (int)finishedHandshake.Length),
+                ref finishedRecord
             );
 
             this.nextEpoch.State = HandshakeState.ExpectingChangeCipherSpec;

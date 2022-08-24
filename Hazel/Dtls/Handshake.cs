@@ -151,6 +151,7 @@ namespace Hazel.Dtls
     /// </summary>
     public struct ClientHello
     {
+        public ProtocolVersion ClientProtocolVersion;
         public ByteSpan Random;
         public ByteSpan Cookie;
         public HazelDtlsSessionInfo Session;
@@ -192,7 +193,7 @@ namespace Hazel.Dtls
         /// Parse a Handshake ClientHello payload from wire format
         /// </summary>
         /// <returns>True if we successfully decode the ClientHello message. Otherwise false</returns>
-        public static bool Parse(out ClientHello result, ByteSpan span)
+        public static bool Parse(out ClientHello result, ProtocolVersion? expectedProtocolVersion, ByteSpan span)
         {
             result = new ClientHello();
             if (span.Length < MinSize)
@@ -200,11 +201,12 @@ namespace Hazel.Dtls
                 return false;
             }
 
-            ProtocolVersion clientVersion = (ProtocolVersion)span.ReadBigEndian16();
-            if (clientVersion != ProtocolVersion.DTLS1_2)
+            result.ClientProtocolVersion = (ProtocolVersion)span.ReadBigEndian16();
+            if (expectedProtocolVersion.HasValue && result.ClientProtocolVersion != expectedProtocolVersion.Value)
             {
                 return false;
             }
+
             span = span.Slice(2);
 
             result.Random = span.Slice(0, Dtls.Random.Size);
@@ -371,7 +373,7 @@ namespace Hazel.Dtls
         /// </summary>
         public void Encode(ByteSpan span)
         {
-            span.WriteBigEndian16((ushort)ProtocolVersion.DTLS1_2);
+            span.WriteBigEndian16((ushort)this.ClientProtocolVersion);
             span = span.Slice(2);
 
             Debug.Assert(this.Random.Length == Dtls.Random.Size);
@@ -478,6 +480,7 @@ namespace Hazel.Dtls
             + CookieSize // cookie (data)
             ;
 
+        public ProtocolVersion ServerProtocolVersion;
         public ByteSpan Cookie;
 
         /// <summary>
@@ -488,7 +491,7 @@ namespace Hazel.Dtls
         /// True if we successfully decode the HelloVerifyRequest
         /// message. Otherwise false.
         /// </returns>
-        public static bool Parse(out HelloVerifyRequest result, ByteSpan span)
+        public static bool Parse(out HelloVerifyRequest result, ProtocolVersion? expectedProtocolVersion, ByteSpan span)
         {
             result = new HelloVerifyRequest();
             if (span.Length < 3)
@@ -496,8 +499,8 @@ namespace Hazel.Dtls
                 return false;
             }
 
-            ProtocolVersion serverVersion = (ProtocolVersion)span.ReadBigEndian16(0);
-            if (serverVersion != ProtocolVersion.DTLS1_2)
+            result.ServerProtocolVersion = (ProtocolVersion)span.ReadBigEndian16(0);
+            if (expectedProtocolVersion.HasValue && result.ServerProtocolVersion != expectedProtocolVersion.Value)
             {
                 return false;
             }
@@ -519,11 +522,11 @@ namespace Hazel.Dtls
         /// </summary>
         /// <param name="peerAddress">Address of the remote peer</param>
         /// <param name="hmac">Listener HMAC signature provider</param>
-        public static void Encode(ByteSpan span, EndPoint peerAddress, HMAC hmac)
+        public static void Encode(ByteSpan span, EndPoint peerAddress, HMAC hmac, ProtocolVersion protocolVersion)
         {
             ByteSpan cookie = ComputeAddressMac(peerAddress, hmac);
 
-            span.WriteBigEndian16((ushort)ProtocolVersion.DTLS1_2);
+            span.WriteBigEndian16((ushort)protocolVersion);
             span[2] = (byte)CookieSize;
             cookie.CopyTo(span.Slice(3));
         }
@@ -576,7 +579,7 @@ namespace Hazel.Dtls
     /// </summary>
     public struct ServerHello
     {
-        //public ProtocolVersion ServerVersion;
+        public ProtocolVersion ServerProtocolVersion;
         public ByteSpan Random;
         public CipherSuite CipherSuite;
         public HazelDtlsSessionInfo Session;
@@ -606,7 +609,7 @@ namespace Hazel.Dtls
                 return false;
             }
 
-            ProtocolVersion serverVersion = (ProtocolVersion)span.ReadBigEndian16();
+            result.ServerProtocolVersion = (ProtocolVersion)span.ReadBigEndian16();
             span = span.Slice(2);
 
             result.Random = span.Slice(0, Dtls.Random.Size);
@@ -638,7 +641,7 @@ namespace Hazel.Dtls
         {
             Debug.Assert(this.Random.Length == Dtls.Random.Size);
 
-            span.WriteBigEndian16((ushort)ProtocolVersion.DTLS1_2, 0);
+            span.WriteBigEndian16((ushort)this.ServerProtocolVersion, 0);
             span = span.Slice(2);
 
             this.Random.CopyTo(span);
