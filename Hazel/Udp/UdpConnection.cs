@@ -59,10 +59,12 @@ namespace Hazel.Udp
         protected abstract void WriteBytesToConnection(byte[] bytes, int length);
 
         /// <inheritdoc/>
-        public override void Send(MessageWriter msg)
+        public override SendError Send(MessageWriter msg)
         {
             if (this._state != ConnectionState.Connected)
-                throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
+            {
+                return SendError.Disconnected;
+            }
 
             byte[] buffer = new byte[msg.Length];
             Buffer.BlockCopy(msg.Buffer, 0, buffer, 0, msg.Length);
@@ -82,6 +84,8 @@ namespace Hazel.Udp
                     Statistics.LogUnreliableSend(buffer.Length - 1);
                     break;
             }
+
+            return SendError.None;
         }
         
         /// <summary>
