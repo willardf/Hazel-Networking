@@ -83,21 +83,6 @@ namespace Hazel.Udp
                     break;
             }
         }
-
-        /// <inheritdoc/>
-        /// <remarks>
-        ///     <include file="DocInclude/common.xml" path="docs/item[@name='Connection_SendBytes_General']/*" />
-        ///     <para>
-        ///         Udp connections can currently send messages using <see cref="SendOption.None"/> and
-        ///         <see cref="SendOption.Reliable"/>. Fragmented messages are not currently supported and will default to
-        ///         <see cref="SendOption.None"/> until implemented.
-        ///     </para>
-        /// </remarks>
-        public override void SendBytes(byte[] bytes, SendOption sendOption = SendOption.None)
-        {
-            //Add header information and send
-            HandleSend(bytes, (byte)sendOption);
-        }
         
         /// <summary>
         ///     Handles the reliable/fragmented sending from this connection.
