@@ -10,5 +10,6 @@ namespace Hazel
     {
         None,
         Disconnected,
+        Unknown
     }
 }

@@ -290,7 +290,7 @@ namespace Hazel.Udp.FewerThreads
 
                         if (AcceptConnection != null)
                         {
-                            if (!AcceptConnection((IPEndPoint)remoteEndPoint, message.Buffer, out var response))
+                            if (!AcceptConnection(remoteEndPoint, message.Buffer, out var response))
                             {
                                 message.Recycle();
                                 if (response != null)
@@ -303,7 +303,7 @@ namespace Hazel.Udp.FewerThreads
                         }
 
                         aware = false;
-                        connection = new ThreadLimitedUdpServerConnection(this, connectionId, (IPEndPoint)remoteEndPoint, this.IPMode);
+                        connection = new ThreadLimitedUdpServerConnection(this, connectionId, remoteEndPoint, this.IPMode, this.Logger);
                         if (!this.allConnections.TryAdd(connectionId, connection))
                         {
                             throw new HazelException("Failed to add a connection. This should never happen.");

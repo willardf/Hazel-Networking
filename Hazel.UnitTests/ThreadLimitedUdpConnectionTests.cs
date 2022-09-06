@@ -20,7 +20,7 @@ namespace Hazel.UnitTests
 
         protected UdpConnection CreateConnection(IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
         {
-            return new UdpClientConnection(endPoint, ipMode);
+            return new UdpClientConnection(logger, endPoint, ipMode);
         }
 
         [TestMethod]

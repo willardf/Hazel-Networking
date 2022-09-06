@@ -204,7 +204,7 @@ namespace Hazel.Udp
                         }
 
                         aware = false;
-                        connection = new UdpServerConnection(this, (IPEndPoint)remoteEndPoint, this.IPMode);
+                        connection = new UdpServerConnection(this, (IPEndPoint)remoteEndPoint, this.IPMode, this.Logger);
                         if (!this.allConnections.TryAdd(remoteEndPoint, connection))
                         {
                             throw new HazelException("Failed to add a connection. This should never happen.");

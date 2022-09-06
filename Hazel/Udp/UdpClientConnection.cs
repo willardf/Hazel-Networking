@@ -33,8 +33,8 @@ namespace Hazel.Udp
         ///     Creates a new UdpClientConnection.
         /// </summary>
         /// <param name="remoteEndPoint">A <see cref="NetworkEndPoint"/> to connect to.</param>
-        public UdpClientConnection(IPEndPoint remoteEndPoint, IPMode ipMode = IPMode.IPv4)
-            : base()
+        public UdpClientConnection(ILogger logger, IPEndPoint remoteEndPoint, IPMode ipMode = IPMode.IPv4)
+            : base(logger)
         {
             this.EndPoint = remoteEndPoint;
             this.IPMode = ipMode;
