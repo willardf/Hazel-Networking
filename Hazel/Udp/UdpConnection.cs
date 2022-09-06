@@ -9,14 +9,16 @@ namespace Hazel.Udp
     /// <inheritdoc />
     public abstract partial class UdpConnection : NetworkConnection
     {
-        public override float AveragePingMs => this._pingMs;
-
         private const int SioUdpConnectionReset = -1744830452;
-
         public static readonly byte[] EmptyDisconnectBytes = new byte[] { (byte)UdpSendOption.Disconnect };
 
-        public UdpConnection() : base()
+        public override float AveragePingMs => this._pingMs;
+        protected readonly ILogger logger;
+
+
+        public UdpConnection(ILogger logger) : base()
         {
+            this.logger = logger;
             this.PacketPool = new ObjectPool<Packet>(() => new Packet(this));
         }
 
@@ -59,44 +61,41 @@ namespace Hazel.Udp
         protected abstract void WriteBytesToConnection(byte[] bytes, int length);
 
         /// <inheritdoc/>
-        public override void Send(MessageWriter msg)
+        public override SendErrors Send(MessageWriter msg)
         {
             if (this._state != ConnectionState.Connected)
-                throw new InvalidOperationException("Could not send data as this Connection is not connected. Did you disconnect?");
-
-            byte[] buffer = new byte[msg.Length];
-            Buffer.BlockCopy(msg.Buffer, 0, buffer, 0, msg.Length);
-
-            switch (msg.SendOption)
             {
-                case SendOption.Reliable:
-                    ResetKeepAliveTimer();
-
-                    AttachReliableID(buffer, 1);
-                    WriteBytesToConnection(buffer, buffer.Length);
-                    Statistics.LogReliableSend(buffer.Length - 3);
-                    break;
-
-                default:
-                    WriteBytesToConnection(buffer, buffer.Length);
-                    Statistics.LogUnreliableSend(buffer.Length - 1);
-                    break;
+                return SendErrors.Disconnected;
             }
-        }
 
-        /// <inheritdoc/>
-        /// <remarks>
-        ///     <include file="DocInclude/common.xml" path="docs/item[@name='Connection_SendBytes_General']/*" />
-        ///     <para>
-        ///         Udp connections can currently send messages using <see cref="SendOption.None"/> and
-        ///         <see cref="SendOption.Reliable"/>. Fragmented messages are not currently supported and will default to
-        ///         <see cref="SendOption.None"/> until implemented.
-        ///     </para>
-        /// </remarks>
-        public override void SendBytes(byte[] bytes, SendOption sendOption = SendOption.None)
-        {
-            //Add header information and send
-            HandleSend(bytes, (byte)sendOption);
+            try
+            {
+                byte[] buffer = new byte[msg.Length];
+                Buffer.BlockCopy(msg.Buffer, 0, buffer, 0, msg.Length);
+
+                switch (msg.SendOption)
+                {
+                    case SendOption.Reliable:
+                        ResetKeepAliveTimer();
+
+                        AttachReliableID(buffer, 1);
+                        WriteBytesToConnection(buffer, buffer.Length);
+                        Statistics.LogReliableSend(buffer.Length - 3);
+                        break;
+
+                    default:
+                        WriteBytesToConnection(buffer, buffer.Length);
+                        Statistics.LogUnreliableSend(buffer.Length - 1);
+                        break;
+                }
+            }
+            catch (Exception e)
+            {
+                this.logger?.WriteError("Unknown exception while sending: " + e);
+                return SendErrors.Unknown;
+            }
+
+            return SendErrors.None;
         }
         
         /// <summary>

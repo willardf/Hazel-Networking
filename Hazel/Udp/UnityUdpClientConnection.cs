@@ -13,12 +13,10 @@ namespace Hazel.Udp
     public class UnityUdpClientConnection : UdpConnection
     {
         private Socket socket;
-        protected readonly ILogger logger;
 
         public UnityUdpClientConnection(ILogger logger, IPEndPoint remoteEndPoint, IPMode ipMode = IPMode.IPv4)
-            : base()
+            : base(logger)
         {
-            this.logger = logger;
             this.EndPoint = remoteEndPoint;
             this.IPMode = ipMode;
 

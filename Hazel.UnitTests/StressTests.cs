@@ -24,7 +24,7 @@ namespace Hazel.UnitTests
                 new ParallelOptions { MaxDegreeOfParallelism = 64 },
                 (i) => {
                     
-                var connection = new UdpClientConnection(ep);
+                var connection = new UdpClientConnection(new TestLogger(), ep);
                 connection.KeepAliveInterval = 50;
 
                 connection.Connect(new byte[5]);

@@ -10,6 +10,11 @@ namespace Hazel.UnitTests
     internal class UdpConnectionTestHarness : UdpConnection
     {
         public List<MessageReader> BytesSent = new List<MessageReader>();
+
+        public UdpConnectionTestHarness() : base(new TestLogger())
+        {
+        }
+
         public ushort ReliableReceiveLast => this.reliableReceiveLast;
 
 

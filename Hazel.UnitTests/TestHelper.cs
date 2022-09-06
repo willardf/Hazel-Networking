@@ -20,18 +20,18 @@ namespace Hazel.UnitTests
         internal static void RunServerToClientTest(ThreadLimitedUdpConnectionListener listener, Connection connection, int dataSize, SendOption sendOption)
         {
             //Setup meta stuff 
-            byte[] data = BuildData(dataSize);
+            MessageWriter data = BuildData(sendOption, dataSize);
             ManualResetEvent mutex = new ManualResetEvent(false);
 
             //Setup listener
             listener.NewConnection += delegate (NewConnectionEventArgs ncArgs)
             {
-                ncArgs.Connection.SendBytes(data, sendOption);
+                ncArgs.Connection.Send(data);
             };
 
             listener.Start();
 
-            DataReceivedEventArgs? args = null;
+            DataReceivedEventArgs? result = null;
             //Setup conneciton
             connection.DataReceived += delegate (DataReceivedEventArgs a)
             {
@@ -39,7 +39,7 @@ namespace Hazel.UnitTests
 
                 try
                 {
-                    args = a;
+                    result = a;
                 }
                 finally
                 {
@@ -52,14 +52,14 @@ namespace Hazel.UnitTests
             //Wait until data is received
             mutex.WaitOne();
 
-            Assert.AreEqual(data.Length, args.Value.Message.Length);
-
-            for (int i = 0; i < data.Length; i++)
+            var dataReader = ConvertToMessageReader(data);
+            Assert.AreEqual(dataReader.Length, result.Value.Message.Length);
+            for (int i = 0; i < dataReader.Length; i++)
             {
-                Assert.AreEqual(data[i], args.Value.Message.ReadByte());
+                Assert.AreEqual(dataReader.ReadByte(), result.Value.Message.ReadByte());
             }
 
-            Assert.AreEqual(sendOption, args.Value.SendOption);
+            Assert.AreEqual(sendOption, result.Value.SendOption);
         }
 
         /// <summary>
@@ -70,26 +70,26 @@ namespace Hazel.UnitTests
         internal static void RunServerToClientTest(NetworkConnectionListener listener, Connection connection, int dataSize, SendOption sendOption)
         {
             //Setup meta stuff 
-            byte[] data = BuildData(dataSize);
+            MessageWriter data = BuildData(sendOption, dataSize);
             ManualResetEvent mutex = new ManualResetEvent(false);
 
             //Setup listener
-            listener.NewConnection += delegate(NewConnectionEventArgs ncArgs)
+            listener.NewConnection += delegate (NewConnectionEventArgs ncArgs)
             {
-                ncArgs.Connection.SendBytes(data, sendOption);
+                ncArgs.Connection.Send(data);
             };
 
             listener.Start();
 
-            DataReceivedEventArgs? args = null;
+            DataReceivedEventArgs? result = null;
             //Setup conneciton
-            connection.DataReceived += delegate(DataReceivedEventArgs a)
+            connection.DataReceived += delegate (DataReceivedEventArgs a)
             {
                 Trace.WriteLine("Data was received correctly.");
 
                 try
                 {
-                    args = a;
+                    result = a;
                 }
                 finally
                 {
@@ -102,14 +102,14 @@ namespace Hazel.UnitTests
             //Wait until data is received
             mutex.WaitOne();
 
-            Assert.AreEqual(data.Length, args.Value.Message.Length);
-
-            for (int i = 0; i < data.Length; i++)
+            var dataReader = ConvertToMessageReader(data);
+            Assert.AreEqual(dataReader.Length, result.Value.Message.Length);
+            for (int i = 0; i < dataReader.Length; i++)
             {
-                Assert.AreEqual(data[i], args.Value.Message.ReadByte());
+                Assert.AreEqual(dataReader.ReadByte(), result.Value.Message.ReadByte());
             }
 
-            Assert.AreEqual(sendOption, args.Value.SendOption);
+            Assert.AreEqual(sendOption, result.Value.SendOption);
         }
 
         /// <summary>
@@ -120,15 +120,15 @@ namespace Hazel.UnitTests
         internal static void RunClientToServerTest(NetworkConnectionListener listener, Connection connection, int dataSize, SendOption sendOption)
         {
             //Setup meta stuff 
-            byte[] data = BuildData(dataSize);
+            MessageWriter data = BuildData(sendOption, dataSize);
             ManualResetEvent mutex = new ManualResetEvent(false);
             ManualResetEvent mutex2 = new ManualResetEvent(false);
 
             //Setup listener
             DataReceivedEventArgs? result = null;
-            listener.NewConnection += delegate(NewConnectionEventArgs args)
+            listener.NewConnection += delegate (NewConnectionEventArgs args)
             {
-                args.Connection.DataReceived += delegate(DataReceivedEventArgs innerArgs)
+                args.Connection.DataReceived += delegate (DataReceivedEventArgs innerArgs)
                 {
                     Trace.WriteLine("Data was received correctly.");
 
@@ -147,16 +147,16 @@ namespace Hazel.UnitTests
 
             mutex.WaitOne();
 
-            connection.SendBytes(data, sendOption);
+            connection.Send(data);
 
             //Wait until data is received
             mutex2.WaitOne();
 
-            Assert.AreEqual(data.Length, result.Value.Message.Length);
-
+            var dataReader = ConvertToMessageReader(data);
+            Assert.AreEqual(dataReader.Length, result.Value.Message.Length);
             for (int i = 0; i < data.Length; i++)
             {
-                Assert.AreEqual(data[i], result.Value.Message.ReadByte());
+                Assert.AreEqual(dataReader.ReadByte(), result.Value.Message.ReadByte());
             }
 
             Assert.AreEqual(sendOption, result.Value.SendOption);
@@ -171,7 +171,7 @@ namespace Hazel.UnitTests
         internal static void RunClientToServerTest(ThreadLimitedUdpConnectionListener listener, Connection connection, int dataSize, SendOption sendOption)
         {
             //Setup meta stuff 
-            byte[] data = BuildData(dataSize);
+            MessageWriter data = BuildData(sendOption, dataSize);
             ManualResetEvent mutex = new ManualResetEvent(false);
             ManualResetEvent mutex2 = new ManualResetEvent(false);
 
@@ -198,16 +198,16 @@ namespace Hazel.UnitTests
 
             Assert.IsTrue(mutex.WaitOne(100), "Timeout while connecting");
 
-            connection.SendBytes(data, sendOption);
+            connection.Send(data);
 
             //Wait until data is received
             Assert.IsTrue(mutex2.WaitOne(100), "Timeout while sending data");
 
-            Assert.AreEqual(data.Length, result.Value.Message.Length);
-
-            for (int i = 0; i < data.Length; i++)
+            var dataReader = ConvertToMessageReader(data);
+            Assert.AreEqual(dataReader.Length, result.Value.Message.Length);
+            for (int i = 0; i < dataReader.Length; i++)
             {
-                Assert.AreEqual(data[i], result.Value.Message.ReadByte());
+                Assert.AreEqual(dataReader.ReadByte(), result.Value.Message.ReadByte());
             }
 
             Assert.AreEqual(sendOption, result.Value.SendOption);
@@ -222,12 +222,12 @@ namespace Hazel.UnitTests
         {
             ManualResetEvent mutex = new ManualResetEvent(false);
 
-            connection.Disconnected += delegate(object sender, DisconnectedEventArgs args)
+            connection.Disconnected += delegate (object sender, DisconnectedEventArgs args)
             {
                 mutex.Set();
             };
 
-            listener.NewConnection += delegate(NewConnectionEventArgs args)
+            listener.NewConnection += delegate (NewConnectionEventArgs args)
             {
                 args.Connection.Disconnect("Testing");
             };
@@ -249,9 +249,9 @@ namespace Hazel.UnitTests
             ManualResetEvent mutex = new ManualResetEvent(false);
             ManualResetEvent mutex2 = new ManualResetEvent(false);
 
-            listener.NewConnection += delegate(NewConnectionEventArgs args)
+            listener.NewConnection += delegate (NewConnectionEventArgs args)
             {
-                args.Connection.Disconnected += delegate(object sender2, DisconnectedEventArgs args2)
+                args.Connection.Disconnected += delegate (object sender2, DisconnectedEventArgs args2)
                 {
                     mutex2.Set();
                 };
@@ -307,17 +307,31 @@ namespace Hazel.UnitTests
             }
         }
 
+        private static MessageReader ConvertToMessageReader(MessageWriter writer)
+        {
+            var output = new MessageReader();
+            output.Buffer = writer.Buffer;
+            output.Offset = writer.SendOption == SendOption.None ? 1 : 3;
+            output.Length = writer.Length - output.Offset;
+            output.Position = 0;
+
+            return output;
+        }
+
         /// <summary>
         ///     Builds new data of increaseing value bytes.
         /// </summary>
         /// <param name="dataSize">The number of bytes to generate.</param>
         /// <returns>The data.</returns>
-        static byte[] BuildData(int dataSize)
+        static MessageWriter BuildData(SendOption sendOption, int dataSize)
         {
-            byte[] data = new byte[dataSize];
+            var output = MessageWriter.Get(sendOption);
             for (int i = 0; i < dataSize; i++)
-                data[i] = (byte)i;
-            return data;
+            {
+                output.Write((byte)i);
+            }
+
+            return output;
         }
     }
 }
