@@ -24,7 +24,7 @@ namespace Hazel.Udp
         public delegate bool AcceptConnectionCheck(IPEndPoint endPoint, byte[] input, out byte[] response);
 
         private Socket socket;
-        private Action<string> Logger;
+        private ILogger Logger;
         private Timer reliablePacketTimer;
 
         private ConcurrentDictionary<EndPoint, UdpServerConnection> allConnections = new ConcurrentDictionary<EndPoint, UdpServerConnection>();
@@ -35,7 +35,7 @@ namespace Hazel.Udp
         ///     Creates a new UdpConnectionListener for the given <see cref="IPAddress"/>, port and <see cref="IPMode"/>.
         /// </summary>
         /// <param name="endPoint">The endpoint to listen on.</param>
-        public UdpConnectionListener(IPEndPoint endPoint, IPMode ipMode = IPMode.IPv4, Action<string> logger = null)
+        public UdpConnectionListener(IPEndPoint endPoint, IPMode ipMode = IPMode.IPv4, ILogger logger = null)
         {
             this.Logger = logger;
             this.EndPoint = endPoint;
@@ -101,7 +101,7 @@ namespace Hazel.Udp
             {
                 message?.Recycle();
 
-                this.Logger?.Invoke("Socket Ex in StartListening: " + sx.Message);
+                this.Logger?.WriteError("Socket Ex in StartListening: " + sx.Message);
 
                 Thread.Sleep(10);
                 StartListeningForData();
@@ -110,7 +110,7 @@ namespace Hazel.Udp
             catch (Exception ex)
             {
                 message.Recycle();
-                this.Logger?.Invoke("Stopped due to: " + ex.Message);
+                this.Logger?.WriteError("Stopped due to: " + ex.Message);
                 return;
             }
         }
@@ -142,7 +142,7 @@ namespace Hazel.Udp
                 // This thread suggests the IP is not passed out from WinSoc so maybe not possible
                 // http://stackoverflow.com/questions/2576926/python-socket-error-on-udp-data-receive-10054
                 message.Recycle();
-                this.Logger?.Invoke($"Socket Ex {sx.SocketErrorCode} in ReadCallback: {sx.Message}");
+                this.Logger?.WriteError($"Socket Ex {sx.SocketErrorCode} in ReadCallback: {sx.Message}");
 
                 Thread.Sleep(10);
                 StartListeningForData();
@@ -152,7 +152,7 @@ namespace Hazel.Udp
             {
                 //If the socket's been disposed then we can just end there.
                 message.Recycle();
-                this.Logger?.Invoke("Stopped due to: " + ex.Message);
+                this.Logger?.WriteError("Stopped due to: " + ex.Message);
                 return;
             }
 
@@ -161,7 +161,7 @@ namespace Hazel.Udp
             if (bytesReceived == 0)
             {
                 message.Recycle();
-                this.Logger?.Invoke("Received 0 bytes");
+                this.Logger?.WriteInfo("Received 0 bytes");
                 Thread.Sleep(10);
                 StartListeningForData();
                 return;
@@ -266,7 +266,7 @@ namespace Hazel.Udp
             }
             catch (SocketException e)
             {
-                this.Logger?.Invoke("Could not send data as a SocketException occurred: " + e);
+                this.Logger?.WriteError("Could not send data as a SocketException occurred: " + e);
             }
             catch (ObjectDisposedException)
             {
