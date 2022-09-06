@@ -54,7 +54,7 @@ namespace Hazel.UnitTests
 
             var dataReader = ConvertToMessageReader(data);
             Assert.AreEqual(dataReader.Length, result.Value.Message.Length);
-            for (int i = 0; i < data.Length; i++)
+            for (int i = 0; i < dataReader.Length; i++)
             {
                 Assert.AreEqual(dataReader.ReadByte(), result.Value.Message.ReadByte());
             }
@@ -104,7 +104,7 @@ namespace Hazel.UnitTests
 
             var dataReader = ConvertToMessageReader(data);
             Assert.AreEqual(dataReader.Length, result.Value.Message.Length);
-            for (int i = 0; i < data.Length; i++)
+            for (int i = 0; i < dataReader.Length; i++)
             {
                 Assert.AreEqual(dataReader.ReadByte(), result.Value.Message.ReadByte());
             }
@@ -205,7 +205,7 @@ namespace Hazel.UnitTests
 
             var dataReader = ConvertToMessageReader(data);
             Assert.AreEqual(dataReader.Length, result.Value.Message.Length);
-            for (int i = 0; i < data.Length; i++)
+            for (int i = 0; i < dataReader.Length; i++)
             {
                 Assert.AreEqual(dataReader.ReadByte(), result.Value.Message.ReadByte());
             }

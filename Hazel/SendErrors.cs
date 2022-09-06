@@ -6,7 +6,7 @@ using System.Text;
 namespace Hazel
 {
     [Flags]
-    public enum SendError
+    public enum SendErrors
     {
         None,
         Disconnected,

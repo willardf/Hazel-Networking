@@ -131,7 +131,7 @@ namespace Hazel
         ///     Sends a number of bytes to the end point of the connection using the specified <see cref="SendOption"/>.
         /// </summary>
         /// <param name="msg">The message to send.</param>
-        public abstract SendError Send(MessageWriter msg);
+        public abstract SendErrors Send(MessageWriter msg);
                 
         /// <summary>
         ///     Connects the connection to a server and begins listening.

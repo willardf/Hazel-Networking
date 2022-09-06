@@ -61,11 +61,11 @@ namespace Hazel.Udp
         protected abstract void WriteBytesToConnection(byte[] bytes, int length);
 
         /// <inheritdoc/>
-        public override SendError Send(MessageWriter msg)
+        public override SendErrors Send(MessageWriter msg)
         {
             if (this._state != ConnectionState.Connected)
             {
-                return SendError.Disconnected;
+                return SendErrors.Disconnected;
             }
 
             try
@@ -92,10 +92,10 @@ namespace Hazel.Udp
             catch (Exception e)
             {
                 this.logger?.WriteError("Unknown exception while sending: " + e);
-                return SendError.Unknown;
+                return SendErrors.Unknown;
             }
 
-            return SendError.None;
+            return SendErrors.None;
         }
         
         /// <summary>
