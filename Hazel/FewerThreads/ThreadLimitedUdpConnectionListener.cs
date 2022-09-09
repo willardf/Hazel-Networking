@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -11,7 +10,7 @@ namespace Hazel.Udp.FewerThreads
     ///     Listens for new UDP connections and creates UdpConnections for them.
     /// </summary>
     /// <inheritdoc />
-    public class ThreadLimitedUdpConnectionListener : IDisposable
+    public class ThreadLimitedUdpConnectionListener : NetworkConnectionListener
     {
         private struct SendMessageInfo
         {
@@ -29,8 +28,6 @@ namespace Hazel.Udp.FewerThreads
         private const int SendReceiveBufferSize = 1024 * 1024;
         private const int BufferSize = ushort.MaxValue;
 
-        public event Action<NewConnectionEventArgs> NewConnection;
-
         /// <summary>
         /// A callback for early connection rejection. 
         /// * Return false to reject connection.
@@ -41,9 +38,6 @@ namespace Hazel.Udp.FewerThreads
 
         private Socket socket;
         protected ILogger Logger;
-
-        public IPEndPoint EndPoint { get; }
-        public IPMode IPMode { get; }
 
         private Thread reliablePacketThread;
         private Thread receiveThread;
@@ -171,7 +165,7 @@ namespace Hazel.Udp.FewerThreads
             }
         }
 
-        public void Start()
+        public override void Start()
         {
             try
             {
@@ -206,6 +200,12 @@ namespace Hazel.Udp.FewerThreads
                     catch (SocketException sx)
                     {
                         message.Recycle();
+                        if (sx.SocketErrorCode == SocketError.NotConnected)
+                        {
+                            this.InvokeInternalError(HazelInternalErrors.ConnectionDisconnected);
+                            return;
+                        }
+
                         this.Logger.WriteError("Socket Ex in ReceiveLoop: " + sx.Message);
                         continue;
                     }
@@ -323,7 +323,7 @@ namespace Hazel.Udp.FewerThreads
                 message.Position = 0;
                 try
                 {
-                    this.NewConnection?.Invoke(new NewConnectionEventArgs(message, connection));
+                    this.InvokeNewConnection(message, connection);
                 }
                 catch (Exception e)
                 {
@@ -361,7 +361,7 @@ namespace Hazel.Udp.FewerThreads
         {
         }
 
-        protected virtual void Dispose(bool disposing)
+        protected override void Dispose(bool disposing)
         {
             foreach (var kvp in this.allConnections)
             {
@@ -396,11 +396,8 @@ namespace Hazel.Udp.FewerThreads
             this.receiveQueue = null;
             this.sendQueue?.Dispose();
             this.sendQueue = null;
-        }
 
-        public void Dispose()
-        {
-            this.Dispose(true);
+            base.Dispose(disposing);
         }
     }
 }
