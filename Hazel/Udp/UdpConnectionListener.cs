@@ -136,12 +136,18 @@ namespace Hazel.Udp
             }
             catch (SocketException sx)
             {
+                message.Recycle();
+                if (sx.SocketErrorCode == SocketError.NotConnected)
+                {
+                    this.InvokeInternalError(HazelInternalErrors.ConnectionDisconnected);
+                    return;
+                }
+
                 // Client no longer reachable, pretend it didn't happen
                 // TODO should this not inform the connection this client is lost???
 
                 // This thread suggests the IP is not passed out from WinSoc so maybe not possible
                 // http://stackoverflow.com/questions/2576926/python-socket-error-on-udp-data-receive-10054
-                message.Recycle();
                 this.Logger?.WriteError($"Socket Ex {sx.SocketErrorCode} in ReadCallback: {sx.Message}");
 
                 Thread.Sleep(10);
@@ -150,7 +156,7 @@ namespace Hazel.Udp
             }
             catch (Exception ex)
             {
-                //If the socket's been disposed then we can just end there.
+                // Idk, maybe a null ref after dispose?
                 message.Recycle();
                 this.Logger?.WriteError("Stopped due to: " + ex.Message);
                 return;

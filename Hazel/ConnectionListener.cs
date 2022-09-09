@@ -40,6 +40,16 @@ namespace Hazel
         public event Action<NewConnectionEventArgs> NewConnection;
 
         /// <summary>
+        /// Invoked when an internal error causes the listener to be unable to continue handling messages.
+        /// </summary>
+        /// <remarks>
+        /// Support for this is still pretty limited. At the time of writing, only iOS devices need this in one case:
+        /// When iOS suspends an app, it might also free our socket while not allowing Unity to run in the background.
+        /// When Unity resumes, it can't know that time passed or the socket is freed, so we used to continuously throw internal errors.
+        /// </remarks>
+        public event Action<HazelInternalErrors> OnInternalError;
+
+        /// <summary>
         ///     Makes this connection listener begin listening for connections.
         /// </summary>
         /// <remarks>
@@ -81,6 +91,32 @@ namespace Hazel
             }
         }
 
+
+        /// <summary>
+        ///     Invokes the InternalError event with the supplied reason.
+        /// </summary>
+        /// <param name="msg">The user sent bytes that were received as part of the handshake.</param>
+        /// <param name="connection">The connection to pass in the arguments.</param>
+        /// <remarks>
+        ///     Implementers should call this to invoke the <see cref="NewConnection"/> event before data is received so that
+        ///     subscribers do not miss any data that may have been sent immediately after connecting.
+        /// </remarks>
+        protected void InvokeInternalError(HazelInternalErrors reason)
+        {
+            // Make a copy to avoid race condition between null check and invocation
+            Action<HazelInternalErrors> handler = this.OnInternalError;
+            if (handler != null)
+            {
+                try
+                {
+                    handler(reason);
+                }
+                catch
+                {
+                }
+            }
+        }
+
         /// <summary>
         ///     Call to dispose of the connection listener.
         /// </summary>
@@ -96,6 +132,7 @@ namespace Hazel
         protected virtual void Dispose(bool disposing)
         {
             this.NewConnection = null;
+            this.OnInternalError = null;
         }
     }
 }
