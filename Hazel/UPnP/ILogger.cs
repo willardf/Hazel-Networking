@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Hazel
 {
@@ -10,6 +6,7 @@ namespace Hazel
     {
         void WriteVerbose(string msg);
         void WriteError(string msg);
+        void WriteWarning(string msg);
         void WriteInfo(string msg);
     }
 
@@ -22,6 +19,10 @@ namespace Hazel
         }
 
         public void WriteError(string msg)
+        {
+        }
+
+        public void WriteWarning(string msg)
         {
         }
 
@@ -44,6 +45,11 @@ namespace Hazel
             {
                 Console.WriteLine($"{DateTime.Now} [VERBOSE] {msg}");
             }
+        }
+
+        public void WriteWarning(string msg)
+        {
+            Console.WriteLine($"{DateTime.Now} [WARN] {msg}");
         }
 
         public void WriteError(string msg)
