@@ -27,6 +27,18 @@ namespace Hazel.UnitTests
             }
         }
 
+        public void WriteWarning(string msg)
+        {
+            if (string.IsNullOrEmpty(this.prefix))
+            {
+                Console.WriteLine($"[WARN] {msg}");
+            }
+            else
+            {
+                Console.WriteLine($"[{this.prefix}][WARN] {msg}");
+            }
+        }
+
         public void WriteError(string msg)
         {
             if (string.IsNullOrEmpty(this.prefix))

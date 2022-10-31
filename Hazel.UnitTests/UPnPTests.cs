@@ -36,6 +36,11 @@ namespace Hazel.UnitTests
             Console.WriteLine(msg);
         }
 
+        public void WriteWarning(string msg)
+        {
+            Console.WriteLine(msg);
+        }
+
         public void WriteError(string msg)
         {
             Console.WriteLine(msg);
