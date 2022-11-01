@@ -17,6 +17,11 @@ namespace Hazel.Udp.FewerThreads
             };
         }
 
+        public override string ToString()
+        {
+            return this.Serial.ToString();
+        }
+
         public bool Equals(ConnectionId other)
         {
             return this.Serial == other.Serial

@@ -39,15 +39,16 @@ namespace Hazel.Dtls
         {
             Dispose();
 
+            this.ConnectionId = connectionId;
             this.Epoch = 0;
             this.CanHandleApplicationData = false;
             while (this.QueuedApplicationDataMessage.TryDequeue(out _));
 
+            this.CurrentEpoch.ConnectionId = this.ConnectionId;
             this.CurrentEpoch.NextOutgoingSequence = 2; // Account for our ClientHelloVerify
             this.CurrentEpoch.NextExpectedSequence = nextExpectedSequenceNumber;
             this.CurrentEpoch.PreviousSequenceWindowBitmask = 0;
-            this.CurrentEpoch.MasterRecordProtection = NullRecordProtection.Instance;
-            this.CurrentEpoch.PreviousRecordProtection = null;
+            this.CurrentEpoch.SetRecordProtection(NullRecordProtection.Instance);
             this.CurrentEpoch.ServerFinishedVerification.SecureClear();
             this.CurrentEpoch.ExpectedClientFinishedVerification.SecureClear();
 
@@ -59,8 +60,6 @@ namespace Hazel.Dtls
             this.NextEpoch.VerificationStream = new Sha256Stream();
             this.NextEpoch.ClientVerification = new byte[Finished.Size];
             this.NextEpoch.ServerVerification = new byte[Finished.Size];
-
-            this.ConnectionId = connectionId;
 
             this.StartOfNegotiation = DateTime.UtcNow;
         }

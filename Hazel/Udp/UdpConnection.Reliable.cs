@@ -72,6 +72,10 @@ namespace Hazel.Udp
         /// </remarks>
         private float _pingMs = 500;
 
+        public int MissingAcks => this.reliableDataPacketsSent.Count; 
+        public int MissingPings => this.pingsSinceAck;
+        public int LastPacketAcked;
+
         /// <summary>
         ///     The maximum times a message should be resent before marking the endpoint as disconnected.
         /// </summary>
@@ -123,13 +127,14 @@ namespace Hazel.Udp
             // Packets resent
             public int Resend()
             {
+                Packet self;
                 var connection = this.Connection;
                 if (!this.Acknowledged && connection != null)
                 {
                     long lifetimeMs = this.Stopwatch.ElapsedMilliseconds;
                     if (lifetimeMs >= connection.DisconnectTimeoutMs)
                     {
-                        if (connection.reliableDataPacketsSent.TryRemove(this.Id, out Packet self))
+                        if (connection.reliableDataPacketsSent.TryRemove(this.Id, out self))
                         {
                             connection.DisconnectInternal(HazelInternalErrors.ReliablePacketWithoutResponse, $"Reliable packet {self.Id} (size={this.Length}) was not ack'd after {lifetimeMs}ms ({self.Retransmissions} resends)");
 
@@ -145,7 +150,7 @@ namespace Hazel.Udp
                         if (connection.ResendLimit != 0
                             && this.Retransmissions > connection.ResendLimit)
                         {
-                            if (connection.reliableDataPacketsSent.TryRemove(this.Id, out Packet self))
+                            if (connection.reliableDataPacketsSent.TryRemove(this.Id, out self))
                             {
                                 connection.DisconnectInternal(HazelInternalErrors.ReliablePacketWithoutResponse, $"Reliable packet {self.Id} (size={this.Length}) was not ack'd after {self.Retransmissions} resends ({lifetimeMs}ms)");
 
@@ -436,6 +441,14 @@ namespace Hazel.Udp
                 lock (PingLock)
                 {
                     this._pingMs = this._pingMs * .7f + rt * .3f;
+                }
+            }
+
+            lock (PingLock)
+            {
+                if (id > this.LastPacketAcked || this.LastPacketAcked - id > 32000)
+                {
+                    this.LastPacketAcked = id;
                 }
             }
         }

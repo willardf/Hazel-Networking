@@ -311,8 +311,7 @@ namespace Hazel.Dtls
                             peer.CanHandleApplicationData = false; // Need a Finished message
                             peer.CurrentEpoch.NextOutgoingSequenceForPreviousEpoch = (ulong)peer.CurrentEpoch.NextOutgoingSequence;
                             peer.CurrentEpoch.PreviousRecordProtection?.Dispose();
-                            peer.CurrentEpoch.PreviousRecordProtection = peer.CurrentEpoch.MasterRecordProtection;
-                            peer.CurrentEpoch.MasterRecordProtection = peer.NextEpoch.RecordProtection;
+                            peer.CurrentEpoch.SetRecordProtection(peer.NextEpoch.RecordProtection);
                             peer.CurrentEpoch.NextOutgoingSequence = 1;
                             peer.CurrentEpoch.NextExpectedSequence = 1;
                             peer.CurrentEpoch.PreviousSequenceWindowBitmask = 0;

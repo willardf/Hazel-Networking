@@ -20,9 +20,15 @@ namespace Hazel
 
         private void RunProcessing()
         {
-            while (this.inputs.TryTake(out var item, Timeout.Infinite))
+            foreach (var item in this.inputs.GetConsumingEnumerable())
             {
-                this.factory(item);
+                try
+                {
+                    this.factory(item);
+                }
+                catch
+                {
+                }
             }
         }
 

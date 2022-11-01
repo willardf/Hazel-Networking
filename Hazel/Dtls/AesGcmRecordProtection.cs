@@ -11,7 +11,7 @@ namespace Hazel.Dtls
     public class Aes128GcmRecordProtection : IRecordProtection
     {
         private static int InstanceCount;
-        public int Id { get; } = Interlocked.Increment(ref InstanceCount);
+        public int Id { get; }
 
         private const int ImplicitNonceSize = 4;
         private const int ExplicitNonceSize = 8;
@@ -33,6 +33,8 @@ namespace Hazel.Dtls
         /// <param name="clientRandom">Client random data</param>
         public Aes128GcmRecordProtection(ByteSpan masterSecret, ByteSpan serverRandom, ByteSpan clientRandom)
         {
+            this.Id = Interlocked.Increment(ref InstanceCount);
+
             ByteSpan combinedRandom = new byte[serverRandom.Length + clientRandom.Length];
             serverRandom.CopyTo(combinedRandom);
             clientRandom.CopyTo(combinedRandom.Slice(serverRandom.Length));
@@ -59,8 +61,9 @@ namespace Hazel.Dtls
             this.clientWriteCipher = new Aes128Gcm(this.clientWriteKey);
         }
 
-        private Aes128GcmRecordProtection(ByteSpan clientWriteKey, ByteSpan serverWriteKey, ByteSpan clientWriteIV, ByteSpan serverWriteIV)
+        private Aes128GcmRecordProtection(int id, ByteSpan clientWriteKey, ByteSpan serverWriteKey, ByteSpan clientWriteIV, ByteSpan serverWriteIV)
         {
+            this.Id = id;
             this.clientWriteKey = clientWriteKey;
             this.serverWriteKey = serverWriteKey;
             this.clientWriteIV = clientWriteIV;
@@ -145,7 +148,7 @@ namespace Hazel.Dtls
 
         public IRecordProtection Duplicate()
         {
-            return new Aes128GcmRecordProtection(this.clientWriteKey, this.serverWriteKey, this.clientWriteIV, this.serverWriteIV);
+            return new Aes128GcmRecordProtection(this.Id, this.clientWriteKey, this.serverWriteKey, this.clientWriteIV, this.serverWriteIV);
         }
 
         private static bool DecryptCiphertext(ByteSpan output, ByteSpan input, ref Record record, Aes128Gcm cipher, ByteSpan writeIV)

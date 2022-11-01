@@ -56,7 +56,6 @@ namespace Hazel.Udp.FewerThreads
         
         private BlockingCollection<ReceiveMessageInfo> receiveQueue;
         protected BlockingCollection<SendMessageInfo> sendQueue = new BlockingCollection<SendMessageInfo>();
-        private HazelPipelineSegment<SendMessageInfo> appDataQueue;
 
         public int MaxAge
         {
@@ -75,7 +74,7 @@ namespace Hazel.Udp.FewerThreads
         }
 
         public int ConnectionCount { get { return this.allConnections.Count; } }
-        public int SendQueueLength { get { return this.appDataQueue.Count; } }
+        public int SendQueueLength { get { return this.sendQueue.Count; } }
         public int ReceiveQueueLength { get { return this.receiveQueue.Count; } }
 
         private bool isActive;
@@ -87,8 +86,6 @@ namespace Hazel.Udp.FewerThreads
             this.IPMode = ipMode;
 
             this.receiveQueue = new BlockingCollection<ReceiveMessageInfo>(10000);
-            this.appDataQueue = new HazelPipelineSegment<SendMessageInfo>(numWorkers, ProcessQueuedSend);
-            this.appDataQueue.Start();
 
             this.socket = UdpConnection.CreateSocket(this.IPMode);
             this.socket.ExclusiveAddressUse = true;
@@ -317,7 +314,7 @@ namespace Hazel.Udp.FewerThreads
 
         private void QueueRawData(ByteSpan span, IPEndPoint remoteEndPoint)
         {
-            this.appDataQueue.AddInput(new SendMessageInfo(span, remoteEndPoint));
+            ProcessQueuedSend(new SendMessageInfo(span, remoteEndPoint));
         }
 
         protected virtual void ProcessQueuedSend(SendMessageInfo info)
@@ -357,7 +354,6 @@ namespace Hazel.Udp.FewerThreads
             this.isActive = false;
 
             // Flush outgoing packets
-            this.appDataQueue?.Join();
             this.sendQueue.CompleteAdding();
 
             if (wasActive)
@@ -380,8 +376,6 @@ namespace Hazel.Udp.FewerThreads
 
             this.receiveQueue?.Dispose();
             this.receiveQueue = null;
-            this.appDataQueue?.Dispose();
-            this.appDataQueue = null;
 
             base.Dispose(disposing);
         }
