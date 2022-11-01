@@ -20,7 +20,7 @@ namespace Hazel.Udp.FewerThreads
         /// </remarks>
         public ThreadLimitedUdpConnectionListener Listener { get; private set; }
 
-        public ThreadLimitedUdpConnectionListener.ConnectionId ConnectionId { get; private set; }
+        public ConnectionId ConnectionId { get; private set; }
 
         /// <summary>
         ///     Creates a UdpConnection for the virtual connection to the endpoint.
@@ -28,7 +28,7 @@ namespace Hazel.Udp.FewerThreads
         /// <param name="listener">The listener that created this connection.</param>
         /// <param name="endPoint">The endpoint that we are connected to.</param>
         /// <param name="IPMode">The IPMode we are connected using.</param>
-        internal ThreadLimitedUdpServerConnection(ThreadLimitedUdpConnectionListener listener, ThreadLimitedUdpConnectionListener.ConnectionId connectionId, IPEndPoint endPoint, IPMode IPMode, ILogger logger)
+        internal ThreadLimitedUdpServerConnection(ThreadLimitedUdpConnectionListener listener, ConnectionId connectionId, IPEndPoint endPoint, IPMode IPMode, ILogger logger)
             : base(logger)
         {
             this.Listener = listener;
@@ -49,7 +49,7 @@ namespace Hazel.Udp.FewerThreads
             // but I don't want to have a bunch of client references in the send queue...
             // Does this perhaps mean the encryption is being done in the wrong class?
             this.Statistics.LogPacketSend(length);
-            Listener.SendDataRaw(bytes, EndPoint);
+            this.Listener.SendDataRaw(bytes, EndPoint);
         }
 
         /// <inheritdoc />
@@ -89,7 +89,7 @@ namespace Hazel.Udp.FewerThreads
 
             try
             {
-                this.WriteBytesToConnection(bytes, bytes.Length);
+                this.Listener.SendDisconnect(bytes, this.EndPoint);
             }
             catch { }
 

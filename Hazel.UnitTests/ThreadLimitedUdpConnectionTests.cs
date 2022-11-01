@@ -30,7 +30,8 @@ namespace Hazel.UnitTests
 
             bool serverConnected = false;
             bool serverDisconnected = false;
-            bool clientDisconnected = false;
+
+            ManualResetEvent clientDisconnected = new ManualResetEvent(false);
 
             using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger("SERVER")))
             using (UdpConnection connection = this.CreateConnection(ep, new TestLogger("CLIENT")))
@@ -40,7 +41,7 @@ namespace Hazel.UnitTests
                     serverConnected = true;
                     evt.Connection.Disconnected += (o, et) => serverDisconnected = true;
                 };
-                connection.Disconnected += (o, evt) => clientDisconnected = true;
+                connection.Disconnected += (o, evt) => clientDisconnected.Set();
 
                 listener.Start();
                 connection.Connect();
@@ -50,7 +51,7 @@ namespace Hazel.UnitTests
                 Thread.Sleep(100);
 
                 Assert.IsTrue(serverConnected);
-                Assert.IsTrue(clientDisconnected);
+                Assert.IsTrue(clientDisconnected.WaitOne(5000));
                 Assert.IsFalse(serverDisconnected);
             }
         }
@@ -378,7 +379,7 @@ namespace Hazel.UnitTests
 
                 connection.Connect();
 
-                mutex.WaitOne();
+                mutex.WaitOne(5000);
 
                 Assert.AreEqual(ConnectionState.Connected, client.State);
 

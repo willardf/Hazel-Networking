@@ -1,19 +1,26 @@
 using Hazel.Crypto;
 using System;
 using System.Diagnostics;
+using System.Threading;
 
 namespace Hazel.Dtls
 {
     /// <summary>
     /// *_AES_128_GCM_* cipher suite
     /// </summary>
-    public class Aes128GcmRecordProtection: IRecordProtection
+    public class Aes128GcmRecordProtection : IRecordProtection
     {
+        private static int InstanceCount;
+        public int Id { get; } = Interlocked.Increment(ref InstanceCount);
+
         private const int ImplicitNonceSize = 4;
         private const int ExplicitNonceSize = 8;
 
         private readonly Aes128Gcm serverWriteCipher;
         private readonly Aes128Gcm clientWriteCipher;
+
+        private readonly ByteSpan clientWriteKey;
+        private readonly ByteSpan serverWriteKey;
 
         private readonly ByteSpan serverWriteIV;
         private readonly ByteSpan clientWriteIV;
@@ -43,10 +50,21 @@ namespace Hazel.Dtls
             ByteSpan expandedKey = new byte[ExpandedSize];
             PrfSha256.ExpandSecret(expandedKey, masterSecret, PrfLabel.KEY_EXPANSION, combinedRandom);
 
-            ByteSpan clientWriteKey = expandedKey.Slice(0, Aes128Gcm.KeySize);
-            ByteSpan serverWriteKey = expandedKey.Slice(Aes128Gcm.KeySize, Aes128Gcm.KeySize);
+            this.clientWriteKey = expandedKey.Slice(0, Aes128Gcm.KeySize);
+            this.serverWriteKey = expandedKey.Slice(Aes128Gcm.KeySize, Aes128Gcm.KeySize);
             this.clientWriteIV = expandedKey.Slice(2 * Aes128Gcm.KeySize, ImplicitNonceSize);
             this.serverWriteIV = expandedKey.Slice(2 * Aes128Gcm.KeySize + ImplicitNonceSize, ImplicitNonceSize);
+
+            this.serverWriteCipher = new Aes128Gcm(this.serverWriteKey);
+            this.clientWriteCipher = new Aes128Gcm(this.clientWriteKey);
+        }
+
+        private Aes128GcmRecordProtection(ByteSpan clientWriteKey, ByteSpan serverWriteKey, ByteSpan clientWriteIV, ByteSpan serverWriteIV)
+        {
+            this.clientWriteKey = clientWriteKey;
+            this.serverWriteKey = serverWriteKey;
+            this.clientWriteIV = clientWriteIV;
+            this.serverWriteIV = serverWriteIV;
 
             this.serverWriteCipher = new Aes128Gcm(serverWriteKey);
             this.clientWriteCipher = new Aes128Gcm(clientWriteKey);
@@ -123,6 +141,11 @@ namespace Hazel.Dtls
         public bool DecryptCiphertextFromClient(ByteSpan output, ByteSpan input, ref Record record)
         {
             return DecryptCiphertext(output, input, ref record, this.clientWriteCipher, this.clientWriteIV);
+        }
+
+        public IRecordProtection Duplicate()
+        {
+            return new Aes128GcmRecordProtection(this.clientWriteKey, this.serverWriteKey, this.clientWriteIV, this.serverWriteIV);
         }
 
         private static bool DecryptCiphertext(ByteSpan output, ByteSpan input, ref Record record, Aes128Gcm cipher, ByteSpan writeIV)
