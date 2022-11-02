@@ -31,7 +31,6 @@ namespace Hazel.Dtls
         public IRecordProtection MasterRecordProtection { get; private set; }
         public IRecordProtection PreviousRecordProtection { get; private set; }
 
-        [ThreadStatic]
         private ConcurrentBag<IRecordProtection> allRecordProtections;
 
         // Need to keep these around so we can re-transmit our
