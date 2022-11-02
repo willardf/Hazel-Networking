@@ -8,6 +8,11 @@ namespace Hazel.Dtls
     public interface IRecordProtection : IDisposable
     {
         /// <summary>
+        /// An id shared by this record protection and all its copies
+        /// </summary>
+        int Id { get; }
+
+        /// <summary>
         /// Calculate the size of an encrypted plaintext
         /// </summary>
         /// <param name="dataSize">Size of plaintext in bytes</param>
@@ -62,6 +67,11 @@ namespace Hazel.Dtls
         /// <param name="record">Parent DTLS record</param>
         /// <returns>True if the input was authenticated and decrypted. Otherwise false</returns>
         bool DecryptCiphertextFromClient(ByteSpan output, ByteSpan input, ref Record record);
+
+        /// <summary>
+        /// Creates an exact duplicate of this instance.
+        /// </summary>
+        IRecordProtection Duplicate();
     }
 
     /// <summary>

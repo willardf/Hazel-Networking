@@ -12,10 +12,16 @@ namespace Hazel.Udp.FewerThreads
     /// <inheritdoc />
     public class ThreadLimitedUdpConnectionListener : NetworkConnectionListener
     {
-        private struct SendMessageInfo
+        protected struct SendMessageInfo
         {
             public ByteSpan Span;
             public IPEndPoint Recipient;
+
+            public SendMessageInfo(ByteSpan span, IPEndPoint recipient)
+            {
+                this.Span = span;
+                this.Recipient = recipient;
+            }
         }
 
         private struct ReceiveMessageInfo
@@ -46,49 +52,11 @@ namespace Hazel.Udp.FewerThreads
 
         public bool ReceiveThreadRunning => this.receiveThread.ThreadState == ThreadState.Running;
 
-        public struct ConnectionId : IEquatable<ConnectionId>
-        {
-            public IPEndPoint EndPoint;
-            public int Serial;
-
-            public static ConnectionId Create(IPEndPoint endPoint, int serial)
-            {
-                return new ConnectionId{
-                    EndPoint = endPoint,
-                    Serial = serial,
-                };
-            }
-
-            public bool Equals(ConnectionId other)
-            {
-                return this.Serial == other.Serial
-                    && this.EndPoint.Equals(other.EndPoint)
-                    ;
-            }
-
-            public override bool Equals(object obj)
-            {
-                if (obj is ConnectionId)
-                {
-                    return this.Equals((ConnectionId)obj);
-                }
-
-                return false;
-            }
-
-            public override int GetHashCode()
-            {
-                ///NOTE(mendsley): We're only hashing the endpoint
-                /// here, as the common case will have one
-                /// connection per address+port tuple.
-                return this.EndPoint.GetHashCode();
-            }
-        }
-
         protected ConcurrentDictionary<ConnectionId, ThreadLimitedUdpServerConnection> allConnections = new ConcurrentDictionary<ConnectionId, ThreadLimitedUdpServerConnection>();
         
         private BlockingCollection<ReceiveMessageInfo> receiveQueue;
-        private BlockingCollection<SendMessageInfo> sendQueue = new BlockingCollection<SendMessageInfo>();
+        protected BlockingCollection<SendMessageInfo> sendQueue = new BlockingCollection<SendMessageInfo>();
+        private HazelPipelineSegment<SendMessageInfo> appDataQueue;
 
         public int MaxAge
         {
@@ -107,7 +75,7 @@ namespace Hazel.Udp.FewerThreads
         }
 
         public int ConnectionCount { get { return this.allConnections.Count; } }
-        public int SendQueueLength { get { return this.sendQueue.Count; } }
+        public int SendQueueLength { get { return this.appDataQueue.Count; } }
         public int ReceiveQueueLength { get { return this.receiveQueue.Count; } }
 
         private bool isActive;
@@ -119,6 +87,8 @@ namespace Hazel.Udp.FewerThreads
             this.IPMode = ipMode;
 
             this.receiveQueue = new BlockingCollection<ReceiveMessageInfo>(10000);
+            this.appDataQueue = new HazelPipelineSegment<SendMessageInfo>(numWorkers, ProcessQueuedSend);
+            this.appDataQueue.Start();
 
             this.socket = UdpConnection.CreateSocket(this.IPMode);
             this.socket.ExclusiveAddressUse = true;
@@ -230,9 +200,9 @@ namespace Hazel.Udp.FewerThreads
                 {
                     this.ReadCallback(msg.Message, msg.Sender, msg.ConnectionId);
                 }
-                catch
+                catch (Exception ex)
                 {
-
+                    this.Logger.WriteError("Uncaught exception from read callback: " + ex);
                 }
             }
         }
@@ -260,7 +230,7 @@ namespace Hazel.Udp.FewerThreads
                 }
                 catch (Exception e)
                 {
-                    this.Logger.WriteError("Error in loop while sending: " + e.Message);
+                    this.Logger.WriteError("Error in loop while sending: " + e);
                     Thread.Sleep(1);
                 }
             }
@@ -340,9 +310,24 @@ namespace Hazel.Udp.FewerThreads
             QueueRawData(response, remoteEndPoint);
         }
 
-        protected virtual void QueueRawData(ByteSpan span, IPEndPoint remoteEndPoint)
+        internal void SendDisconnect(byte[] buffer, IPEndPoint remoteEndPoint)
         {
-            this.sendQueue.TryAdd(new SendMessageInfo() { Span = span, Recipient = remoteEndPoint });
+            this.ProcessQueuedSend(new SendMessageInfo(buffer, remoteEndPoint));
+        }
+
+        private void QueueRawData(ByteSpan span, IPEndPoint remoteEndPoint)
+        {
+            this.appDataQueue.AddInput(new SendMessageInfo(span, remoteEndPoint));
+        }
+
+        protected virtual void ProcessQueuedSend(SendMessageInfo info)
+        {
+            if (info.Span.GetUnderlyingArray() == null)
+            {
+                return;
+            }
+
+            this.sendQueue.TryAdd(info);
         }
 
         /// <summary>
@@ -372,7 +357,8 @@ namespace Hazel.Udp.FewerThreads
             this.isActive = false;
 
             // Flush outgoing packets
-            this.sendQueue?.CompleteAdding();
+            this.appDataQueue?.Join();
+            this.sendQueue.CompleteAdding();
 
             if (wasActive)
             {
@@ -394,8 +380,8 @@ namespace Hazel.Udp.FewerThreads
 
             this.receiveQueue?.Dispose();
             this.receiveQueue = null;
-            this.sendQueue?.Dispose();
-            this.sendQueue = null;
+            this.appDataQueue?.Dispose();
+            this.appDataQueue = null;
 
             base.Dispose(disposing);
         }

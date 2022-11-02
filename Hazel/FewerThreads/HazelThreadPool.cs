@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Hazel
 {
-    internal class HazelThreadPool
+    public class HazelThreadPool
     {
         private Thread[] threads;
 

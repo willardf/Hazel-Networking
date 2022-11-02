@@ -22,143 +22,6 @@ namespace Hazel.Dtls
         // Min MTU - UDP+IP header - 1 (for good measure. :))
         private const int MaxCertFragmentSizeV1 = 576 - 32 - 1;
 
-        /// <summary>
-        /// Current state of handshake sequence
-        /// </summary>
-        enum HandshakeState
-        {
-            ExpectingHello,
-            ExpectingClientKeyExchange,
-            ExpectingChangeCipherSpec,
-            ExpectingFinish
-        }
-
-        /// <summary>
-        /// State to manage the current epoch `N`
-        /// </summary>
-        struct CurrentEpoch
-        {
-            public ulong NextOutgoingSequence;
-
-            public ulong NextExpectedSequence;
-            public ulong PreviousSequenceWindowBitmask;
-
-            public IRecordProtection RecordProtection;
-            public IRecordProtection PreviousRecordProtection;
-
-            // Need to keep these around so we can re-transmit our
-            // last handshake record flight
-            public ByteSpan ExpectedClientFinishedVerification;
-            public ByteSpan ServerFinishedVerification;
-            public ulong NextOutgoingSequenceForPreviousEpoch;
-        }
-
-        /// <summary>
-        /// State to manage the transition from the current
-        /// epoch `N` to epoch `N+1`
-        /// </summary>
-        struct NextEpoch
-        {
-            public ushort Epoch;
-
-            public HandshakeState State;
-            public CipherSuite SelectedCipherSuite;
-
-            public ulong NextOutgoingSequence;
-
-            public IHandshakeCipherSuite Handshake;
-            public IRecordProtection RecordProtection;
-
-            public ByteSpan ClientRandom;
-            public ByteSpan ServerRandom;
-
-            public Sha256Stream VerificationStream;
-
-            public ByteSpan ClientVerification;
-            public ByteSpan ServerVerification;
-
-        }
-
-        /// <summary>
-        /// Per-peer state
-        /// </summary>
-        sealed class PeerData : IDisposable
-        {
-            public ushort Epoch;
-            public bool CanHandleApplicationData;
-
-            public HazelDtlsSessionInfo Session;
-
-            public CurrentEpoch CurrentEpoch;
-            public NextEpoch  NextEpoch;
-
-            public ConnectionId ConnectionId;
-
-            public readonly List<ByteSpan> QueuedApplicationDataMessage = new List<ByteSpan>();
-            public readonly ConcurrentBag<MessageReader> ApplicationData = new ConcurrentBag<MessageReader>();
-            public readonly ProtocolVersion ProtocolVersion;
-
-            public DateTime StartOfNegotiation;
-
-            public PeerData(ConnectionId connectionId, ulong nextExpectedSequenceNumber, ProtocolVersion protocolVersion)
-            {
-                ByteSpan block = new byte[2 * Finished.Size];
-                this.CurrentEpoch.ServerFinishedVerification = block.Slice(0, Finished.Size);
-                this.CurrentEpoch.ExpectedClientFinishedVerification = block.Slice(Finished.Size, Finished.Size);
-                this.ProtocolVersion = protocolVersion;
-
-                ResetPeer(connectionId, nextExpectedSequenceNumber);
-            }
-
-            public void ResetPeer(ConnectionId connectionId, ulong nextExpectedSequenceNumber)
-            {
-                Dispose();
-
-                this.Epoch = 0;
-                this.CanHandleApplicationData = false;
-                this.QueuedApplicationDataMessage.Clear();
-
-                this.CurrentEpoch.NextOutgoingSequence = 2; // Account for our ClientHelloVerify
-                this.CurrentEpoch.NextExpectedSequence = nextExpectedSequenceNumber;
-                this.CurrentEpoch.PreviousSequenceWindowBitmask = 0;
-                this.CurrentEpoch.RecordProtection = NullRecordProtection.Instance;
-                this.CurrentEpoch.PreviousRecordProtection = null;
-                this.CurrentEpoch.ServerFinishedVerification.SecureClear();
-                this.CurrentEpoch.ExpectedClientFinishedVerification.SecureClear();
-
-                this.NextEpoch.State = HandshakeState.ExpectingHello;
-                this.NextEpoch.RecordProtection = null;
-                this.NextEpoch.Handshake = null;
-                this.NextEpoch.ClientRandom = new byte[Random.Size];
-                this.NextEpoch.ServerRandom = new byte[Random.Size];
-                this.NextEpoch.VerificationStream = new Sha256Stream();
-                this.NextEpoch.ClientVerification = new byte[Finished.Size];
-                this.NextEpoch.ServerVerification = new byte[Finished.Size];
-
-                this.ConnectionId = connectionId;
-
-                this.StartOfNegotiation = DateTime.UtcNow;
-            }
-
-            public void Dispose()
-            {
-                this.CurrentEpoch.RecordProtection?.Dispose();
-                this.CurrentEpoch.PreviousRecordProtection?.Dispose();
-                this.NextEpoch.RecordProtection?.Dispose();
-                this.NextEpoch.Handshake?.Dispose();
-                this.NextEpoch.VerificationStream?.Dispose();
-
-                while (this.ApplicationData.TryTake(out var msg))
-                {
-                    try
-                    {
-                        msg.Recycle();
-                    }
-                    catch { }
-                }
-            }
-        }
-
         private RandomNumberGenerator random;
 
         // Private key component of certificate's public key
@@ -387,7 +250,7 @@ namespace Hazel.Dtls
                     }
 
                     // Validate record authenticity
-                    int decryptedSize = peer.CurrentEpoch.RecordProtection.GetDecryptedSize(recordPayload.Length);
+                    int decryptedSize = peer.CurrentEpoch.MasterRecordProtection.GetDecryptedSize(recordPayload.Length);
                     if (decryptedSize < 0)
                     {
                         this.Logger.WriteInfo($"Dropping malformed record: Length {recordPayload.Length} Decrypted length: {decryptedSize}");
@@ -397,7 +260,7 @@ namespace Hazel.Dtls
                     ByteSpan decryptedPayload = recordPayload.ReuseSpanIfPossible(decryptedSize);
                     ProtocolVersion protocolVersion = peer.ProtocolVersion;
 
-                    if (!peer.CurrentEpoch.RecordProtection.DecryptCiphertextFromClient(decryptedPayload, recordPayload, ref record))
+                    if (!peer.CurrentEpoch.MasterRecordProtection.DecryptCiphertextFromClient(decryptedPayload, recordPayload, ref record))
                     {
                         this.Logger.WriteVerbose($"Dropping non-authentic {record.ContentType} record from `{peerAddress}`");
                         return;
@@ -446,10 +309,9 @@ namespace Hazel.Dtls
                             // Migrate to the next epoch
                             peer.Epoch = peer.NextEpoch.Epoch;
                             peer.CanHandleApplicationData = false; // Need a Finished message
-                            peer.CurrentEpoch.NextOutgoingSequenceForPreviousEpoch = peer.CurrentEpoch.NextOutgoingSequence;
+                            peer.CurrentEpoch.NextOutgoingSequenceForPreviousEpoch = (ulong)peer.CurrentEpoch.NextOutgoingSequence;
                             peer.CurrentEpoch.PreviousRecordProtection?.Dispose();
-                            peer.CurrentEpoch.PreviousRecordProtection = peer.CurrentEpoch.RecordProtection;
-                            peer.CurrentEpoch.RecordProtection = peer.NextEpoch.RecordProtection;
+                            peer.CurrentEpoch.SetRecordProtection(peer.NextEpoch.RecordProtection);
                             peer.CurrentEpoch.NextOutgoingSequence = 1;
                             peer.CurrentEpoch.NextExpectedSequence = 1;
                             peer.CurrentEpoch.PreviousSequenceWindowBitmask = 0;
@@ -703,7 +565,7 @@ namespace Hazel.Dtls
                             // Either way, there is not a feasible
                             // way to progress the connection.
                             MarkConnectionAsStale(peer.ConnectionId);
-                            this.existingPeers.TryRemove(peerAddress, out _);
+                            this.RemovePeerRecord(peer.ConnectionId);
 
                             return false;
                         }
@@ -731,8 +593,8 @@ namespace Hazel.Dtls
                         finishedRecord.ContentType = ContentType.Handshake;
                         finishedRecord.ProtocolVersion = protocolVersion;
                         finishedRecord.Epoch = peer.Epoch;
-                        finishedRecord.SequenceNumber = peer.CurrentEpoch.NextOutgoingSequence;
-                        finishedRecord.Length = (ushort)peer.CurrentEpoch.RecordProtection.GetEncryptedSize(plaintextFinishedPayloadSize);
+                        finishedRecord.SequenceNumber = (ulong)peer.CurrentEpoch.NextOutgoingSequence;
+                        finishedRecord.Length = (ushort)peer.CurrentEpoch.MasterRecordProtection.GetEncryptedSize(plaintextFinishedPayloadSize);
                         ++peer.CurrentEpoch.NextOutgoingSequence;
 
                         // Encode the flight into wire format
@@ -758,7 +620,7 @@ namespace Hazel.Dtls
                         );
 
                         // Protect the Finished Handshake record
-                        peer.CurrentEpoch.RecordProtection.EncryptServerPlaintext(
+                        peer.CurrentEpoch.MasterRecordProtection.EncryptServerPlaintext(
                             startOfFinishedRecord.Slice(Record.Size, finishedRecord.Length),
                             startOfFinishedRecord.Slice(Record.Size, plaintextFinishedPayloadSize),
                             ref finishedRecord
@@ -766,8 +628,7 @@ namespace Hazel.Dtls
 
                         // Current epoch can now handle application data
                         peer.CanHandleApplicationData = true;
-
-                        base.QueueRawData(packet, peerAddress);
+                        this.sendQueue.Add(new SendMessageInfo(packet, peerAddress));
                         break;
 
                     // Drop messages that we do not support
@@ -847,7 +708,7 @@ namespace Hazel.Dtls
                         outgoingSequence = peer.CurrentEpoch.NextExpectedSequence;
                         ++peer.CurrentEpoch.NextOutgoingSequenceForPreviousEpoch;
 
-                        recordProtection = peer.CurrentEpoch.RecordProtection;
+                        recordProtection = peer.CurrentEpoch.MasterRecordProtection;
                     }
 
 #if DEBUG
@@ -990,8 +851,8 @@ namespace Hazel.Dtls
             initialRecord.ContentType = ContentType.Handshake;
             initialRecord.ProtocolVersion = protocolVersion;
             initialRecord.Epoch = peer.Epoch;
-            initialRecord.SequenceNumber = peer.CurrentEpoch.NextOutgoingSequence;
-            initialRecord.Length = (ushort)peer.CurrentEpoch.RecordProtection.GetEncryptedSize(initialRecordPayloadSize);
+            initialRecord.SequenceNumber = (ulong)peer.CurrentEpoch.NextOutgoingSequence;
+            initialRecord.Length = (ushort)peer.CurrentEpoch.MasterRecordProtection.GetEncryptedSize(initialRecordPayloadSize);
             ++peer.CurrentEpoch.NextOutgoingSequence;
 
             // Convert initial record of the flight to
@@ -1010,13 +871,13 @@ namespace Hazel.Dtls
             certificateData = certificateData.Slice(certInitialFragmentSize);
 
             // Protect initial record of the flight
-            peer.CurrentEpoch.RecordProtection.EncryptServerPlaintext(
+            peer.CurrentEpoch.MasterRecordProtection.EncryptServerPlaintext(
                 packet.Slice(Record.Size, initialRecord.Length),
                 packet.Slice(Record.Size, initialRecordPayloadSize),
                 ref initialRecord
             );
 
-            base.QueueRawData(packet, peerAddress);
+            this.sendQueue.Add(new SendMessageInfo(packet, peerAddress));
 
             // Record record payload for verification
             if (recordMessagesForVerifyData)
@@ -1054,8 +915,8 @@ namespace Hazel.Dtls
                 additionalRecord.ContentType = ContentType.Handshake;
                 additionalRecord.ProtocolVersion = protocolVersion;
                 additionalRecord.Epoch = peer.Epoch;
-                additionalRecord.SequenceNumber = peer.CurrentEpoch.NextOutgoingSequence;
-                additionalRecord.Length = (ushort)peer.CurrentEpoch.RecordProtection.GetEncryptedSize(additionalRecordPayloadSize);
+                additionalRecord.SequenceNumber = (ulong)peer.CurrentEpoch.NextOutgoingSequence;
+                additionalRecord.Length = (ushort)peer.CurrentEpoch.MasterRecordProtection.GetEncryptedSize(additionalRecordPayloadSize);
                 ++peer.CurrentEpoch.NextOutgoingSequence;
 
                 // Convert record to wire format
@@ -1070,13 +931,13 @@ namespace Hazel.Dtls
                 certificateData = certificateData.Slice(certFragmentSize);
 
                 // Protect record
-                peer.CurrentEpoch.RecordProtection.EncryptServerPlaintext(
+                peer.CurrentEpoch.MasterRecordProtection.EncryptServerPlaintext(
                     packet.Slice(Record.Size, additionalRecord.Length),
                     packet.Slice(Record.Size, additionalRecordPayloadSize),
                     ref additionalRecord
                 );
 
-                base.QueueRawData(packet, peerAddress);
+                this.sendQueue.Add(new SendMessageInfo(packet, peerAddress));
             }
 
             // Describe final record of the flight
@@ -1102,8 +963,8 @@ namespace Hazel.Dtls
             finalRecord.ContentType = ContentType.Handshake;
             finalRecord.ProtocolVersion = protocolVersion;
             finalRecord.Epoch = peer.Epoch;
-            finalRecord.SequenceNumber = peer.CurrentEpoch.NextOutgoingSequence;
-            finalRecord.Length = (ushort)peer.CurrentEpoch.RecordProtection.GetEncryptedSize(finalRecordPayloadSize);
+            finalRecord.SequenceNumber = (ulong)peer.CurrentEpoch.NextOutgoingSequence;
+            finalRecord.Length = (ushort)peer.CurrentEpoch.MasterRecordProtection.GetEncryptedSize(finalRecordPayloadSize);
             ++peer.CurrentEpoch.NextOutgoingSequence;
 
             // Convert final record of the flight to wire
@@ -1130,13 +991,13 @@ namespace Hazel.Dtls
             }
 
             // Protect final record of the flight
-            peer.CurrentEpoch.RecordProtection.EncryptServerPlaintext(
+            peer.CurrentEpoch.MasterRecordProtection.EncryptServerPlaintext(
                 packet.Slice(Record.Size, finalRecord.Length),
                 packet.Slice(Record.Size, finalRecordPayloadSize),
                 ref finalRecord
             );
 
-            base.QueueRawData(packet, peerAddress);
+            this.sendQueue.Add(new SendMessageInfo(packet, peerAddress));
 
             return true;
         }
@@ -1187,7 +1048,7 @@ namespace Hazel.Dtls
             // We only accept Handshake protocol messages from non-peers
             if (record.ContentType != ContentType.Handshake)
             {
-                this.Logger.WriteError($"Dropping non-handhsake message from non-peer `{peerAddress}`");
+                this.Logger.WriteError($"Dropping non-handshake message from non-peer `{peerAddress}`: {record.ContentType}");
                 return;
             }
 
@@ -1275,92 +1136,61 @@ namespace Hazel.Dtls
                 ref record
             );
 
-            base.QueueRawData(packet, peerAddress);
+            this.sendQueue.TryAdd(new SendMessageInfo(packet, peerAddress));
         }
 
         /// <summary>
         /// Handle a requrest to send a datagram to the network
         /// </summary>
-        protected override void QueueRawData(ByteSpan span, IPEndPoint remoteEndPoint)
+        protected override void ProcessQueuedSend(SendMessageInfo msg)
         {
             PeerData peer;
-            if (!this.existingPeers.TryGetValue(remoteEndPoint, out peer))
+            if (!this.existingPeers.TryGetValue(msg.Recipient, out peer))
             {
                 // Drop messages if we don't know how to send them
                 return;
             }
 
-            lock (peer)
+            // If we're negotiating a new epoch, queue data
+            if (peer.Epoch == 0 || peer.NextEpoch.State != HandshakeState.ExpectingHello)
             {
-                // If we're negotiating a new epoch, queue data
-                if (peer.Epoch == 0 || peer.NextEpoch.State != HandshakeState.ExpectingHello)
-                {
-                    ByteSpan copyOfSpan = new byte[span.Length];
-                    span.CopyTo(copyOfSpan);
-
-                    peer.QueuedApplicationDataMessage.Add(copyOfSpan);
-                    return;
-                }
-
-                ProtocolVersion protocolVersion = peer.ProtocolVersion;
-
-                // Send any queued application data now
-                for (int ii = 0, nn = peer.QueuedApplicationDataMessage.Count; ii != nn; ++ii)
-                {
-                    ByteSpan queuedSpan = peer.QueuedApplicationDataMessage[ii];
-
-                    Record outgoingRecord = new Record();
-                    outgoingRecord.ContentType = ContentType.ApplicationData;
-                    outgoingRecord.ProtocolVersion = protocolVersion;
-                    outgoingRecord.Epoch = peer.Epoch;
-                    outgoingRecord.SequenceNumber = peer.CurrentEpoch.NextOutgoingSequence;
-                    outgoingRecord.Length = (ushort)peer.CurrentEpoch.RecordProtection.GetEncryptedSize(queuedSpan.Length);
-                    ++peer.CurrentEpoch.NextOutgoingSequence;
-
-                    // Encode the record to wire format
-                    ByteSpan packet = new byte[Record.Size + outgoingRecord.Length];
-                    ByteSpan writer = packet;
-                    outgoingRecord.Encode(writer);
-                    writer = writer.Slice(Record.Size);
-                    queuedSpan.CopyTo(writer);
-
-                    // Protect the record
-                    peer.CurrentEpoch.RecordProtection.EncryptServerPlaintext(
-                        packet.Slice(Record.Size, outgoingRecord.Length),
-                        packet.Slice(Record.Size, queuedSpan.Length),
-                        ref outgoingRecord
-                    );
-
-                    base.QueueRawData(packet, remoteEndPoint);
-                }
-                peer.QueuedApplicationDataMessage.Clear();
-
-                {
-                    Record outgoingRecord = new Record();
-                    outgoingRecord.ContentType = ContentType.ApplicationData;
-                    outgoingRecord.ProtocolVersion = protocolVersion;
-                    outgoingRecord.Epoch = peer.Epoch;
-                    outgoingRecord.SequenceNumber = peer.CurrentEpoch.NextOutgoingSequence;
-                    outgoingRecord.Length = (ushort)peer.CurrentEpoch.RecordProtection.GetEncryptedSize(span.Length);
-                    ++peer.CurrentEpoch.NextOutgoingSequence;
-
-                    // Encode the record to wire format
-                    ByteSpan packet = new byte[Record.Size + outgoingRecord.Length];
-                    ByteSpan writer = packet;
-                    outgoingRecord.Encode(writer);
-                    writer = writer.Slice(Record.Size);
-                    span.CopyTo(writer);
-
-                    // Protect the record
-                    peer.CurrentEpoch.RecordProtection.EncryptServerPlaintext(
-                        packet.Slice(Record.Size, outgoingRecord.Length),
-                        packet.Slice(Record.Size, span.Length),
-                        ref outgoingRecord
-                    );
-
-                    base.QueueRawData(packet, remoteEndPoint);
-                }
+                peer.QueuedApplicationDataMessage.Enqueue(msg.Span);
+                return;
             }
+
+            // Send any queued application data now
+            while (peer.QueuedApplicationDataMessage.TryDequeue(out var queuedSpan))
+            {
+                EncryptEnqueueApplicationDataRecord(msg, peer, queuedSpan);
+            }
+
+            EncryptEnqueueApplicationDataRecord(msg, peer, msg.Span);
+        }
+
+        private void EncryptEnqueueApplicationDataRecord(SendMessageInfo msg, PeerData peer, ByteSpan queuedSpan)
+        {
+            Record outgoingRecord = new Record();
+            outgoingRecord.ContentType = ContentType.ApplicationData;
+            outgoingRecord.ProtocolVersion = peer.ProtocolVersion;
+            outgoingRecord.Epoch = peer.Epoch;
+            outgoingRecord.SequenceNumber = (ulong)Interlocked.Increment(ref peer.CurrentEpoch.NextOutgoingSequence);
+            outgoingRecord.Length = (ushort)peer.CurrentEpoch.MasterRecordProtection.GetEncryptedSize(queuedSpan.Length);
+
+            // Encode the record to wire format
+            ByteSpan packet = new byte[Record.Size + outgoingRecord.Length];
+            ByteSpan writer = packet;
+            outgoingRecord.Encode(writer);
+            writer = writer.Slice(Record.Size);
+            queuedSpan.CopyTo(writer);
+
+            // Protect the record
+            peer.CurrentEpoch.EncryptServerPlaintext_ThreadSafe(
+                packet.Slice(Record.Size, outgoingRecord.Length),
+                packet.Slice(Record.Size, queuedSpan.Length),
+                ref outgoingRecord
+            );
+
+            this.sendQueue.TryAdd(new SendMessageInfo(packet, msg.Recipient));
         }
 
         private void HandleStaleConnections(object _)
@@ -1405,7 +1235,10 @@ namespace Hazel.Dtls
         /// <inheritdoc />
         internal override void RemovePeerRecord(ConnectionId connectionId)
         {
-            this.existingPeers.TryRemove(connectionId.EndPoint, out _);
+            if (this.existingPeers.TryRemove(connectionId.EndPoint, out var peer))
+            {
+                peer.Dispose();
+            }
         }
 
         /// <summary>
@@ -1416,6 +1249,5 @@ namespace Hazel.Dtls
             int rawSerialId = Interlocked.Increment(ref this.connectionSerial_unsafe);
             return ConnectionId.Create(endPoint, rawSerialId);
         }
-
     }
 }

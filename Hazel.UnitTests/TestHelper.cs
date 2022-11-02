@@ -1,11 +1,8 @@
-using System;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-
-using Hazel;
-using System.Net;
-using System.Threading;
-using System.Diagnostics;
 using Hazel.Udp.FewerThreads;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
+using System.Diagnostics;
+using System.Threading;
 
 namespace Hazel.UnitTests
 {
@@ -17,90 +14,41 @@ namespace Hazel.UnitTests
         /// </summary>
         /// <param name="listener">The listener to test.</param>
         /// <param name="connection">The connection to test.</param>
-        internal static void RunServerToClientTest(ThreadLimitedUdpConnectionListener listener, Connection connection, int dataSize, SendOption sendOption)
-        {
-            //Setup meta stuff 
-            MessageWriter data = BuildData(sendOption, dataSize);
-            ManualResetEvent mutex = new ManualResetEvent(false);
-
-            //Setup listener
-            listener.NewConnection += delegate (NewConnectionEventArgs ncArgs)
-            {
-                ncArgs.Connection.Send(data);
-            };
-
-            listener.Start();
-
-            DataReceivedEventArgs? result = null;
-            //Setup conneciton
-            connection.DataReceived += delegate (DataReceivedEventArgs a)
-            {
-                Trace.WriteLine("Data was received correctly.");
-
-                try
-                {
-                    result = a;
-                }
-                finally
-                {
-                    mutex.Set();
-                }
-            };
-
-            connection.Connect();
-
-            //Wait until data is received
-            mutex.WaitOne();
-
-            var dataReader = ConvertToMessageReader(data);
-            Assert.AreEqual(dataReader.Length, result.Value.Message.Length);
-            for (int i = 0; i < dataReader.Length; i++)
-            {
-                Assert.AreEqual(dataReader.ReadByte(), result.Value.Message.ReadByte());
-            }
-
-            Assert.AreEqual(sendOption, result.Value.SendOption);
-        }
-
-        /// <summary>
-        ///     Runs a general test on the given listener and connection.
-        /// </summary>
-        /// <param name="listener">The listener to test.</param>
-        /// <param name="connection">The connection to test.</param>
         internal static void RunServerToClientTest(NetworkConnectionListener listener, Connection connection, int dataSize, SendOption sendOption)
         {
             //Setup meta stuff 
             MessageWriter data = BuildData(sendOption, dataSize);
-            ManualResetEvent mutex = new ManualResetEvent(false);
+            ManualResetEvent clientConnected = new ManualResetEvent(false);
+            ManualResetEvent dataReceived = new ManualResetEvent(false);
 
+            Connection conn = null;
             //Setup listener
             listener.NewConnection += delegate (NewConnectionEventArgs ncArgs)
             {
-                ncArgs.Connection.Send(data);
+                conn = ncArgs.Connection;
+                clientConnected.Set();
+            };
+
+            //Setup connection
+            DataReceivedEventArgs? result = null;
+            connection.DataReceived += delegate (DataReceivedEventArgs a)
+            {
+                Console.WriteLine("Data was received correctly.");
+                result = a;
+                dataReceived.Set();
             };
 
             listener.Start();
-
-            DataReceivedEventArgs? result = null;
-            //Setup conneciton
-            connection.DataReceived += delegate (DataReceivedEventArgs a)
-            {
-                Trace.WriteLine("Data was received correctly.");
-
-                try
-                {
-                    result = a;
-                }
-                finally
-                {
-                    mutex.Set();
-                }
-            };
-
             connection.Connect();
 
-            //Wait until data is received
-            mutex.WaitOne();
+            // Wait until data is received
+            Assert.IsTrue(clientConnected.WaitOne(1000), "Client never connected");
+
+            Assert.AreEqual(SendErrors.None, conn.Send(data));
+            Console.WriteLine("Data was sent correctly.");
+
+            // Wait until data is received
+            Assert.IsTrue(dataReceived.WaitOne(1000), "Data was never received");
 
             var dataReader = ConvertToMessageReader(data);
             Assert.AreEqual(dataReader.Length, result.Value.Message.Length);
@@ -130,10 +78,8 @@ namespace Hazel.UnitTests
             {
                 args.Connection.DataReceived += delegate (DataReceivedEventArgs innerArgs)
                 {
-                    Trace.WriteLine("Data was received correctly.");
-
+                    Console.WriteLine("Data was received correctly.");
                     result = innerArgs;
-
                     mutex2.Set();
                 };
 
@@ -141,71 +87,17 @@ namespace Hazel.UnitTests
             };
 
             listener.Start();
-
-            //Connect
             connection.Connect();
 
-            mutex.WaitOne();
+            Assert.IsTrue(mutex.WaitOne(1000), "Client never connected");
 
-            connection.Send(data);
+            Assert.AreEqual(SendErrors.None, connection.Send(data));
 
-            //Wait until data is received
-            mutex2.WaitOne();
+            Assert.IsTrue(mutex2.WaitOne(1000), "Data was never received");
 
             var dataReader = ConvertToMessageReader(data);
             Assert.AreEqual(dataReader.Length, result.Value.Message.Length);
             for (int i = 0; i < data.Length; i++)
-            {
-                Assert.AreEqual(dataReader.ReadByte(), result.Value.Message.ReadByte());
-            }
-
-            Assert.AreEqual(sendOption, result.Value.SendOption);
-        }
-
-
-        /// <summary>
-        ///     Runs a general test on the given listener and connection.
-        /// </summary>
-        /// <param name="listener">The listener to test.</param>
-        /// <param name="connection">The connection to test.</param>
-        internal static void RunClientToServerTest(ThreadLimitedUdpConnectionListener listener, Connection connection, int dataSize, SendOption sendOption)
-        {
-            //Setup meta stuff 
-            MessageWriter data = BuildData(sendOption, dataSize);
-            ManualResetEvent mutex = new ManualResetEvent(false);
-            ManualResetEvent mutex2 = new ManualResetEvent(false);
-
-            //Setup listener
-            DataReceivedEventArgs? result = null;
-            listener.NewConnection += delegate (NewConnectionEventArgs args)
-            {
-                args.Connection.DataReceived += delegate (DataReceivedEventArgs innerArgs)
-                {
-                    Trace.WriteLine("Data was received correctly.");
-
-                    result = innerArgs;
-
-                    mutex2.Set();
-                };
-
-                mutex.Set();
-            };
-
-            listener.Start();
-
-            //Connect
-            connection.Connect();
-
-            Assert.IsTrue(mutex.WaitOne(100), "Timeout while connecting");
-
-            connection.Send(data);
-
-            //Wait until data is received
-            Assert.IsTrue(mutex2.WaitOne(100), "Timeout while sending data");
-
-            var dataReader = ConvertToMessageReader(data);
-            Assert.AreEqual(dataReader.Length, result.Value.Message.Length);
-            for (int i = 0; i < dataReader.Length; i++)
             {
                 Assert.AreEqual(dataReader.ReadByte(), result.Value.Message.ReadByte());
             }

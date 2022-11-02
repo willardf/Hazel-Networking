@@ -135,6 +135,13 @@ namespace Hazel
 
         #region WriteMethods
 
+        public void CopyFrom(MessageWriter target)
+        {
+            target.SendOption = target.SendOption;
+            System.Buffer.BlockCopy(target.Buffer, 0, this.Buffer, 0, target.Length);
+            this.Position = this.Length = target.Length;
+        }
+
         public void CopyFrom(MessageReader target)
         {
             int offset, length;

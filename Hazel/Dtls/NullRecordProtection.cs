@@ -11,6 +11,8 @@ namespace Hazel.Dtls
     /// </summary>
     public class NullRecordProtection : IRecordProtection
     {
+        public int Id => -1;
+
         public readonly static NullRecordProtection Instance = new NullRecordProtection();
 
         public void Dispose()
@@ -47,6 +49,11 @@ namespace Hazel.Dtls
         {
             CopyMaybeOverlappingSpans(output, input);
             return true;
+        }
+
+        public IRecordProtection Duplicate()
+        {
+            return this;
         }
 
         private static void CopyMaybeOverlappingSpans(ByteSpan output, ByteSpan input)

@@ -87,7 +87,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
         protected DtlsConnectionListener CreateListener(int numWorkers, IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
         {
-            DtlsConnectionListener listener = new DtlsConnectionListener(2, endPoint, logger, ipMode);
+            DtlsConnectionListener listener = new DtlsConnectionListener(numWorkers, endPoint, logger, ipMode);
             listener.SetCertificate(GetCertificateForServer());
             return listener;
 
@@ -105,42 +105,38 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         {
             IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 27510);
 
-            bool serverConnected = false;
+            ManualResetEventSlim serverConnected = new ManualResetEventSlim();
             bool serverDisconnected = false;
-            bool clientDisconnected = false;
+            ManualResetEventSlim clientDisconnected = new ManualResetEventSlim();
 
-            Semaphore signal = new Semaphore(0, int.MaxValue);
-
-            using (var listener = (DtlsConnectionListener)CreateListener(2, new IPEndPoint(IPAddress.Any, ep.Port), new TestLogger()))
+            using (var listener = CreateListener(2, new IPEndPoint(IPAddress.Any, ep.Port), new TestLogger()))
             using (var connection = CreateConnection(ep, new TestLogger()))
             {
                 listener.NewConnection += (evt) =>
                 {
-                    serverConnected = true;
-                    signal.Release();
-                    evt.Connection.Disconnected += (o, et) => {
+                    serverConnected.Set();
+                    evt.Connection.Disconnected += (o, et) =>
+                    {
                         serverDisconnected = true;
                     };
                 };
-                connection.Disconnected += (o, evt) => {
-                    clientDisconnected = true;
-                    signal.Release();
+
+                connection.Disconnected += (o, evt) =>
+                {
+                    clientDisconnected.Set();
                 };
 
                 listener.Start();
                 connection.Connect();
 
                 // wait for the client to connect
-                signal.WaitOne(10);
+                Assert.IsTrue(serverConnected.Wait(1000), "Server never connected");
 
                 listener.Dispose();
 
-                // wait for the client to disconnect
-                signal.WaitOne(100);
+                Assert.IsTrue(clientDisconnected.Wait(5000), "Client never disconnected");
+                Assert.IsFalse(serverDisconnected, "Server shouldn't see a disconnect event when disposing.");
 
-                Assert.IsTrue(serverConnected);
-                Assert.IsTrue(clientDisconnected);
-                Assert.IsFalse(serverDisconnected);
                 Assert.AreEqual(0, listener.PeerCount);
             }
         }
@@ -221,7 +217,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 27510);
 
             IPEndPoint connectionEndPoint = ep;
-            DtlsConnectionListener.ConnectionId connectionId = new ThreadLimitedUdpConnectionListener.ConnectionId();
+            ConnectionId connectionId = new ConnectionId();
 
             Semaphore signal = new Semaphore(0, int.MaxValue);
 
@@ -277,7 +273,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 27510);
 
             IPEndPoint connectionEndPoint = ep;
-            DtlsConnectionListener.ConnectionId connectionId = new ThreadLimitedUdpConnectionListener.ConnectionId();
+            ConnectionId connectionId = new ConnectionId();
 
             Semaphore signal = new Semaphore(0, int.MaxValue);
 
@@ -963,8 +959,8 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         [TestMethod]
         public void DtlsUnreliableServerToClientTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
-            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger("Server")))
+            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger("Client")))
             {
                 TestHelper.RunServerToClientTest(listener, connection, 10, SendOption.None);
             }
@@ -1081,17 +1077,17 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             using (var listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger("Server")))
             using (var connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger("Client")))
             {
-                ManualResetEvent mutex = new ManualResetEvent(false);
-                ManualResetEvent mutex2 = new ManualResetEvent(false);
+                ManualResetEvent clientConnected = new ManualResetEvent(false);
+                ManualResetEvent clientDisconnected = new ManualResetEvent(false);
 
                 listener.NewConnection += delegate (NewConnectionEventArgs args)
                 {
                     args.Connection.Disconnected += delegate (object sender2, DisconnectedEventArgs args2)
                     {
-                        mutex2.Set();
+                        clientDisconnected.Set();
                     };
 
-                    mutex.Set();
+                    clientConnected.Set();
                 };
 
                 listener.Start();
@@ -1099,12 +1095,12 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 connection.Connect();
 
                 Assert.AreEqual(ConnectionState.Connected, connection.State);
-                mutex.WaitOne(1000);
+                Assert.IsTrue(clientConnected.WaitOne(1000), "Client never connected");
                 Assert.AreEqual(ConnectionState.Connected, connection.State);
 
                 connection.Disconnect("Testing");
 
-                mutex2.WaitOne(1000);
+                Assert.IsTrue(clientDisconnected.WaitOne(1000), "Client never disconnected");
                 Assert.AreEqual(ConnectionState.NotConnected, connection.State);
             }
         }

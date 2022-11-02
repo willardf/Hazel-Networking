@@ -53,6 +53,42 @@ namespace Hazel.UnitTests.Dtls
             }
         }
 
+
+        [TestMethod]
+        public void ServerCanEncryptWithDuplicateInstances()
+        {
+            using (Aes128GcmRecordProtection recordProtection = new Aes128GcmRecordProtection(this.masterSecret, this.serverRandom, this.clientRandom))
+            using (IRecordProtection duplicateProtection = recordProtection.Duplicate())
+            {
+                byte[] messageAsBytes = Encoding.UTF8.GetBytes(TestMessage);
+
+                // I want to see that if instances are used at different rates, the outputs are deterministic
+                Record unusedRecord = new Record();
+                unusedRecord.Length = (ushort)recordProtection.GetEncryptedSize(messageAsBytes.Length);
+                ByteSpan unused = new byte[unusedRecord.Length];
+                recordProtection.EncryptClientPlaintext(unused, messageAsBytes, ref unusedRecord);
+
+                Record record = new Record();
+                record.ContentType = ContentType.ApplicationData;
+                record.ProtocolVersion = ProtocolVersion.DTLS1_2;
+                record.Epoch = 1;
+                record.SequenceNumber = 124;
+                record.Length = (ushort)recordProtection.GetEncryptedSize(messageAsBytes.Length);
+
+                ByteSpan encrypted1 = new byte[record.Length];
+                recordProtection.EncryptClientPlaintext(encrypted1, messageAsBytes, ref record);
+
+                ByteSpan encrypted2 = new byte[record.Length];
+                duplicateProtection.EncryptClientPlaintext(encrypted2, messageAsBytes, ref record);
+
+                Assert.AreEqual(encrypted1.Length, encrypted2.Length);
+                for (int i = 0; i < encrypted1.Length; i++)
+                {
+                    Assert.AreEqual(encrypted1[i], encrypted2[i]);
+                }
+            }
+        }
+
         [TestMethod]
         public void ClientCanEncryptAndDecryptData()
         {
