@@ -565,7 +565,7 @@ namespace Hazel.Dtls
                             // Either way, there is not a feasible
                             // way to progress the connection.
                             MarkConnectionAsStale(peer.ConnectionId);
-                            this.existingPeers.TryRemove(peerAddress, out _);
+                            this.RemovePeerRecord(peer.ConnectionId);
 
                             return false;
                         }
@@ -1235,7 +1235,10 @@ namespace Hazel.Dtls
         /// <inheritdoc />
         internal override void RemovePeerRecord(ConnectionId connectionId)
         {
-            this.existingPeers.TryRemove(connectionId.EndPoint, out _);
+            if (this.existingPeers.TryRemove(connectionId.EndPoint, out var peer))
+            {
+                peer.Dispose();
+            }
         }
 
         /// <summary>
@@ -1246,6 +1249,5 @@ namespace Hazel.Dtls
             int rawSerialId = Interlocked.Increment(ref this.connectionSerial_unsafe);
             return ConnectionId.Create(endPoint, rawSerialId);
         }
-
     }
 }
