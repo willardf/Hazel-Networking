@@ -295,9 +295,8 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         {
             IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 27510);
 
-            IPEndPoint connectionEndPoint = ep;
-
-            Semaphore signal = new Semaphore(0, int.MaxValue);
+            Connection serverConnection = null;
+            bool clientDisconnected = false;
 
             using (LocklessDtlsConnectionListener listener = new LocklessDtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, ep.Port), new TestLogger()))
             using (MalformedDTLSClient connection = new MalformedDTLSClient(new TestLogger(), ep))
@@ -307,14 +306,11 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
                 listener.NewConnection += (evt) =>
                 {
-                    connectionEndPoint = evt.Connection.EndPoint;
-
-                    signal.Release();
-                    evt.Connection.Disconnected += (o, et) => {
-                    };
+                    serverConnection = evt.Connection;
                 };
+
                 connection.Disconnected += (o, evt) => {
-                    signal.Release();
+                    clientDisconnected = true;
                 };
 
                 listener.Start();
@@ -322,12 +318,10 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
                 Assert.IsTrue(listener.ReceiveThreadRunning, "Listener should be able to handle a malformed hello packet");
                 Assert.AreEqual(ConnectionState.NotConnected, connection.State);
+                Assert.IsNull(serverConnection, "Server NewConnection event should not fire");
+                Assert.IsTrue(clientDisconnected, "Client disconnect event should fire");
 
-                Assert.AreEqual(0, listener.ConnectionCount);
-
-                // wait for the client to disconnect
-                listener.Dispose();
-                signal.WaitOne(100);
+                Assert.AreEqual(1, listener.ConnectionCount, "We expect the listener to count this connection until it times out server-side.");
             }
         }
 

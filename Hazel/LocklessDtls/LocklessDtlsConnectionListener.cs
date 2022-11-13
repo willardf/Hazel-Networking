@@ -1,3 +1,4 @@
+using Hazel.Tools;
 using Hazel.Udp;
 using System;
 using System.Collections.Concurrent;
@@ -61,7 +62,7 @@ namespace Hazel.Dtls
 
         protected ConcurrentDictionary<EndPoint, LocklessDtlsServerConnection> allConnections = new ConcurrentDictionary<EndPoint, LocklessDtlsServerConnection>();
         
-        private BlockingCollection<LocklessDtlsServerConnection> receiveQueue;
+        private ConcurrentSetQueue<LocklessDtlsServerConnection> receiveQueue;
         private BlockingCollection<SendMessageInfo> sendQueue = new BlockingCollection<SendMessageInfo>();
 
         public int MaxAge
@@ -96,7 +97,7 @@ namespace Hazel.Dtls
 
             this.hmacHelper = new ThreadedHmacHelper(logger);
 
-            this.receiveQueue = new BlockingCollection<LocklessDtlsServerConnection>();
+            this.receiveQueue = new ConcurrentSetQueue<LocklessDtlsServerConnection>();
 
             this.socket = UdpConnection.CreateSocket(this.IPMode);
             this.socket.ExclusiveAddressUse = true;
@@ -235,13 +236,17 @@ namespace Hazel.Dtls
         internal void EnqueueMessageReceived(MessageReader message, LocklessDtlsServerConnection connection)
         {
             connection.PacketsReceived.Enqueue(message);
-            this.receiveQueue.TryAdd(connection);
+            try
+            {
+                this.receiveQueue.TryAdd(connection);
+            }
+            catch { }
         }
 
         private void ProcessingLoop()
         {
             var myTid = Thread.CurrentThread.ManagedThreadId;
-            foreach (var sender in this.receiveQueue.GetConsumingEnumerable())
+            while (this.receiveQueue.TryTake(out var sender))
             {
                 if (Interlocked.CompareExchange(ref sender.LockedBy, myTid, 0) != 0)
                 {
@@ -426,7 +431,7 @@ namespace Hazel.Dtls
                 this.processThreads.Join();
             }
 
-            this.receiveQueue?.Dispose();
+            // this.receiveQueue?.Dispose();
             this.receiveQueue = null;
             this.sendQueue?.Dispose();
             this.sendQueue = null;
