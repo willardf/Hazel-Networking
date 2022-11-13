@@ -82,25 +82,19 @@ namespace Hazel.UnitTests
             listener.Start();
 
             DataReceivedEventArgs? result = null;
-            //Setup conneciton
             connection.DataReceived += delegate (DataReceivedEventArgs a)
             {
                 Trace.WriteLine("Data was received correctly.");
-
-                try
-                {
-                    result = a;
-                }
-                finally
-                {
-                    mutex.Set();
-                }
+                result = a;
+                mutex.Set();
             };
 
             connection.Connect();
 
             //Wait until data is received
-            mutex.WaitOne();
+            mutex.WaitOne(1000);
+
+            Assert.IsNotNull(result, "Data never received");
 
             var dataReader = ConvertToMessageReader(data);
             Assert.AreEqual(dataReader.Length, result.Value.Message.Length);
