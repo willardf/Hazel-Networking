@@ -227,10 +227,15 @@ namespace Hazel.Dtls
                         }
                     }
 
-                    connection.PacketsReceived.Enqueue(message);
-                    this.receiveQueue.Add(connection);
+                    EnqueueMessageReceived(message, connection);
                 }
             }
+        }
+
+        internal void EnqueueMessageReceived(MessageReader message, LocklessDtlsServerConnection connection)
+        {
+            connection.PacketsReceived.Enqueue(message);
+            this.receiveQueue.TryAdd(connection);
         }
 
         private void ProcessingLoop()
@@ -369,7 +374,7 @@ namespace Hazel.Dtls
             connection.HandleReceive(message, bytesReceived);
         }
 
-        internal void QueueRawData(byte[] response, LocklessDtlsServerConnection connection)
+        internal void QueuePlaintextAppData(byte[] response, LocklessDtlsServerConnection connection)
         {
             connection.PacketsSent.Enqueue(response);
             this.receiveQueue.TryAdd(connection);
@@ -386,6 +391,14 @@ namespace Hazel.Dtls
 
         protected override void Dispose(bool disposing)
         {
+            // Stop receiving messages and drain the queue
+            var rcvQueue = this.receiveQueue;
+            if (rcvQueue != null)
+            {
+                rcvQueue.CompleteAdding();
+                while (rcvQueue.TryTake(out _)) ;
+            }
+
             foreach (var kvp in this.allConnections)
             {
                 kvp.Value.Dispose();
@@ -405,8 +418,6 @@ namespace Hazel.Dtls
             try { this.socket.Shutdown(SocketShutdown.Both); } catch { }
             try { this.socket.Close(); } catch { }
             try { this.socket.Dispose(); } catch { }
-
-            this.receiveQueue?.CompleteAdding();
 
             if (wasActive)
             {

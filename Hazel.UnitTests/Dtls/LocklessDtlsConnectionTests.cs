@@ -166,20 +166,20 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             }
         }
 
-        class MalformedDTLSListener : DtlsConnectionListener
+        class MalformedDTLSListener : LocklessDtlsConnectionListener
         {
             public MalformedDTLSListener(int numWorkers, IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
                 : base(numWorkers, endPoint, logger, ipMode)
             {
             }
 
-            public void InjectPacket(ByteSpan packet, IPEndPoint peerAddress, ConnectionId connectionId)
+            public void InjectPacket(ByteSpan packet, LocklessDtlsServerConnection connection)
             {
                 MessageReader reader = MessageReader.GetSized(packet.Length);
                 reader.Length = packet.Length;
                 Array.Copy(packet.GetUnderlyingArray(), packet.Offset, reader.Buffer, reader.Offset, packet.Length);
 
-                base.ProcessIncomingMessageFromOtherThread(reader, peerAddress, connectionId);
+                this.EnqueueMessageReceived(reader, connection);
             }
         }
 
@@ -241,8 +241,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         {
             IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 27510);
 
-            IPEndPoint connectionEndPoint = ep;
-            DtlsConnectionListener.ConnectionId connectionId = new ThreadLimitedUdpConnectionListener.ConnectionId();
+            LocklessDtlsServerConnection serverConnection = null;
 
             Semaphore signal = new Semaphore(0, int.MaxValue);
 
@@ -254,8 +253,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
                 listener.NewConnection += (evt) =>
                 {
-                    connectionEndPoint = evt.Connection.EndPoint;
-                    connectionId = ((ThreadLimitedUdpServerConnection)evt.Connection).ConnectionId;
+                    serverConnection = (LocklessDtlsServerConnection)evt.Connection;
 
                     signal.Release();
                     evt.Connection.Disconnected += (o, et) => {
@@ -284,7 +282,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 record.Encode(encoded);
                 data.CopyTo(encoded.Slice(Record.Size));
 
-                listener.InjectPacket(encoded, connectionEndPoint, connectionId);
+                listener.InjectPacket(encoded, serverConnection);
 
                 // wait for the client to disconnect
                 listener.Dispose();
@@ -298,11 +296,10 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 27510);
 
             IPEndPoint connectionEndPoint = ep;
-            DtlsConnectionListener.ConnectionId connectionId = new ThreadLimitedUdpConnectionListener.ConnectionId();
 
             Semaphore signal = new Semaphore(0, int.MaxValue);
 
-            using (DtlsConnectionListener listener = new DtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, ep.Port), new TestLogger()))
+            using (LocklessDtlsConnectionListener listener = new LocklessDtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, ep.Port), new TestLogger()))
             using (MalformedDTLSClient connection = new MalformedDTLSClient(new TestLogger(), ep))
             {
                 listener.SetCertificate(GetCertificateForServer());
@@ -311,7 +308,6 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 listener.NewConnection += (evt) =>
                 {
                     connectionEndPoint = evt.Connection.EndPoint;
-                    connectionId = ((ThreadLimitedUdpServerConnection)evt.Connection).ConnectionId;
 
                     signal.Release();
                     evt.Connection.Disconnected += (o, et) => {
@@ -327,7 +323,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 Assert.IsTrue(listener.ReceiveThreadRunning, "Listener should be able to handle a malformed hello packet");
                 Assert.AreEqual(ConnectionState.NotConnected, connection.State);
 
-                Assert.AreEqual(0, listener.PeerCount);
+                Assert.AreEqual(0, listener.ConnectionCount);
 
                 // wait for the client to disconnect
                 listener.Dispose();
@@ -351,7 +347,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             var logger = new TestLogger("Throttle");
 
             using (SocketCapture capture = new SocketCapture(captureEndPoint, listenerEndPoint, logger))
-            using (DtlsConnectionListener listener = new DtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, listenerEndPoint.Port), new TestLogger("Server")))
+            using (LocklessDtlsConnectionListener listener = new LocklessDtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, listenerEndPoint.Port), new TestLogger("Server")))
             using (DtlsUnityConnection connection = new DtlsUnityConnection(new TestLogger("Client "), captureEndPoint))
             {
                 Semaphore listenerToConnectionThrottle = new Semaphore(0, int.MaxValue);
@@ -433,7 +429,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             var logger = new TestLogger("Throttle");
 
             using (SocketCapture capture = new SocketCapture(captureEndPoint, listenerEndPoint, logger))
-            using (DtlsConnectionListener listener = new DtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, listenerEndPoint.Port), new TestLogger("Server")))
+            using (LocklessDtlsConnectionListener listener = new LocklessDtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, listenerEndPoint.Port), new TestLogger("Server")))
             using (DtlsUnityConnection connection = new DtlsUnityConnection(new TestLogger("Client "), captureEndPoint))
             {
                 Semaphore listenerToConnectionThrottle = new Semaphore(0, int.MaxValue);
@@ -506,7 +502,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             Semaphore signal = new Semaphore(0, int.MaxValue);
 
             using (SocketCapture capture = new SocketCapture(captureEndPoint, listenerEndPoint))
-            using (DtlsConnectionListener listener = new DtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, listenerEndPoint.Port), new TestLogger("Server")))
+            using (LocklessDtlsConnectionListener listener = new LocklessDtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, listenerEndPoint.Port), new TestLogger("Server")))
             using (DtlsUnityConnection connection = new DtlsUnityConnection(new TestLogger("Client "), captureEndPoint))
             {
                 Semaphore listenerToConnectionThrottle = new Semaphore(0, int.MaxValue);
@@ -577,7 +573,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             Semaphore signal = new Semaphore(0, int.MaxValue);
 
             using (SocketCapture capture = new SocketCapture(captureEndPoint, listenerEndPoint))
-            using (DtlsConnectionListener listener = new DtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, listenerEndPoint.Port), new TestLogger()))
+            using (LocklessDtlsConnectionListener listener = new LocklessDtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, listenerEndPoint.Port), new TestLogger()))
             using (TestDtlsHandshakeDropUnityConnection connection = new TestDtlsHandshakeDropUnityConnection(new TestLogger(), captureEndPoint))
             {
                 connection.DropSendClientKeyExchangeFlightCount = 1;

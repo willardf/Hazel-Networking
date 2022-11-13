@@ -1059,7 +1059,7 @@ namespace Hazel.Dtls
         /// <summary>
         /// Handle a request to send a datagram to the network
         /// </summary>
-        private void EncryptAndSendAppData(ByteSpan span, LocklessDtlsServerConnection connection)
+        internal void EncryptAndSendAppData(ByteSpan span, LocklessDtlsServerConnection connection)
         {
             PeerData peer = connection.PeerData;
             if (peer == null)

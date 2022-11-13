@@ -53,7 +53,19 @@ namespace Hazel.Dtls
             // but I don't want to have a bunch of client references in the send queue...
             // Does this perhaps mean the encryption is being done in the wrong class?
             this.Statistics.LogPacketSend(length);
-            this.Listener.QueueRawData(bytes, this);
+            this.Listener.QueuePlaintextAppData(bytes, this);
+        }
+
+        /// <inheritdoc />
+        private void WriteBytesToConnectionSync(byte[] bytes, int length)
+        {
+            if (bytes.Length != length) throw new ArgumentException("I made an assumption here. I hope you see this error.");
+
+            // Hrm, well this is inaccurate for DTLS connections because the Listener does the encryption which may change the size.
+            // but I don't want to have a bunch of client references in the send queue...
+            // Does this perhaps mean the encryption is being done in the wrong class?
+            this.Statistics.LogPacketSend(length);
+            this.Listener.EncryptAndSendAppData(bytes, this);
         }
 
         /// <inheritdoc />
@@ -82,11 +94,12 @@ namespace Hazel.Dtls
             }
 
             this.PeerData = peerData;
-            this.State = ConnectionState.Connected;
+            this.State = ConnectionState.Connecting;
         }
 
         internal void SetHelloAsProcessed()
         {
+            this.State = ConnectionState.Connected;
             this.HelloProcessed = true;
             this.InitializeKeepAliveTimer();
         }
@@ -110,7 +123,7 @@ namespace Hazel.Dtls
 
             try
             {
-                this.WriteBytesToConnection(bytes, bytes.Length);
+                this.WriteBytesToConnectionSync(bytes, bytes.Length);
             }
             catch { }
 
