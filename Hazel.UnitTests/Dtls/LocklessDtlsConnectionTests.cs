@@ -863,11 +863,12 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                             for (int i = 0; i < serverConnections.Length; ++i)
                             {
                                 var conn = serverConnections[i];
-
                                 conn?.Send(msg);
                             }
+
                             msg.Recycle();
                         };
+
                         serverConnections[ncArgs.HandshakeData.ReadByte()] = udpConn;
                     };
 
@@ -893,28 +894,28 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                         Assert.AreEqual(ConnectionState.Connected, connection.State);
 
                         threads[myTid] = new Thread(() =>
+                        {
+                            connection.DataReceived += (DataReceivedEventArgs data) =>
                             {
-                                connection.DataReceived += (DataReceivedEventArgs data) =>
+                                var tidReceived = data.Message.ReadInt32();
+                                myArray.Count[tidReceived]++;
+                                if (myArray.Count.All(c => c == 1000))
                                 {
-                                    var tidReceived = data.Message.ReadInt32();
-                                    myArray.Count[tidReceived]++;
-                                    if (myArray.Count.All(c => c == 1000))
-                                    {
-                                        myArray.Event.Set();
-                                    }
-                                };
-
-                                var msg = MessageWriter.Get(SendOption.Reliable);
-                                msg.Write(myTid);
-
-                                for (int i = 0; i < 1000; i++)
-                                {
-                                    connection.Send(msg);
-                                    Thread.Yield();
+                                    myArray.Event.Set();
                                 }
+                            };
 
-                                msg.Recycle();
-                            });
+                            var msg = MessageWriter.Get(SendOption.Reliable);
+                            msg.Write(myTid);
+
+                            for (int i = 0; i < 1000; i++)
+                            {
+                                connection.Send(msg);
+                                Thread.Yield();
+                            }
+
+                            msg.Recycle();
+                        });
                     }
 
                     foreach (var thread in threads)
@@ -927,15 +928,12 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                         thread.Join();
                     }
 
-                    while (listener.ReceiveQueueLength > 0) Thread.Sleep(1);
-                    Thread.Sleep(1000);
-                    while (listener.SendQueueLength > 0) Thread.Sleep(1);
-                    Thread.Sleep(1000);
+                    TestHelper.WaitAll(dictionary.Values.Select(e => e.Event), TimeSpan.FromSeconds(30));
 
                     for (int tid = 0; tid < threads.Length; tid++)
                     {
                         var tidsRecieved = dictionary[tid];
-                        foreach(var cnt in tidsRecieved)
+                        foreach (var cnt in tidsRecieved.Count)
                         {
                             Assert.AreEqual(1000, cnt);
                         }

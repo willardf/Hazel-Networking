@@ -4,6 +4,7 @@ using Hazel.Udp.FewerThreads;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
@@ -830,6 +831,17 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             }
         }
 
+        private class ExchangeData
+        {
+            public int[] Count;
+            public ManualResetEventSlim Event;
+            public ExchangeData(int numClients)
+            {
+                this.Count = new int[numClients];
+                this.Event = new ManualResetEventSlim();
+            }
+        }
+
         /// <summary>
         ///  Tests send and receiving with concurrent clients
         /// </summary>
@@ -876,14 +888,14 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                     listener.Start();
 
                     // Maps MyTid to count of tid received
-                    Dictionary<int, int[]> dictionary = new Dictionary<int, int[]>();
+                    Dictionary<int, ExchangeData> dictionary = new Dictionary<int, ExchangeData>();
                     Thread[] threads = new Thread[NumClients];
                     for (int tid = 0; tid < threads.Length; tid++)
                     {
                         int myTid = tid;
                         var connection = connections[tid];
 
-                        var myArray = dictionary[myTid] = new int[NumClients];
+                        var myArray = dictionary[myTid] = new ExchangeData(NumClients);
 
                         // Set everyone up first
                         connection.Connect(new byte[] { (byte)myTid });
@@ -892,7 +904,11 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                         connection.DataReceived += (DataReceivedEventArgs data) =>
                         {
                             var tidReceived = data.Message.ReadInt32();
-                            myArray[tidReceived]++;
+                            myArray.Count[tidReceived]++;
+                            if (myArray.Count.All(c => c == 1000))
+                            {
+                                myArray.Event.Set();
+                            }
                         };
 
                         threads[myTid] = new Thread(() =>
@@ -903,7 +919,6 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                             for (int i = 0; i < 1000; i++)
                             {
                                 connection.Send(msg);
-                                Thread.Yield();
                             }
 
                             msg.Recycle();
@@ -923,15 +938,12 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                         thread.Join();
                     }
 
-                    while (listener.ReceiveQueueLength > 0) Thread.Sleep(1);
-                    Thread.Sleep(1000);
-                    while (listener.SendQueueLength > 0) Thread.Sleep(1);
-                    Thread.Sleep(1000);
+                    TestHelper.WaitAll(dictionary.Values.Select(e => e.Event), TimeSpan.FromSeconds(30));
 
                     for (int tid = 0; tid < threads.Length; tid++)
                     {
                         var tidsRecieved = dictionary[tid];
-                        foreach (var cnt in tidsRecieved)
+                        foreach (var cnt in tidsRecieved.Count)
                         {
                             Assert.AreEqual(1000, cnt);
                         }

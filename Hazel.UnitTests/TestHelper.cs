@@ -6,6 +6,7 @@ using System.Net;
 using System.Threading;
 using System.Diagnostics;
 using Hazel.Udp.FewerThreads;
+using System.Collections.Generic;
 
 namespace Hazel.UnitTests
 {
@@ -326,6 +327,18 @@ namespace Hazel.UnitTests
             }
 
             return output;
+        }
+
+        public static void WaitAll(IEnumerable<ManualResetEventSlim> events, TimeSpan MaxWait)
+        {
+            DateTime timeStart = DateTime.UtcNow;
+            foreach (var evt in events)
+            {
+                var timeSpent = DateTime.UtcNow - timeStart;
+                if (timeSpent > MaxWait) break;
+
+                evt.Wait(MaxWait - timeSpent);
+            }
         }
     }
 }
