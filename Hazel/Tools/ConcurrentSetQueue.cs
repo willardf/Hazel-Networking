@@ -10,9 +10,7 @@ namespace Hazel.Tools
 
         public int Count => this.set.Count;
 
-        public bool IsSynchronized => false;
-
-        public object SyncRoot => this.set;
+        private object SyncRoot => this.set;
 
         public bool TryAdd(T item)
         {

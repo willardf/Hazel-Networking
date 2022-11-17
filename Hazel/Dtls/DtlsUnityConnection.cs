@@ -429,7 +429,7 @@ namespace Hazel.Dtls
                 ulong windowMask = 1ul << windowIndex;
                 if (record.SequenceNumber < this.currentEpoch.NextExpectedSequence)
                 {
-                    if (windowIndex >= 64)
+                    if (windowIndex >= 96)
                     {
                         this.logger.WriteError($"Dropping too-old record: Sequnce({record.SequenceNumber}) Expected({this.currentEpoch.NextExpectedSequence})");
                         continue;

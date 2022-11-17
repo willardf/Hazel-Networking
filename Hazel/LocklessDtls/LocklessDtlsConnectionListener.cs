@@ -236,11 +236,7 @@ namespace Hazel.Dtls
         internal void EnqueueMessageReceived(MessageReader message, LocklessDtlsServerConnection connection)
         {
             connection.PacketsReceived.Enqueue(message);
-            try
-            {
-                this.receiveQueue.TryAdd(connection);
-            }
-            catch { }
+            this.receiveQueue.TryAdd(connection);
         }
 
         private void ProcessingLoop()
@@ -381,8 +377,17 @@ namespace Hazel.Dtls
 
         internal void QueuePlaintextAppData(byte[] response, LocklessDtlsServerConnection connection)
         {
-            connection.PacketsSent.Enqueue(response);
-            this.receiveQueue.TryAdd(connection);
+            var myTid = Thread.CurrentThread.ManagedThreadId;
+            if (connection.LockedBy == myTid)
+            {
+                // We are already dedicated to this connection, so let's just send instead of queueing and reading it later.
+                EncryptAndSendAppData(response, connection);
+            }
+            else
+            {
+                connection.PacketsSent.Enqueue(response);
+                this.receiveQueue.TryAdd(connection);
+            }
         }
 
         /// <summary>

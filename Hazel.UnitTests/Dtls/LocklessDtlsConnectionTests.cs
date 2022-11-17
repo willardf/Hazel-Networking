@@ -4,6 +4,7 @@ using Hazel.Udp.FewerThreads;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
@@ -821,6 +822,17 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             }
         }
 
+        private class ExchangeData
+        {
+            public int[] Count;
+            public ManualResetEventSlim Event;
+            public ExchangeData(int numClients)
+            {
+                this.Count = new int[numClients];
+                this.Event = new ManualResetEventSlim();
+            }
+        }
+
         /// <summary>
         ///  Tests send and receiving with concurrent clients
         /// </summary>
@@ -828,12 +840,22 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         public void DtlsMultithreadedExchangeTest()
         {
             const int NumClients = 4;
-            using (var listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (var listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger("Server")))
             {
                 Connection[] serverConnections = new Connection[NumClients];
                 listener.NewConnection += (ncArgs) =>
                     {
-                        ncArgs.Connection.DataReceived += (DataReceivedEventArgs data) =>
+                        // Since we're expecting to be spammed, disable resends and never drop for missing acks/pings. They just add more spam.
+                        var udpConn = (UdpConnection)ncArgs.Connection;
+                        udpConn.ResendTimeoutMs = int.MaxValue;
+                        udpConn.DisconnectTimeoutMs = int.MaxValue;
+
+                        udpConn.Disconnected += (object sender, DisconnectedEventArgs dcArgs) =>
+                        {
+                            Console.WriteLine("Server disconnected a client");
+                        };
+
+                        udpConn.DataReceived += (DataReceivedEventArgs data) =>
                         {
                             var tid = data.Message.ReadInt32();
                             var msg = MessageWriter.Get(SendOption.Reliable);
@@ -846,25 +868,25 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                             }
                             msg.Recycle();
                         };
-                        serverConnections[ncArgs.HandshakeData.ReadByte()] = ncArgs.Connection;
+                        serverConnections[ncArgs.HandshakeData.ReadByte()] = udpConn;
                     };
 
                 UdpConnection[] connections = null;
                 try
                 {
-                    connections = this.CreateConnections(NumClients, new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger());
+                    connections = this.CreateConnections(NumClients, new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger("Client"));
 
                     listener.Start();
 
                     // Maps MyTid to count of tid received
-                    Dictionary<int, int[]> dictionary = new Dictionary<int, int[]>();
+                    Dictionary<int, ExchangeData> dictionary = new Dictionary<int, ExchangeData>();
                     Thread[] threads = new Thread[NumClients];
                     for (int tid = 0; tid < threads.Length; tid++)
                     {
                         int myTid = tid;
                         var connection = connections[tid];
 
-                        var myArray = dictionary[myTid] = new int[NumClients];
+                        var myArray = dictionary[myTid] = new ExchangeData(NumClients);
 
                         // Set everyone up first
                         connection.Connect(new byte[] { (byte)myTid });
@@ -873,10 +895,14 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                         threads[myTid] = new Thread(() =>
                             {
                                 connection.DataReceived += (DataReceivedEventArgs data) =>
+                                {
+                                    var tidReceived = data.Message.ReadInt32();
+                                    myArray.Count[tidReceived]++;
+                                    if (myArray.Count.All(c => c == 1000))
                                     {
-                                        var tidReceived = data.Message.ReadInt32();
-                                        myArray[tidReceived]++;
-                                    };
+                                        myArray.Event.Set();
+                                    }
+                                };
 
                                 var msg = MessageWriter.Get(SendOption.Reliable);
                                 msg.Write(myTid);
@@ -884,7 +910,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                                 for (int i = 0; i < 1000; i++)
                                 {
                                     connection.Send(msg);
-                                    Thread.Sleep(1);
+                                    Thread.Yield();
                                 }
 
                                 msg.Recycle();
@@ -900,6 +926,11 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                     {
                         thread.Join();
                     }
+
+                    while (listener.ReceiveQueueLength > 0) Thread.Sleep(1);
+                    Thread.Sleep(1000);
+                    while (listener.SendQueueLength > 0) Thread.Sleep(1);
+                    Thread.Sleep(1000);
 
                     for (int tid = 0; tid < threads.Length; tid++)
                     {
