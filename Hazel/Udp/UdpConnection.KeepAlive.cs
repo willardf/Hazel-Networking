@@ -77,7 +77,7 @@ namespace Hazel.Udp
                 HandleKeepAlive,
                 null,
                 keepAliveInterval,
-                keepAliveInterval
+                Timeout.Infinite
             );
         }
 
@@ -100,6 +100,8 @@ namespace Hazel.Udp
             catch
             {
             }
+
+            ResetKeepAliveTimer();
         }
 
         // Pings are special, quasi-reliable packets. 
@@ -128,9 +130,10 @@ namespace Hazel.Udp
 
             pkt.Stopwatch.Restart();
 
+            
             WriteBytesToConnection(bytes, bytes.Length);
 
-            Statistics.LogReliableSend(0);
+            this.Statistics.LogPingSent();
         }
 
         /// <summary>
@@ -140,7 +143,7 @@ namespace Hazel.Udp
         {
             try
             {
-                keepAliveTimer?.Change(keepAliveInterval, keepAliveInterval);
+                keepAliveTimer?.Change(keepAliveInterval, Timeout.Infinite);
             }
             catch { }
         }

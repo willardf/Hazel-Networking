@@ -3,6 +3,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
+using System.Threading;
 
 namespace Hazel.Dtls
 {
@@ -29,7 +30,7 @@ namespace Hazel.Dtls
         public int LockedBy = 0;
         public readonly ConcurrentQueue<MessageReader> PacketsReceived = new ConcurrentQueue<MessageReader>();
         public readonly ConcurrentQueue<byte[]> PacketsSent = new ConcurrentQueue<byte[]>();
-
+        
         /// <summary>
         ///     Creates a UdpConnection for the virtual connection to the endpoint.
         /// </summary>
@@ -49,23 +50,12 @@ namespace Hazel.Dtls
         {
             if (bytes.Length != length) throw new ArgumentException("I made an assumption here. I hope you see this error.");
 
-            // Hrm, well this is inaccurate for DTLS connections because the Listener does the encryption which may change the size.
-            // but I don't want to have a bunch of client references in the send queue...
-            // Does this perhaps mean the encryption is being done in the wrong class?
-            this.Statistics.LogPacketSend(length);
             this.Listener.QueuePlaintextAppData(bytes, this);
         }
 
-        /// <inheritdoc />
-        private void WriteBytesToConnectionSync(byte[] bytes, int length)
+        internal void WriteBytesToConnectionSync(byte[] bytes)
         {
-            if (bytes.Length != length) throw new ArgumentException("I made an assumption here. I hope you see this error.");
 
-            // Hrm, well this is inaccurate for DTLS connections because the Listener does the encryption which may change the size.
-            // but I don't want to have a bunch of client references in the send queue...
-            // Does this perhaps mean the encryption is being done in the wrong class?
-            this.Statistics.LogPacketSend(length);
-            this.Listener.EncryptAndSendAppData(bytes, this);
         }
 
         /// <inheritdoc />
@@ -110,8 +100,8 @@ namespace Hazel.Dtls
         protected override bool SendDisconnect(MessageWriter data = null)
         {
             if (!Listener.RemoveConnectionTo(this.EndPoint)) return false;
-            this._state = ConnectionState.NotConnected;
-            
+            this._state = ConnectionState.Disconnected;
+
             var bytes = EmptyDisconnectBytes;
             if (data != null && data.Length > 0)
             {
@@ -121,23 +111,16 @@ namespace Hazel.Dtls
                 bytes[0] = (byte)UdpSendOption.Disconnect;
             }
 
-            try
-            {
-                this.WriteBytesToConnectionSync(bytes, bytes.Length);
-            }
-            catch { }
+            this.Listener.QueuePlaintextAppData(bytes, this);
 
             return true;
         }
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing)
-            {
-                SendDisconnect();
-            }
-
+            this.logger.WriteInfo("Disposed");
             this.Listener.RemoveConnectionTo(this.EndPoint);
+
             this.PeerData?.Dispose();
             base.Dispose(disposing);
         }

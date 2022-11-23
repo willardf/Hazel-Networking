@@ -325,7 +325,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 connection.Connect();
 
                 Assert.IsTrue(listener.ReceiveThreadRunning, "Listener should be able to handle a malformed hello packet");
-                Assert.AreEqual(ConnectionState.NotConnected, connection.State);
+                Assert.AreEqual(ConnectionState.Disconnected, connection.State);
 
                 Assert.AreEqual(0, listener.PeerCount);
 
@@ -623,7 +623,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         {
 #if DEBUG
             IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 27510);
-            using (DtlsConnectionListener listener = (DtlsConnectionListener)CreateListener(2, new IPEndPoint(IPAddress.Any, ep.Port), new TestLogger()))
+            using (DtlsConnectionListener listener = CreateListener(2, new IPEndPoint(IPAddress.Any, ep.Port), new TestLogger()))
             {
                 // Adjust the ping rate to end the test faster
                 listener.NewConnection += (evt) =>
@@ -637,25 +637,26 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
                 for (int i = 0; i < 5; ++i)
                 {
-                    using (DtlsUnityConnection connection = (DtlsUnityConnection)CreateConnection(ep, new TestLogger()))
+                    using (DtlsUnityConnection connection = CreateConnection(ep, new TestLogger()))
                     {
                         connection.KeepAliveInterval = 100;
                         connection.MissingPingsUntilDisconnect = 3;
                         connection.Connect();
 
-                        Thread.Sleep(10);
+                        Assert.AreEqual(ConnectionState.Connected, connection.State);
 
                         // After connecting, quietly stop responding to all messages to fake connection loss.
                         connection.TestDropRate = 1;
 
                         Thread.Sleep(500);    //Enough time for ~3 keep alive packets
 
-                        Assert.AreEqual(ConnectionState.NotConnected, connection.State);
+                        Assert.AreEqual(ConnectionState.Disconnected, connection.State);
                     }
                 }
 
                 listener.DisconnectOldConnections(TimeSpan.FromMilliseconds(500), null);
 
+                Assert.AreEqual(0, listener.ConnectionCount, "All clients disconnected, connection count should be zero.");
                 Assert.AreEqual(0, listener.PeerCount, "All clients disconnected, peer count should be zero.");
             }
 #else
@@ -1251,7 +1252,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 connection.Disconnect("Testing");
 
                 mutex2.WaitOne(1000);
-                Assert.AreEqual(ConnectionState.NotConnected, connection.State);
+                Assert.AreEqual(ConnectionState.Disconnected, connection.State);
             }
         }
 
@@ -1294,7 +1295,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 serverMutex.Set();
 
                 mutex.Wait(500);
-                Assert.AreEqual(ConnectionState.NotConnected, connection.State);
+                Assert.AreEqual(ConnectionState.Disconnected, connection.State);
             }
         }
 

@@ -422,7 +422,7 @@ namespace Hazel.UnitTests
                 connection.Disconnect("Testing");
 
                 mutex2.WaitOne(1000);
-                Assert.AreEqual(ConnectionState.NotConnected, connection.State);
+                Assert.AreEqual(ConnectionState.Disconnected, connection.State);
             }
         }
 
@@ -465,7 +465,7 @@ namespace Hazel.UnitTests
                 serverMutex.Set();
 
                 mutex.Wait(500);
-                Assert.AreEqual(ConnectionState.NotConnected, connection.State);
+                Assert.AreEqual(ConnectionState.Disconnected, connection.State);
             }
         }
 

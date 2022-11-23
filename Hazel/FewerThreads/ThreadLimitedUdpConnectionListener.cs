@@ -147,6 +147,7 @@ namespace Hazel.Udp.FewerThreads
                 if (now - conn.CreationTime > maxAge)
                 {
                     conn.Disconnect("Stale Connection", disconnectMessage);
+                    conn.Dispose();
                 }
             }
         }

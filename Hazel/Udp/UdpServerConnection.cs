@@ -67,12 +67,12 @@ namespace Hazel.Udp
         {
             lock (this)
             {
-                if (this._state != ConnectionState.Connected)
+                if (this._state == ConnectionState.NotConnected || this._state == ConnectionState.Disconnected)
                 {
                     return false;
                 }
 
-                this._state = ConnectionState.NotConnected;
+                this._state = ConnectionState.Disconnected;
             }
             
             var bytes = EmptyDisconnectBytes;

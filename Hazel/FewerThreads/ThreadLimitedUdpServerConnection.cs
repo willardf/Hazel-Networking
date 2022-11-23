@@ -76,7 +76,7 @@ namespace Hazel.Udp.FewerThreads
         protected override bool SendDisconnect(MessageWriter data = null)
         {
             if (!Listener.RemoveConnectionTo(this.ConnectionId)) return false;
-            this._state = ConnectionState.NotConnected;
+            this._state = ConnectionState.Disconnected;
             
             var bytes = EmptyDisconnectBytes;
             if (data != null && data.Length > 0)

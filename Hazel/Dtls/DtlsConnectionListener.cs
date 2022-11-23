@@ -1405,7 +1405,10 @@ namespace Hazel.Dtls
         /// <inheritdoc />
         internal override void RemovePeerRecord(ConnectionId connectionId)
         {
-            this.existingPeers.TryRemove(connectionId.EndPoint, out _);
+            if (this.existingPeers.TryRemove(connectionId.EndPoint, out var peer))
+            {
+                peer.Dispose();
+            }
         }
 
         /// <summary>

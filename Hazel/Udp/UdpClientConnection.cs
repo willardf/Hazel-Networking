@@ -163,7 +163,7 @@ namespace Hazel.Udp
             {
                 // If the socket's been disposed then we can just end there but make sure we're in NotConnected state.
                 // If we end up here I'm really lost...
-                this.State = ConnectionState.NotConnected;
+                this.State = ConnectionState.Disconnected;
                 return;
             }
             catch (SocketException e)
@@ -212,7 +212,7 @@ namespace Hazel.Udp
                 // If the server disconnects you during the hello
                 // you can go straight from Connecting to NotConnected.
                 if (state == ConnectionState.Connected
-                    || state == ConnectionState.NotConnected)
+                    || state == ConnectionState.Disconnected)
                 {
                     connectWaitLock.Set();
                 }
@@ -304,8 +304,8 @@ namespace Hazel.Udp
         {
             lock (this)
             {
-                if (this._state == ConnectionState.NotConnected) return false;
-                this.State = ConnectionState.NotConnected; // Use the property so we release the state lock
+                if (this._state == ConnectionState.NotConnected || this._state == ConnectionState.Disconnected) return false;
+                this.State = ConnectionState.Disconnected; // Use the property so we release the state lock
             }
 
             var bytes = EmptyDisconnectBytes;

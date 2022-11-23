@@ -61,7 +61,7 @@ namespace Hazel.Dtls
         public bool ReceiveThreadRunning => this.receiveThread.ThreadState == ThreadState.Running;
 
         protected ConcurrentDictionary<EndPoint, LocklessDtlsServerConnection> allConnections = new ConcurrentDictionary<EndPoint, LocklessDtlsServerConnection>();
-        
+
         private ConcurrentSetQueue<LocklessDtlsServerConnection> receiveQueue;
         private BlockingCollection<SendMessageInfo> sendQueue = new BlockingCollection<SendMessageInfo>();
 
@@ -130,6 +130,14 @@ namespace Hazel.Dtls
             }
         }
 
+        public void DisconnectAll(MessageWriter disconnectMessage = null)
+        {
+            foreach (var conn in this.allConnections.Values)
+            {
+                conn.Disconnect("MassRequest", disconnectMessage);
+            }
+        }
+
         private void ManageReliablePackets()
         {
             TimeSpan maxAge = TimeSpan.FromSeconds(2.5f);
@@ -151,7 +159,6 @@ namespace Hazel.Dtls
                                 && RemoveConnectionTo(connection.EndPoint))
                             {
                                 connection.Disconnect("Stale Connection", null);
-                                connection.Dispose();
                             }
                         }
                     }
@@ -269,11 +276,21 @@ namespace Hazel.Dtls
                     }
                     catch (Exception ex)
                     {
-                        this.Logger.WriteError("Unhandled exception in ReadCallback: " + ex);
+                        this.Logger.WriteError("Unhandled exception in EncryptAndSendAppData: " + ex);
                     }
                 }
 
+                if (sender.State == ConnectionState.Disconnected)
+                {
+                    sender.Dispose();
+                    return; // Intentionally do not release LockedBy! This lets us ignore this connection if it somehow was requeued!
+                }
+
                 Interlocked.Exchange(ref sender.LockedBy, 0);
+                if (sender.PacketsReceived.Count > 0 || sender.PacketsSent.Count > 0)
+                {
+                    this.receiveQueue.TryAdd(sender);
+                }
             }
         }
 
@@ -401,27 +418,18 @@ namespace Hazel.Dtls
 
         protected override void Dispose(bool disposing)
         {
-            // Stop receiving messages and drain the queue
-            var rcvQueue = this.receiveQueue;
-            if (rcvQueue != null)
-            {
-                rcvQueue.CompleteAdding();
-                while (rcvQueue.TryTake(out _)) ;
-            }
-
-            foreach (var kvp in this.allConnections)
-            {
-                kvp.Value.Dispose();
-            }
-
             bool wasActive = this.isActive;
             this.isActive = false;
 
-            // Flush outgoing packets
-            this.sendQueue?.CompleteAdding();
-
             if (wasActive)
             {
+                this.receiveQueue.CompleteAdding();
+
+                this.reliablePacketThread.Join();
+                this.receiveThread.Join();
+                this.processThreads.Join();
+
+                this.sendQueue?.CompleteAdding();
                 this.sendThread.Join();
             }
 
@@ -429,14 +437,11 @@ namespace Hazel.Dtls
             try { this.socket.Close(); } catch { }
             try { this.socket.Dispose(); } catch { }
 
-            if (wasActive)
+            foreach (var kvp in this.allConnections)
             {
-                this.reliablePacketThread.Join();
-                this.receiveThread.Join();
-                this.processThreads.Join();
+                kvp.Value.Dispose();
             }
 
-            // this.receiveQueue?.Dispose();
             this.receiveQueue = null;
             this.sendQueue?.Dispose();
             this.sendQueue = null;

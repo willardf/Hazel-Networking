@@ -62,8 +62,6 @@ namespace Hazel
                 }
                 catch { }
             }
-
-            this.Dispose();
         }
 
         /// <summary>
@@ -110,8 +108,6 @@ namespace Hazel
                 }
                 catch { }
             }
-
-            this.Dispose();
         }
     }
 }

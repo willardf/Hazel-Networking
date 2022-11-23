@@ -319,6 +319,27 @@ namespace Hazel
         /// </summary>
         int pingMessagesReceived;
 
+
+        /// <summary>
+        ///     The number of ping messages sent.
+        /// </summary>
+        /// <remarks>
+        ///     This is the number of hello messages that were sent by the <see cref="Connection"/>, incremented
+        ///     each time that SendPing is called by the Connection. Messages are counted before the bytes go on the wire.
+        /// </remarks>
+        public int PingMessagesSent
+        {
+            get
+            {
+                return pingMessagesSent;
+            }
+        }
+
+        /// <summary>
+        ///     The number of hello messages received.
+        /// </summary>
+        int pingMessagesSent;
+
         /// <summary>
         ///     The number of hello messages received.
         /// </summary>
@@ -540,6 +561,14 @@ namespace Hazel
         {
             Interlocked.Increment(ref pingMessagesReceived);
             Interlocked.Add(ref totalBytesReceived, totalLength);
+        }
+
+        /// <summary>
+        ///     Logs the sending of a hello data packet in the statistics.
+        /// </summary>
+        internal void LogPingSent()
+        {
+            Interlocked.Increment(ref pingMessagesSent);
         }
 
         /// <summary>

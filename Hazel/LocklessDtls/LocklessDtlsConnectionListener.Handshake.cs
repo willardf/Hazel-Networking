@@ -28,27 +28,8 @@ namespace Hazel.Dtls
 
         // HMAC key to validate ClientHello cookie
         private ThreadedHmacHelper hmacHelper;
-        private HMAC CurrentCookieHmac { 
-            get 
-            {
-                return hmacHelper.GetCurrentCookieHmacsForThread();
-            }
-        }
-        private HMAC PreviousCookieHmac
-        {
-            get
-            {
-                return hmacHelper.GetPreviousCookieHmacsForThread();
-            }
-        }
-
-        // TODO: Move these into an DtlsErrorStatistics class
-        public int NonPeerNonHelloPacketsDropped;
-        public int NonVerifiedFinishedHandshake;
-        public int NonPeerVerifyHelloRequests;
-        public int PeerVerifyHelloRequests;
-
-        private int connectionSerial_unsafe =  0;
+        private HMAC CurrentCookieHmac => hmacHelper.GetCurrentCookieHmacsForThread();
+        private HMAC PreviousCookieHmac => hmacHelper.GetPreviousCookieHmacsForThread();
 
         /// <summary>
         /// Set the certificate key pair for the listener
@@ -1099,6 +1080,7 @@ namespace Hazel.Dtls
             outgoingRecord.Epoch = peer.Epoch;
             outgoingRecord.SequenceNumber = peer.CurrentEpoch.NextOutgoingSequence;
             outgoingRecord.Length = (ushort)peer.CurrentEpoch.RecordProtection.GetEncryptedSize(span.Length);
+                        
             ++peer.CurrentEpoch.NextOutgoingSequence;
 
             // Encode the record to wire format
@@ -1115,6 +1097,7 @@ namespace Hazel.Dtls
                 ref outgoingRecord
             );
 
+            connection.Statistics.LogPacketSend(packet.Length);
             this.sendQueue.TryAdd(new SendMessageInfo(packet, connection.EndPoint));
         }
     }

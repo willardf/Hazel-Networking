@@ -63,7 +63,7 @@ namespace Hazel.Udp
         /// <inheritdoc/>
         public override SendErrors Send(MessageWriter msg)
         {
-            if (this._state != ConnectionState.Connected)
+            if (this._state == ConnectionState.NotConnected || this._state == ConnectionState.Disconnected)
             {
                 return SendErrors.Disconnected;
             }

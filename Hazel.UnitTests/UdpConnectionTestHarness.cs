@@ -37,7 +37,7 @@ namespace Hazel.UnitTests
                     return false;
                 }
 
-                this.State = ConnectionState.NotConnected;
+                this.State = ConnectionState.Disconnected;
             }
 
             return true;

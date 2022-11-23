@@ -168,7 +168,7 @@ namespace Hazel.Udp
             }
             catch (SocketException e)
             {
-                this.State = ConnectionState.NotConnected;
+                this.State = ConnectionState.Disconnected;
                 throw new HazelException("A SocketException occurred while binding to the port.", e);
             }
 
@@ -182,7 +182,7 @@ namespace Hazel.Udp
             {
                 // If the socket's been disposed then we can just end there but make sure we're in NotConnected state.
                 // If we end up here I'm really lost...
-                this.State = ConnectionState.NotConnected;
+                this.State = ConnectionState.Disconnected;
                 return;
             }
             catch (SocketException e)
@@ -301,8 +301,8 @@ namespace Hazel.Udp
         {
             lock (this)
             {
-                if (this._state == ConnectionState.NotConnected) return false;
-                this._state = ConnectionState.NotConnected;
+                if (this._state == ConnectionState.NotConnected || this._state == ConnectionState.Disconnected) return false;
+                this._state = ConnectionState.Disconnected;
             }
 
             var bytes = EmptyDisconnectBytes;

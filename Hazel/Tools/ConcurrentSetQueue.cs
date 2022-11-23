@@ -29,6 +29,11 @@ namespace Hazel.Tools
             return true;
         }
 
+        public bool TryRemove(T item)
+        {
+            return this.set.TryRemove(item, out _);
+        }
+
         public bool TryTake(out T item)
         {
         tryAgain:
