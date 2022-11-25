@@ -121,7 +121,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         }
 
         [TestMethod]
-        public void DtlsServerDisposeDisconnectsTest()
+        public void DtlsServerDisposeDoesNotDisconnectTest()
         {
             IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 27510);
 
@@ -155,13 +155,15 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 // wait for the client to connect
                 signal.WaitOne(100);
 
+                Assert.AreEqual(connection.State, ConnectionState.Connected);
+
                 listener.Dispose();
 
                 // wait for the client to disconnect
-                signal.WaitOne(1000);
+                Assert.IsFalse(signal.WaitOne(100));
 
                 Assert.IsTrue(serverConnected, "Server connect event should fire");
-                Assert.IsTrue(clientDisconnected, "Client disconnect event should fire");
+                Assert.IsFalse(clientDisconnected, "Client disconnect event shouldn't fire");
                 Assert.IsFalse(serverDisconnected, "Server disconnect event shouldn't fire");
                 Assert.AreEqual(0, listener.ConnectionCount);
             }
@@ -333,10 +335,6 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             IPEndPoint captureEndPoint = new IPEndPoint(IPAddress.Loopback, 27511);
             IPEndPoint listenerEndPoint = new IPEndPoint(IPAddress.Loopback, 27510);
 
-            bool serverConnected = false;
-            bool serverDisconnected = false;
-            bool clientDisconnected = false;
-
             Semaphore signal = new Semaphore(0, int.MaxValue);
 
             var logger = new TestLogger("Throttle");
@@ -380,31 +378,14 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
                 listener.NewConnection += (evt) =>
                 {
-                    serverConnected = true;
-                    signal.Release();
-                    evt.Connection.Disconnected += (o, et) => {
-                        serverDisconnected = true;
-                    };
-                };
-                connection.Disconnected += (o, evt) => {
-                    clientDisconnected = true;
                     signal.Release();
                 };
 
                 listener.Start();
                 connection.Connect();
 
-                // wait for the client to connect
-                signal.WaitOne(10);
-
-                listener.Dispose();
-
-                // wait for the client to disconnect
-                signal.WaitOne(100);
-
-                Assert.IsTrue(serverConnected);
-                Assert.IsTrue(clientDisconnected);
-                Assert.IsFalse(serverDisconnected);
+                Assert.IsTrue(signal.WaitOne(100), "Server NewConnection should fire");
+                Assert.AreEqual(connection.State, ConnectionState.Connected);
             }
         }
 
@@ -414,10 +395,6 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         {
             IPEndPoint captureEndPoint = new IPEndPoint(IPAddress.Loopback, 27511);
             IPEndPoint listenerEndPoint = new IPEndPoint(IPAddress.Loopback, 27510);
-
-            bool serverConnected = false;
-            bool serverDisconnected = false;
-            bool clientDisconnected = false;
 
             Semaphore signal = new Semaphore(0, int.MaxValue);
 
@@ -456,31 +433,14 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
                 listener.NewConnection += (evt) =>
                 {
-                    serverConnected = true;
-                    signal.Release();
-                    evt.Connection.Disconnected += (o, et) => {
-                        serverDisconnected = true;
-                    };
-                };
-                connection.Disconnected += (o, evt) => {
-                    clientDisconnected = true;
                     signal.Release();
                 };
 
                 listener.Start();
                 connection.Connect();
 
-                // wait for the client to connect
-                signal.WaitOne(10);
-
-                listener.Dispose();
-
-                // wait for the client to disconnect
-                signal.WaitOne(100);
-
-                Assert.IsTrue(serverConnected);
-                Assert.IsTrue(clientDisconnected);
-                Assert.IsFalse(serverDisconnected);
+                Assert.IsTrue(signal.WaitOne(100), "Server NewConnection should fire");
+                Assert.AreEqual(connection.State, ConnectionState.Connected);
             }
         }
 
@@ -489,10 +449,6 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         {
             IPEndPoint captureEndPoint = new IPEndPoint(IPAddress.Loopback, 27511);
             IPEndPoint listenerEndPoint = new IPEndPoint(IPAddress.Loopback, 27510);
-
-            bool serverConnected = false;
-            bool serverDisconnected = false;
-            bool clientDisconnected = false;
 
             Semaphore signal = new Semaphore(0, int.MaxValue);
 
@@ -527,31 +483,14 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
                 listener.NewConnection += (evt) =>
                 {
-                    serverConnected = true;
-                    signal.Release();
-                    evt.Connection.Disconnected += (o, et) => {
-                        serverDisconnected = true;
-                    };
-                };
-                connection.Disconnected += (o, evt) => {
-                    clientDisconnected = true;
                     signal.Release();
                 };
 
                 listener.Start();
                 connection.Connect();
 
-                // wait for the client to connect
-                signal.WaitOne(10);
-
-                listener.Dispose();
-
-                // wait for the client to disconnect
-                signal.WaitOne(100);
-
-                Assert.IsTrue(serverConnected);
-                Assert.IsTrue(clientDisconnected);
-                Assert.IsFalse(serverDisconnected);
+                Assert.IsTrue(signal.WaitOne(100), "Server NewConnection should fire");
+                Assert.AreEqual(connection.State, ConnectionState.Connected);
             }
         }
 
@@ -610,18 +549,73 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         ///     Tests the keepalive functionality from the client,
         /// </summary>
         [TestMethod]
-        public void PingDisconnectClientTest()
+        public void ServerPingDisconnectsTest()
         {
 #if DEBUG
             IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 27510);
             using (var listener = CreateListener(2, new IPEndPoint(IPAddress.Any, ep.Port), new TestLogger("Server")))
             {
-                // Adjust the ping rate to end the test faster
+                UdpConnection serverConn = null;
                 listener.NewConnection += (evt) =>
                 {
                     var conn = (UdpConnection)evt.Connection;
+                    conn.OnInternalDisconnect = (err) =>
+                    {
+                        Console.WriteLine("Disconnected for " + err);
+                        return null;
+                    };
+
                     conn.KeepAliveInterval = 100;
                     conn.MissingPingsUntilDisconnect = 3;
+
+                    serverConn = conn;
+                };
+
+                listener.Start();
+
+                for (int i = 0; i < 5; ++i)
+                {
+                    using (var connection = CreateConnection(ep, new TestLogger("Client " + i)))
+                    {
+                        // Server should disconnect us, client should be patient
+                        connection.KeepAliveInterval = int.MaxValue;
+                        connection.MissingPingsUntilDisconnect = int.MaxValue;
+                        connection.Connect(timeout: 1000);
+
+                        Assert.AreEqual(ConnectionState.Connected, connection.State);
+
+                        // After connecting, quietly stop responding to all messages to fake connection loss.
+                        serverConn.TestDropRate = 1;
+
+                        Thread.Sleep(500);    //Enough time for ~3 keep alive packets
+
+                        Assert.AreEqual(ConnectionState.Disconnected, connection.State);
+                    }
+                }
+
+                Assert.AreEqual(0, listener.ConnectionCount, "All clients disconnected, peer count should be zero.");
+            }
+#else
+            Assert.Inconclusive("Only works in DEBUG");
+#endif
+        }
+
+        /// <summary>
+        ///     Tests the keepalive functionality from the client,
+        /// </summary>
+        [TestMethod]
+        public void ClientPingDisconnectsTest()
+        {
+#if DEBUG
+            IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 27510);
+            using (var listener = CreateListener(2, new IPEndPoint(IPAddress.Any, ep.Port), new TestLogger("Server")))
+            {
+                // Client should disconnect us, server should be patient
+                listener.NewConnection += (evt) =>
+                {
+                    var conn = (UdpConnection)evt.Connection;
+                    conn.KeepAliveInterval = int.MaxValue;
+                    conn.MissingPingsUntilDisconnect = int.MaxValue;
                 };
 
                 listener.Start();
@@ -646,8 +640,6 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                         Assert.AreEqual(ConnectionState.Disconnected, connection.State);
                     }
                 }
-
-                listener.DisconnectOldConnections(TimeSpan.FromMilliseconds(500), null);
 
                 Assert.AreEqual(0, listener.ConnectionCount, "All clients disconnected, peer count should be zero.");
             }

@@ -27,7 +27,6 @@ namespace Hazel.Dtls
         internal PeerData PeerData { get; private set; }
         internal bool HelloProcessed { get; private set; }
 
-        public int LockedBy = 0;
         public readonly ConcurrentQueue<MessageReader> PacketsReceived = new ConcurrentQueue<MessageReader>();
         public readonly ConcurrentQueue<byte[]> PacketsSent = new ConcurrentQueue<byte[]>();
         
@@ -50,12 +49,12 @@ namespace Hazel.Dtls
         {
             if (bytes.Length != length) throw new ArgumentException("I made an assumption here. I hope you see this error.");
 
+            if (this.State == ConnectionState.Disconnected)
+            {
+                return;
+            }
+
             this.Listener.QueuePlaintextAppData(bytes, this);
-        }
-
-        internal void WriteBytesToConnectionSync(byte[] bytes)
-        {
-
         }
 
         /// <inheritdoc />

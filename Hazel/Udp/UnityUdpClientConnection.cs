@@ -280,16 +280,6 @@ namespace Hazel.Udp
                 return;
             }
 
-#if DEBUG
-            if (this.TestDropRate > 0)
-            {
-                if ((this.testDropCount++ % this.TestDropRate) == 0)
-                {
-                    return;
-                }
-            }
-#endif
-
             HandleReceive(msg, msg.Length);
         }
 

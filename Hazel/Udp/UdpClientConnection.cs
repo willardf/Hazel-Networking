@@ -282,17 +282,6 @@ namespace Hazel.Udp
                 return;
             }
 
-#if DEBUG
-            if (this.TestDropRate > 0)
-            {
-                if ((this.testDropCount++ % this.TestDropRate) == 0)
-                {
-                    return;
-                }
-            }
-
-            DataReceivedRaw?.Invoke(msg.Buffer, msg.Length);
-#endif
             HandleReceive(msg, msg.Length);
         }
 

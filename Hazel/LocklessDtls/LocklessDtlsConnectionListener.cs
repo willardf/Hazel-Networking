@@ -62,7 +62,7 @@ namespace Hazel.Dtls
 
         protected ConcurrentDictionary<EndPoint, LocklessDtlsServerConnection> allConnections = new ConcurrentDictionary<EndPoint, LocklessDtlsServerConnection>();
 
-        private ConcurrentSetQueue<LocklessDtlsServerConnection> receiveQueue;
+        private MultiQueue<LocklessDtlsServerConnection> receiveQueue;
         private BlockingCollection<SendMessageInfo> sendQueue = new BlockingCollection<SendMessageInfo>();
 
         public int MaxAge
@@ -97,7 +97,7 @@ namespace Hazel.Dtls
 
             this.hmacHelper = new ThreadedHmacHelper(logger);
 
-            this.receiveQueue = new ConcurrentSetQueue<LocklessDtlsServerConnection>();
+            this.receiveQueue = new MultiQueue<LocklessDtlsServerConnection>(numWorkers);
 
             this.socket = UdpConnection.CreateSocket(this.IPMode);
             this.socket.ExclusiveAddressUse = true;
@@ -115,19 +115,6 @@ namespace Hazel.Dtls
         ~LocklessDtlsConnectionListener()
         {
             this.Dispose(false);
-        }
-
-        // This is just for booting people after they've been connected a certain amount of time...
-        public void DisconnectOldConnections(TimeSpan maxAge, MessageWriter disconnectMessage)
-        {
-            var now = DateTime.UtcNow;
-            foreach (var conn in this.allConnections.Values)
-            {
-                if (now - conn.CreationTime > maxAge)
-                {
-                    conn.Disconnect("Stale Connection", disconnectMessage);
-                }
-            }
         }
 
         public void DisconnectAll(MessageWriter disconnectMessage = null)
@@ -222,16 +209,23 @@ namespace Hazel.Dtls
                     LocklessDtlsServerConnection connection;
                     if (!this.allConnections.TryGetValue(remoteEP, out connection))
                     {
-                        lock (this.allConnections)
+                        ByteSpan span = new ByteSpan(message.Buffer, message.Offset + message.Position, message.BytesRemaining);
+                        if (!Record.Parse(out var record, expectedProtocolVersion: null, span))
                         {
-                            if (!this.allConnections.TryGetValue(remoteEP, out connection))
-                            {
-                                connection = new LocklessDtlsServerConnection(this, (IPEndPoint)remoteEP, this.IPMode, this.Logger);
-                                if (!this.allConnections.TryAdd(remoteEP, connection))
-                                {
-                                    this.Logger.WriteError("Failed to add unique connection! This should never happen!");
-                                }
-                            }
+                            this.Logger.WriteError($"Dropping malformed record from `{remoteEP}`");
+                            continue;
+                        }
+
+                        if (record.ContentType != ContentType.Handshake)
+                        {
+                            this.Logger.WriteVerbose($"Dropping non-handshake record from non-peer `{remoteEP}`");
+                            continue;
+                        }
+
+                        connection = new LocklessDtlsServerConnection(this, (IPEndPoint)remoteEP, this.IPMode, this.Logger);
+                        if (!this.allConnections.TryAdd(remoteEP, connection))
+                        {
+                            this.Logger.WriteError("Failed to add unique connection! This should never happen!");
                         }
                     }
 
@@ -246,16 +240,10 @@ namespace Hazel.Dtls
             this.receiveQueue.TryAdd(connection);
         }
 
-        private void ProcessingLoop()
+        private void ProcessingLoop(int myTid)
         {
-            var myTid = Thread.CurrentThread.ManagedThreadId;
-            while (this.receiveQueue.TryTake(out var sender))
+            while (this.receiveQueue.TryTake(myTid, out var sender))
             {
-                if (Interlocked.CompareExchange(ref sender.LockedBy, myTid, 0) != 0)
-                {
-                    continue;
-                }
-
                 while (sender.PacketsReceived.TryDequeue(out var message))
                 {
                     try
@@ -280,10 +268,9 @@ namespace Hazel.Dtls
                     }
                 }
 
-                Interlocked.Exchange(ref sender.LockedBy, 0);
-                if (sender.PacketsReceived.Count > 0 || sender.PacketsSent.Count > 0)
+                if (sender.State == ConnectionState.Disconnected)
                 {
-                    this.receiveQueue.TryAdd(sender);
+                    sender.Dispose();
                 }
             }
         }
@@ -388,17 +375,8 @@ namespace Hazel.Dtls
 
         internal void QueuePlaintextAppData(byte[] response, LocklessDtlsServerConnection connection)
         {
-            var myTid = Thread.CurrentThread.ManagedThreadId;
-            if (connection.LockedBy == myTid)
-            {
-                // We are already dedicated to this connection, so let's just send instead of queueing and reading it later.
-                EncryptAndSendAppData(response, connection);
-            }
-            else
-            {
-                connection.PacketsSent.Enqueue(response);
-                this.receiveQueue.TryAdd(connection);
-            }
+            connection.PacketsSent.Enqueue(response);
+            this.receiveQueue.TryAdd(connection);
         }
 
         /// <summary>

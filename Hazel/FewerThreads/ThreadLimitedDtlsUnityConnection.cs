@@ -137,17 +137,6 @@ namespace Hazel.Dtls
         {
             foreach (var msg in this.receiveQueue.GetConsumingEnumerable())
             {
-#if DEBUG
-                if (this.TestDropRate > 0)
-                {
-                    if ((this.testDropCount++ % this.TestDropRate) == 0)
-                    {
-                        msg.Recycle();
-                        continue;
-                    }
-                }
-#endif
-
                 HandleReceive(msg, msg.Length);
             }
         }

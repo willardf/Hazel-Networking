@@ -130,7 +130,6 @@ namespace Hazel.Udp
 
             pkt.Stopwatch.Restart();
 
-            
             WriteBytesToConnection(bytes, bytes.Length);
 
             this.Statistics.LogPingSent();
@@ -153,11 +152,8 @@ namespace Hazel.Udp
         /// </summary>
         private void DisposeKeepAliveTimer()
         {
-            if (this.keepAliveTimer != null)
-            {
-                this.keepAliveTimer.Dispose();
-            }
-
+            this.keepAliveTimer?.Dispose();
+            
             foreach (var kvp in activePingPackets)
             {
                 if (this.activePingPackets.TryRemove(kvp.Key, out var pkt))

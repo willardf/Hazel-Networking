@@ -342,10 +342,6 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             IPEndPoint captureEndPoint = new IPEndPoint(IPAddress.Loopback, 27511);
             IPEndPoint listenerEndPoint = new IPEndPoint(IPAddress.Loopback, 27510);
 
-            bool serverConnected = false;
-            bool serverDisconnected = false;
-            bool clientDisconnected = false;
-
             Semaphore signal = new Semaphore(0, int.MaxValue);
 
             var logger = new TestLogger("Throttle");
@@ -389,31 +385,14 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
                 listener.NewConnection += (evt) =>
                 {
-                    serverConnected = true;
-                    signal.Release();
-                    evt.Connection.Disconnected += (o, et) => {
-                        serverDisconnected = true;
-                    };
-                };
-                connection.Disconnected += (o, evt) => {
-                    clientDisconnected = true;
                     signal.Release();
                 };
 
                 listener.Start();
                 connection.Connect();
 
-                // wait for the client to connect
-                signal.WaitOne(10);
-
-                listener.Dispose();
-
-                // wait for the client to disconnect
-                signal.WaitOne(100);
-
-                Assert.IsTrue(serverConnected);
-                Assert.IsTrue(clientDisconnected);
-                Assert.IsFalse(serverDisconnected);
+                Assert.IsTrue(signal.WaitOne(100), "Server NewConnection should fire");
+                Assert.AreEqual(connection.State, ConnectionState.Connected);
             }
         }
 
@@ -423,10 +402,6 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         {
             IPEndPoint captureEndPoint = new IPEndPoint(IPAddress.Loopback, 27511);
             IPEndPoint listenerEndPoint = new IPEndPoint(IPAddress.Loopback, 27510);
-
-            bool serverConnected = false;
-            bool serverDisconnected = false;
-            bool clientDisconnected = false;
 
             Semaphore signal = new Semaphore(0, int.MaxValue);
 
@@ -465,31 +440,14 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
                 listener.NewConnection += (evt) =>
                 {
-                    serverConnected = true;
-                    signal.Release();
-                    evt.Connection.Disconnected += (o, et) => {
-                        serverDisconnected = true;
-                    };
-                };
-                connection.Disconnected += (o, evt) => {
-                    clientDisconnected = true;
                     signal.Release();
                 };
 
                 listener.Start();
                 connection.Connect();
 
-                // wait for the client to connect
-                signal.WaitOne(10);
-
-                listener.Dispose();
-
-                // wait for the client to disconnect
-                signal.WaitOne(100);
-
-                Assert.IsTrue(serverConnected);
-                Assert.IsTrue(clientDisconnected);
-                Assert.IsFalse(serverDisconnected);
+                Assert.IsTrue(signal.WaitOne(100), "Server NewConnection should fire");
+                Assert.AreEqual(connection.State, ConnectionState.Connected);
             }
         }
 
@@ -498,10 +456,6 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         {
             IPEndPoint captureEndPoint = new IPEndPoint(IPAddress.Loopback, 27511);
             IPEndPoint listenerEndPoint = new IPEndPoint(IPAddress.Loopback, 27510);
-
-            bool serverConnected = false;
-            bool serverDisconnected = false;
-            bool clientDisconnected = false;
 
             Semaphore signal = new Semaphore(0, int.MaxValue);
 
@@ -536,31 +490,14 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
                 listener.NewConnection += (evt) =>
                 {
-                    serverConnected = true;
-                    signal.Release();
-                    evt.Connection.Disconnected += (o, et) => {
-                        serverDisconnected = true;
-                    };
-                };
-                connection.Disconnected += (o, evt) => {
-                    clientDisconnected = true;
                     signal.Release();
                 };
 
                 listener.Start();
                 connection.Connect();
 
-                // wait for the client to connect
-                signal.WaitOne(10);
-
-                listener.Dispose();
-
-                // wait for the client to disconnect
-                signal.WaitOne(100);
-
-                Assert.IsTrue(serverConnected);
-                Assert.IsTrue(clientDisconnected);
-                Assert.IsFalse(serverDisconnected);
+                Assert.IsTrue(signal.WaitOne(100), "Server NewConnection should fire");
+                Assert.AreEqual(connection.State, ConnectionState.Connected);
             }
         }
 
