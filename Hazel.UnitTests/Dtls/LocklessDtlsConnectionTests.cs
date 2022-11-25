@@ -844,7 +844,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                         var udpConn = (UdpConnection)ncArgs.Connection;
                         udpConn.ResendTimeoutMs = int.MaxValue;
                         udpConn.DisconnectTimeoutMs = int.MaxValue;
-
+                        udpConn.KeepAliveInterval = int.MaxValue;
                         udpConn.Disconnected += (object sender, DisconnectedEventArgs dcArgs) =>
                         {
                             Console.WriteLine("Server disconnected a client because " + dcArgs.Reason);
@@ -853,6 +853,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                         udpConn.DataReceived += (DataReceivedEventArgs data) =>
                         {
                             var tid = data.Message.ReadInt32();
+                            data.Message.Recycle();
                             var msg = MessageWriter.Get(SendOption.Reliable);
                             msg.Write(tid);
 
@@ -882,25 +883,32 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                     {
                         int myTid = tid;
                         var connection = connections[tid];
-
                         var myArray = dictionary[myTid] = new ExchangeData(NumClients);
 
                         // Set everyone up first
+                        connection.ResendTimeoutMs = int.MaxValue;
+                        connection.DisconnectTimeoutMs = int.MaxValue;
+                        connection.KeepAliveInterval = int.MaxValue;
+                        connection.Disconnected += (object sender, DisconnectedEventArgs dcArgs) =>
+                        {
+                            Console.WriteLine("Client disconnected because " + dcArgs.Reason);
+                        };
+
+                        connection.DataReceived += (DataReceivedEventArgs data) =>
+                        {
+                            var tidReceived = data.Message.ReadInt32();
+                            Interlocked.Increment(ref myArray.Count[tidReceived]);
+                            if (myArray.Count.All(c => c == 1000))
+                            {
+                                myArray.Event.Set();
+                            }
+                        };
+
                         connection.Connect(new byte[] { (byte)myTid });
                         Assert.AreEqual(ConnectionState.Connected, connection.State);
 
                         threads[myTid] = new Thread(() =>
                         {
-                            connection.DataReceived += (DataReceivedEventArgs data) =>
-                            {
-                                var tidReceived = data.Message.ReadInt32();
-                                myArray.Count[tidReceived]++;
-                                if (myArray.Count.All(c => c == 1000))
-                                {
-                                    myArray.Event.Set();
-                                }
-                            };
-
                             var msg = MessageWriter.Get(SendOption.Reliable);
                             msg.Write(myTid);
 
@@ -908,6 +916,8 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                             {
                                 connection.Send(msg);
                             }
+
+                            Console.WriteLine($"Thread {myTid} sent its stuff");
 
                             msg.Recycle();
                         });
@@ -936,6 +946,8 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                             Assert.AreEqual(1000, cnt);
                         }
                     }
+
+                    Console.WriteLine("Test complete");
                 }
                 finally
                 {
