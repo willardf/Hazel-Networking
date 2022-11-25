@@ -280,12 +280,6 @@ namespace Hazel.Dtls
                     }
                 }
 
-                if (sender.State == ConnectionState.Disconnected)
-                {
-                    sender.Dispose();
-                    return; // Intentionally do not release LockedBy! This lets us ignore this connection if it somehow was requeued!
-                }
-
                 Interlocked.Exchange(ref sender.LockedBy, 0);
                 if (sender.PacketsReceived.Count > 0 || sender.PacketsSent.Count > 0)
                 {

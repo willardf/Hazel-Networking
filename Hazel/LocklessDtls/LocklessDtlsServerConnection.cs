@@ -1,9 +1,7 @@
 using Hazel.Udp;
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Net;
-using System.Threading;
 
 namespace Hazel.Dtls
 {
@@ -14,6 +12,8 @@ namespace Hazel.Dtls
     public sealed class LocklessDtlsServerConnection : UdpConnection
     {
         public readonly DateTime CreationTime = DateTime.UtcNow;
+
+        protected override bool DisposeOnDisconnect => false;
 
         /// <summary>
         ///     The connection listener that we use the socket of.

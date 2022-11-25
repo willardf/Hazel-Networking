@@ -1,8 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Text;
 
 
 namespace Hazel
@@ -30,6 +26,8 @@ namespace Hazel
         public Func<HazelInternalErrors, MessageWriter> OnInternalDisconnect;
 
         public virtual float AveragePingMs { get; }
+
+        protected virtual bool DisposeOnDisconnect => true;
 
         public long GetIP4Address()
         {
@@ -61,6 +59,11 @@ namespace Hazel
                     InvokeDisconnected(reason, reader);
                 }
                 catch { }
+            }
+
+            if (this.DisposeOnDisconnect)
+            {
+                this.Dispose();
             }
         }
 
@@ -107,6 +110,11 @@ namespace Hazel
                     InvokeDisconnected(reason, null);
                 }
                 catch { }
+            }
+
+            if (this.DisposeOnDisconnect)
+            {
+                this.Dispose();
             }
         }
     }

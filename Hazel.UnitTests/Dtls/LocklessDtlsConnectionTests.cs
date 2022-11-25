@@ -121,7 +121,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         }
 
         [TestMethod]
-        public void DtlsServerDisposeDoesNotDisconnectTest()
+        public void DtlsServerDisposeDisconnectsTest()
         {
             IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 27510);
 
@@ -161,7 +161,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 signal.WaitOne(1000);
 
                 Assert.IsTrue(serverConnected, "Server connect event should fire");
-                Assert.IsFalse(clientDisconnected, "Client disconnect event should fire");
+                Assert.IsTrue(clientDisconnected, "Client disconnect event should fire");
                 Assert.IsFalse(serverDisconnected, "Server disconnect event shouldn't fire");
                 Assert.AreEqual(0, listener.ConnectionCount);
             }
@@ -397,14 +397,14 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 // wait for the client to connect
                 signal.WaitOne(10);
 
-                listener.DisconnectAll();
+                listener.Dispose();
 
                 // wait for the client to disconnect
                 signal.WaitOne(100);
 
                 Assert.IsTrue(serverConnected);
                 Assert.IsTrue(clientDisconnected);
-                Assert.IsTrue(serverDisconnected);
+                Assert.IsFalse(serverDisconnected);
             }
         }
 
@@ -473,14 +473,14 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 // wait for the client to connect
                 signal.WaitOne(10);
 
-                listener.DisconnectAll();
+                listener.Dispose();
 
                 // wait for the client to disconnect
                 signal.WaitOne(100);
 
                 Assert.IsTrue(serverConnected);
                 Assert.IsTrue(clientDisconnected);
-                Assert.IsTrue(serverDisconnected);
+                Assert.IsFalse(serverDisconnected);
             }
         }
 
@@ -544,7 +544,6 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 // wait for the client to connect
                 signal.WaitOne(10);
 
-                listener.DisconnectAll();
                 listener.Dispose();
 
                 // wait for the client to disconnect
@@ -552,7 +551,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
                 Assert.IsTrue(serverConnected);
                 Assert.IsTrue(clientDisconnected);
-                Assert.IsTrue(serverDisconnected);
+                Assert.IsFalse(serverDisconnected);
             }
         }
 
