@@ -95,9 +95,9 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
         }
 
-        private DtlsUnityConnection[] CreateConnections(int num, IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
+        private ThreadLimitedDtlsUnityConnection[] CreateConnections(int num, IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
         {
-            DtlsUnityConnection[] output = new DtlsUnityConnection[num];
+            ThreadLimitedDtlsUnityConnection[] output = new ThreadLimitedDtlsUnityConnection[num];
             for (int i = 0; i < output.Length; ++i)
             {
                 output[i] = CreateConnection(endPoint, logger, ipMode);
@@ -114,9 +114,9 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             }
         }
 
-        protected DtlsUnityConnection CreateConnection(IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
+        protected ThreadLimitedDtlsUnityConnection CreateConnection(IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
         {
-            DtlsUnityConnection connection = new DtlsUnityConnection(logger, endPoint, ipMode);
+            ThreadLimitedDtlsUnityConnection connection = new ThreadLimitedDtlsUnityConnection(logger, endPoint, ipMode);
             connection.SetValidServerCertificates(GetCertificateForClient());
             return connection;
         }
@@ -132,7 +132,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
             Semaphore signal = new Semaphore(0, int.MaxValue);
 
-            using (var listener = (DtlsConnectionListener)CreateListener(2, new IPEndPoint(IPAddress.Any, ep.Port), new TestLogger()))
+            using (var listener = CreateListener(2, new IPEndPoint(IPAddress.Any, ep.Port), new TestLogger()))
             using (var connection = CreateConnection(ep, new TestLogger()))
             {
                 listener.NewConnection += (evt) =>
@@ -574,7 +574,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
                 for (int i = 0; i < 5; ++i)
                 {
-                    using (DtlsUnityConnection connection = CreateConnection(ep, new TestLogger()))
+                    using (var connection = CreateConnection(ep, new TestLogger()))
                     {
                         connection.KeepAliveInterval = 100;
                         connection.MissingPingsUntilDisconnect = 3;
@@ -898,7 +898,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         public void DtlsSessionV0ConnectionTest()
         {
             using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
-            using (DtlsUnityConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
+            using (var connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
                 connection.HazelSessionVersion = 0;
                 listener.Start();

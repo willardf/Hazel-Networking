@@ -15,6 +15,7 @@ namespace Hazel.Dtls
     public partial class ThreadLimitedDtlsUnityConnection : UdpConnection
     {
         private const int BufferSize = ushort.MaxValue;
+        protected override bool DisposeOnDisconnect => false;
 
         /// <summary>
         ///     The socket we're connected via.

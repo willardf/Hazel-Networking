@@ -94,16 +94,16 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
         }
 
-        private DtlsUnityConnection CreateConnection(IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
+        private ThreadLimitedDtlsUnityConnection CreateConnection(IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
         {
-            DtlsUnityConnection connection = new DtlsUnityConnection(logger, endPoint, ipMode);
+            ThreadLimitedDtlsUnityConnection connection = new ThreadLimitedDtlsUnityConnection(logger, endPoint, ipMode);
             connection.SetValidServerCertificates(GetCertificateForClient());
             return connection;
         }
 
-        private DtlsUnityConnection[] CreateConnections(int num, IPEndPoint endPoint, IPMode ipMode = IPMode.IPv4)
+        private ThreadLimitedDtlsUnityConnection[] CreateConnections(int num, IPEndPoint endPoint, IPMode ipMode = IPMode.IPv4)
         {
-            DtlsUnityConnection[] output = new DtlsUnityConnection[num];
+            ThreadLimitedDtlsUnityConnection[] output = new ThreadLimitedDtlsUnityConnection[num];
             for (int i = 0; i < output.Length; ++i)
             {
                 output[i] = CreateConnection(endPoint, new TestLogger("Client " + i), ipMode);
@@ -847,7 +847,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
                         udpConn.Disconnected += (object sender, DisconnectedEventArgs dcArgs) =>
                         {
-                            Console.WriteLine("Server disconnected a client");
+                            Console.WriteLine("Server disconnected a client because " + dcArgs.Reason);
                         };
 
                         udpConn.DataReceived += (DataReceivedEventArgs data) =>
@@ -926,7 +926,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                         thread.Join();
                     }
 
-                    TestHelper.WaitAll(dictionary.Values.Select(e => e.Event), TimeSpan.FromSeconds(15));
+                    TestHelper.WaitAll(dictionary.Values.Select(e => e.Event), TimeSpan.FromSeconds(30));
 
                     for (int tid = 0; tid < threads.Length; tid++)
                     {

@@ -27,10 +27,10 @@ namespace Hazel.Tools
             {
                 return false;
             }
-
+            
             long setIdx = (uint)item.GetHashCode() % this.sets.Length;
             var set = this.sets[setIdx];
-
+            
             if (set.TryAdd(item, 0))
             {
                 Monitor.Enter(set);
