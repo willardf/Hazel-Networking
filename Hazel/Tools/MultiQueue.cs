@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 
@@ -7,56 +8,36 @@ namespace Hazel.Tools
 {
     public class MultiQueue<T>
     {
-        private int[] maxQueueLengths;
+        private ConcurrentQueue<T>[] sets;
+        private SemaphoreSlim[] locks;
 
-        private ConcurrentDictionary<T, int> itemToSet = new ConcurrentDictionary<T, int>();
-
-        private BlockingCollection<T>[] sets;
+        private bool addingComplete;
 
         public int Count => this.sets.Sum(s => s.Count);
 
         public MultiQueue(int numQueues)
         {
-            this.maxQueueLengths = new int[numQueues];
-            this.itemToSet = new ConcurrentDictionary<T, int>();
-            this.sets = new BlockingCollection<T>[numQueues];
+            this.sets = new ConcurrentQueue<T>[numQueues];
+            this.locks = new SemaphoreSlim[numQueues];
+
             for (int i = 0; i < this.sets.Length; i++)
             {
-                this.sets[i] = new BlockingCollection<T>();
+                this.sets[i] = new ConcurrentQueue<T>();
+                this.locks[i] = new SemaphoreSlim(0);
             }
         }
 
         public bool TryAdd(T item)
         {
-        tryagain:
-            if (!this.itemToSet.TryGetValue(item, out int setIdx))
-            {
-                setIdx = 0;
-                int setLen = this.maxQueueLengths[0];
-                for (int i = 0; i < this.maxQueueLengths.Length; ++i)
-                {
-                    int newSetLen = this.maxQueueLengths[i];
-                    if (newSetLen < setLen)
-                    {
-                        setIdx = i;
-                        setLen = newSetLen;
-                    }
-                }
+            if (this.addingComplete) return false;
 
-                if (this.itemToSet.TryAdd(item, setIdx))
-                {
-                    Interlocked.Increment(ref this.maxQueueLengths[setIdx]);
-                } 
-                else
-                {
-                    goto tryagain;
-                }
-            }
+            int setIdx = item.GetHashCode() % this.sets.Length;
 
             try
             {
-                var set = this.sets[setIdx];
-                return set.TryAdd(item);
+                this.sets[setIdx].Enqueue(item);
+                this.locks[setIdx].Release();
+                return true;
             }
             catch
             {
@@ -71,14 +52,39 @@ namespace Hazel.Tools
                 throw new ArgumentOutOfRangeException("QueueId >= NumQueues");
             }
 
-            return this.sets[queueId].TryTake(out item, Timeout.Infinite);
+            this.locks[queueId].Wait();
+            var set = this.sets[queueId];
+            if (set.Count > 0)
+            {
+                return set.TryDequeue(out item);
+            }
+
+            item = default;
+            return false;
         }
 
         public void CompleteAdding()
         {
-            foreach (var set in this.sets)
+            this.addingComplete = true;
+            foreach (var l in this.locks)
             {
-                set.CompleteAdding();
+                l.Release();
+            }
+        }
+
+        internal IEnumerable<T> GetConsumingEnumerable(int queueId)
+        {
+            while (this.TryTake(queueId, out var item))
+            {
+                yield return item;
+            }
+        }
+
+        internal void Dispose()
+        {
+            foreach(var l in this.locks)
+            {
+                l.Dispose();
             }
         }
     }
