@@ -7,6 +7,7 @@ namespace Hazel.Dtls
 {
     /// <summary>
     /// Represents a servers's connection to a client that uses the UDP protocol.
+    /// WARNING! This is not fully tested in production!
     /// </summary>
     /// <inheritdoc/>
     public sealed class LocklessDtlsServerConnection : UdpConnection

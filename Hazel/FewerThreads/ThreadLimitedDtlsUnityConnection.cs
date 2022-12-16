@@ -9,7 +9,8 @@ using System.Threading;
 namespace Hazel.Dtls
 {
     /// <summary>
-    ///     Represents a client's connection to a server that uses the UDP protocol.
+    /// Represents a client's connection to a server that uses the UDP protocol.
+    /// WARNING! This is not fully tested in production!
     /// </summary>
     /// <inheritdoc/>
     public partial class ThreadLimitedDtlsUnityConnection : UdpConnection
