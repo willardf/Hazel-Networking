@@ -1,11 +1,9 @@
 using Hazel.Crypto;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
-using System.Threading;
 
 namespace Hazel.Dtls
 {
@@ -456,8 +454,6 @@ namespace Hazel.Dtls
 
 #if DEBUG
                             this.Logger.WriteError($"Dropping non-verified Finished Handshake from `{peerAddress}`");
-#else
-                            Interlocked.Increment(ref this.NonVerifiedFinishedHandshake);
 #endif
 
                             // Abort the connection here
@@ -616,8 +612,6 @@ namespace Hazel.Dtls
 
 #if DEBUG
                     this.Logger.WriteError($"Sending HelloVerifyRequest to peer `{peerAddress}`");
-#else
-                    Interlocked.Increment(ref this.PeerVerifyHelloRequests);
 #endif
                     this.SendHelloVerifyRequest(peerAddress, outgoingSequence, record.Epoch, recordProtection, protocolVersion);
                     return true;
@@ -965,8 +959,6 @@ namespace Hazel.Dtls
             {
 #if DEBUG
                 this.Logger.WriteError($"Dropping non-ClientHello ({handshake.MessageType}) message from non-peer `{peerAddress}`");
-#else
-                Interlocked.Increment(ref this.NonPeerNonHelloPacketsDropped);
 #endif
                 return;
             }
@@ -986,8 +978,6 @@ namespace Hazel.Dtls
                 {
 #if DEBUG
                     this.Logger.WriteVerbose($"Sending HelloVerifyRequest to non-peer `{peerAddress}`");
-#else
-                    Interlocked.Increment(ref this.NonPeerVerifyHelloRequests);
 #endif
                     this.SendHelloVerifyRequest(peerAddress, 1, 0, NullRecordProtection.Instance, clientHello.ClientProtocolVersion);
                     return;

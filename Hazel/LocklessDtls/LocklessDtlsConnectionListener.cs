@@ -2,6 +2,7 @@ using Hazel.Tools;
 using Hazel.Udp;
 using System;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
@@ -42,14 +43,6 @@ namespace Hazel.Dtls
         private const int SendReceiveBufferSize = 1024 * 1024;
         private const int BufferSize = ushort.MaxValue;
 
-        /// <summary>
-        /// A callback for early connection rejection. 
-        /// * Return false to reject connection.
-        /// * A null response is ok, we just won't send anything.
-        /// </summary>
-        public AcceptConnectionCheck AcceptConnection;
-        public delegate bool AcceptConnectionCheck(IPEndPoint endPoint, byte[] input, out byte[] response);
-
         private Socket socket;
         protected ILogger Logger;
 
@@ -81,9 +74,10 @@ namespace Hazel.Dtls
             }
         }
 
-        public int ConnectionCount { get { return this.allConnections.Count; } }
-        public int SendQueueLength { get { return this.sendQueue.Count; } }
-        public int ReceiveQueueLength { get { return this.receiveQueue.Count; } }
+        public override double AveragePing => this.allConnections.Values.Sum(c => c.AveragePingMs) / this.allConnections.Count;
+        public override int ConnectionCount { get { return this.allConnections.Count; } }
+        public override int SendQueueLength { get { return this.sendQueue.Count; } }
+        public override int ReceiveQueueLength { get { return this.receiveQueue.Count; } }
 
         private bool isActive;
 
@@ -150,9 +144,9 @@ namespace Hazel.Dtls
                         }
                     }
                 }
-            }
 
-            Thread.Sleep(100);
+                Thread.Sleep(100);
+            }
         }
 
         public override void Start()
@@ -284,6 +278,7 @@ namespace Hazel.Dtls
                     if (this.socket.Poll(Timeout.Infinite, SelectMode.SelectWrite))
                     {
                         this.socket.SendTo(msg.Span.GetUnderlyingArray(), msg.Span.Offset, msg.Span.Length, SocketFlags.None, msg.Recipient);
+                        this.Statistics.AddBytesSent(msg.Span.Length - msg.Span.Offset);
                     }
                     else
                     {
