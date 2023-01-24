@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -15,21 +16,16 @@ namespace Hazel.Udp
         private const int SendReceiveBufferSize = 1024 * 1024;
         private const int BufferSize = ushort.MaxValue;
 
-        /// <summary>
-        /// A callback for early connection rejection. 
-        /// * Return false to reject connection.
-        /// * A null response is ok, we just won't send anything.
-        /// </summary>
-        public AcceptConnectionCheck AcceptConnection;
-        public delegate bool AcceptConnectionCheck(IPEndPoint endPoint, byte[] input, out byte[] response);
-
         private Socket socket;
         private ILogger Logger;
         private Timer reliablePacketTimer;
 
         private ConcurrentDictionary<EndPoint, UdpServerConnection> allConnections = new ConcurrentDictionary<EndPoint, UdpServerConnection>();
-        
-        public int ConnectionCount { get { return this.allConnections.Count; } }
+
+        public override double AveragePing => this.allConnections.Values.Sum(c => c.AveragePingMs) / this.allConnections.Count;
+        public override int ConnectionCount { get { return this.allConnections.Count; } }
+        public override int ReceiveQueueLength => throw new NotImplementedException();
+        public override int SendQueueLength => throw new NotImplementedException();
 
         /// <summary>
         ///     Creates a new UdpConnectionListener for the given <see cref="IPAddress"/>, port and <see cref="IPMode"/>.
@@ -269,6 +265,8 @@ namespace Hazel.Udp
                     endPoint,
                     SendCallback,
                     null);
+
+                this.Statistics.AddBytesSent(length);
             }
             catch (SocketException e)
             {
@@ -306,6 +304,8 @@ namespace Hazel.Udp
                     SocketFlags.None,
                     endPoint
                 );
+
+                this.Statistics.AddBytesSent(length);
             }
             catch { }
         }

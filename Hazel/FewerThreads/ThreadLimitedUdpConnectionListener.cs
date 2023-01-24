@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -27,14 +28,6 @@ namespace Hazel.Udp.FewerThreads
 
         private const int SendReceiveBufferSize = 1024 * 1024;
         private const int BufferSize = ushort.MaxValue;
-
-        /// <summary>
-        /// A callback for early connection rejection. 
-        /// * Return false to reject connection.
-        /// * A null response is ok, we just won't send anything.
-        /// </summary>
-        public AcceptConnectionCheck AcceptConnection;
-        public delegate bool AcceptConnectionCheck(IPEndPoint endPoint, byte[] input, out byte[] response);
 
         private Socket socket;
         protected ILogger Logger;
@@ -106,9 +99,10 @@ namespace Hazel.Udp.FewerThreads
             }
         }
 
-        public int ConnectionCount { get { return this.allConnections.Count; } }
-        public int SendQueueLength { get { return this.sendQueue.Count; } }
-        public int ReceiveQueueLength { get { return this.receiveQueue.Count; } }
+        public override double AveragePing => this.allConnections.Values.Sum(c => c.AveragePingMs) / this.allConnections.Count;
+        public override int ConnectionCount { get { return this.allConnections.Count; } }
+        public override int SendQueueLength { get { return this.sendQueue.Count; } }
+        public override int ReceiveQueueLength { get { return this.receiveQueue.Count; } }
 
         private bool isActive;
 
@@ -239,7 +233,12 @@ namespace Hazel.Udp.FewerThreads
 
         protected void ProcessIncomingMessageFromOtherThread(MessageReader message, IPEndPoint remoteEndPoint, ConnectionId connectionId)
         {
-            this.receiveQueue.Add(new ReceiveMessageInfo() { Message = message, Sender = remoteEndPoint, ConnectionId = connectionId });
+            var info = new ReceiveMessageInfo() { Message = message, Sender = remoteEndPoint, ConnectionId = connectionId };
+            if (!this.receiveQueue.TryAdd(info))
+            {
+                this.Statistics.AddReceiveThreadBlocking();
+                this.receiveQueue.Add(info);
+            }
         }
 
         private void SendLoop()
@@ -251,6 +250,7 @@ namespace Hazel.Udp.FewerThreads
                     if (this.socket.Poll(Timeout.Infinite, SelectMode.SelectWrite))
                     {
                         this.socket.SendTo(msg.Span.GetUnderlyingArray(), msg.Span.Offset, msg.Span.Length, SocketFlags.None, msg.Recipient);
+                        this.Statistics.AddBytesSent(msg.Span.Length - msg.Span.Offset);
                     }
                     else
                     {
