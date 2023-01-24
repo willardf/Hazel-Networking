@@ -437,7 +437,7 @@ namespace Hazel.Dtls
 
                     if ((this.currentEpoch.PreviousSequenceWindowBitmask & windowMask) != 0)
                     {
-                        this.logger.WriteError("Dropping duplicate record");
+                        this.logger.WriteWarning("Dropping duplicate record");
                         continue;
                     }
                 }
@@ -617,7 +617,7 @@ namespace Hazel.Dtls
                         if (this.nextEpoch.Cookie.Length == helloVerifyRequest.Cookie.Length
                             && Const.ConstantCompareSpans(this.nextEpoch.Cookie, helloVerifyRequest.Cookie) == 1)
                         {
-                            this.logger.WriteError("Dropping duplicate HelloVerifyRequest handshake message");
+                            this.logger.WriteWarning("Dropping duplicate HelloVerifyRequest handshake message");
                             continue;
                         }
 

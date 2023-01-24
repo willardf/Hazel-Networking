@@ -16,17 +16,17 @@ namespace Hazel.Udp
         private const int SendReceiveBufferSize = 1024 * 1024;
         private const int BufferSize = ushort.MaxValue;
 
-        public override double AveragePing => this.allConnections.Values.Sum(c => c.AveragePingMs) / this.allConnections.Count;
-        public override int ConnectionCount { get { return this.allConnections.Count; } }
-        public override int ReceiveQueueLength => throw new NotImplementedException();
-        public override int SendQueueLength => throw new NotImplementedException();
-
         private Socket socket;
         private ILogger Logger;
         private Timer reliablePacketTimer;
 
         private ConcurrentDictionary<EndPoint, UdpServerConnection> allConnections = new ConcurrentDictionary<EndPoint, UdpServerConnection>();
-        
+
+        public override double AveragePing => this.allConnections.Values.Sum(c => c.AveragePingMs) / this.allConnections.Count;
+        public override int ConnectionCount { get { return this.allConnections.Count; } }
+        public override int ReceiveQueueLength => throw new NotImplementedException();
+        public override int SendQueueLength => throw new NotImplementedException();
+
         /// <summary>
         ///     Creates a new UdpConnectionListener for the given <see cref="IPAddress"/>, port and <see cref="IPMode"/>.
         /// </summary>
@@ -265,6 +265,8 @@ namespace Hazel.Udp
                     endPoint,
                     SendCallback,
                     null);
+
+                this.Statistics.AddBytesSent(length);
             }
             catch (SocketException e)
             {
@@ -302,6 +304,8 @@ namespace Hazel.Udp
                     SocketFlags.None,
                     endPoint
                 );
+
+                this.Statistics.AddBytesSent(length);
             }
             catch { }
         }
