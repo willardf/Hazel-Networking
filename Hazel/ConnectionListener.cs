@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Net;
 
 namespace Hazel
 {
@@ -19,6 +20,21 @@ namespace Hazel
     /// <threadsafety static="true" instance="true"/>
     public abstract class ConnectionListener : IDisposable
     {
+        public readonly ListenerStatistics Statistics = new ListenerStatistics();
+
+        public abstract double AveragePing { get; }
+        public abstract int ConnectionCount { get; }
+        public abstract int SendQueueLength { get; }
+        public abstract int ReceiveQueueLength { get; }
+
+        /// <summary>
+        /// A callback for early connection rejection. 
+        /// * Return false to reject connection.
+        /// * A null response is ok, we just won't send anything.
+        /// </summary>
+        public AcceptConnectionCheck AcceptConnection;
+        public delegate bool AcceptConnectionCheck(IPEndPoint endPoint, byte[] input, out byte[] response);
+
         /// <summary>
         ///     Invoked when a new client connects.
         /// </summary>
