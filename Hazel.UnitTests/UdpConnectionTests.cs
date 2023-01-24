@@ -359,7 +359,7 @@ namespace Hazel.UnitTests
 
                 Thread.Sleep(1050);    //Enough time for ~10 keep alive packets
 
-                Assert.AreEqual(ConnectionState.NotConnected, connection.State);
+                Assert.AreEqual(ConnectionState.Disconnected, connection.State);
                 Assert.AreEqual(3 * connection.MissingPingsUntilDisconnect + 4, connection.Statistics.TotalBytesSent); // + 4 for connecting overhead
             }
 #else

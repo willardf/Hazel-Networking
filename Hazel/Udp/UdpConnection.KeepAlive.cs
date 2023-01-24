@@ -77,7 +77,7 @@ namespace Hazel.Udp
                 HandleKeepAlive,
                 null,
                 keepAliveInterval,
-                keepAliveInterval
+                Timeout.Infinite
             );
         }
 
@@ -100,6 +100,8 @@ namespace Hazel.Udp
             catch
             {
             }
+
+            ResetKeepAliveTimer();
         }
 
         // Pings are special, quasi-reliable packets. 
@@ -130,7 +132,7 @@ namespace Hazel.Udp
 
             WriteBytesToConnection(bytes, bytes.Length);
 
-            Statistics.LogReliableSend(0);
+            this.Statistics.LogPingSent();
         }
 
         /// <summary>
@@ -140,7 +142,7 @@ namespace Hazel.Udp
         {
             try
             {
-                keepAliveTimer?.Change(keepAliveInterval, keepAliveInterval);
+                keepAliveTimer?.Change(keepAliveInterval, Timeout.Infinite);
             }
             catch { }
         }
@@ -150,11 +152,8 @@ namespace Hazel.Udp
         /// </summary>
         private void DisposeKeepAliveTimer()
         {
-            if (this.keepAliveTimer != null)
-            {
-                this.keepAliveTimer.Dispose();
-            }
-
+            this.keepAliveTimer?.Dispose();
+            
             foreach (var kvp in activePingPackets)
             {
                 if (this.activePingPackets.TryRemove(kvp.Key, out var pkt))

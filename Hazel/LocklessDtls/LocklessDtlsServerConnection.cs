@@ -1,14 +1,21 @@
+using Hazel.Udp;
 using System;
+using System.Collections.Concurrent;
 using System.Net;
 
-namespace Hazel.Udp
+namespace Hazel.Dtls
 {
     /// <summary>
-    ///     Represents a servers's connection to a client that uses the UDP protocol.
+    /// Represents a servers's connection to a client that uses the UDP protocol.
+    /// WARNING! This is not fully tested in production!
     /// </summary>
     /// <inheritdoc/>
-    internal sealed class UdpServerConnection : UdpConnection
+    public sealed class LocklessDtlsServerConnection : UdpConnection
     {
+        public readonly DateTime CreationTime = DateTime.UtcNow;
+
+        protected override bool DisposeOnDisconnect => false;
+
         /// <summary>
         ///     The connection listener that we use the socket of.
         /// </summary>
@@ -16,30 +23,39 @@ namespace Hazel.Udp
         ///     Udp server connections utilize the same socket in the listener for sends/receives, this is the listener that 
         ///     created this connection and is hence the listener this conenction sends and receives via.
         /// </remarks>
-        public UdpConnectionListener Listener { get; private set; }
+        public LocklessDtlsConnectionListener Listener { get; private set; }
 
+        internal PeerData PeerData { get; private set; }
+        internal bool HelloProcessed { get; private set; }
+
+        public readonly ConcurrentQueue<MessageReader> PacketsReceived = new ConcurrentQueue<MessageReader>();
+        public readonly ConcurrentQueue<byte[]> PacketsSent = new ConcurrentQueue<byte[]>();
+        
         /// <summary>
         ///     Creates a UdpConnection for the virtual connection to the endpoint.
         /// </summary>
         /// <param name="listener">The listener that created this connection.</param>
         /// <param name="endPoint">The endpoint that we are connected to.</param>
         /// <param name="IPMode">The IPMode we are connected using.</param>
-        internal UdpServerConnection(UdpConnectionListener listener, IPEndPoint endPoint, IPMode IPMode, ILogger logger)
+        internal LocklessDtlsServerConnection(LocklessDtlsConnectionListener listener, IPEndPoint endPoint, IPMode IPMode, ILogger logger)
             : base(logger)
         {
             this.Listener = listener;
             this.EndPoint = endPoint;
             this.IPMode = IPMode;
-
-            State = ConnectionState.Connected;
-            this.InitializeKeepAliveTimer();
         }
 
         /// <inheritdoc />
         protected override void WriteBytesToConnection(byte[] bytes, int length)
         {
-            this.Statistics.LogPacketSend(length);
-            Listener.SendData(bytes, length, EndPoint);
+            if (bytes.Length != length) throw new ArgumentException("I made an assumption here. I hope you see this error.");
+
+            if (this.State == ConnectionState.Disconnected)
+            {
+                return;
+            }
+
+            this.Listener.QueuePlaintextAppData(bytes, this);
         }
 
         /// <inheritdoc />
@@ -60,21 +76,32 @@ namespace Hazel.Udp
             throw new InvalidOperationException("Cannot manually connect a UdpServerConnection, did you mean to use UdpClientConnection?");
         }
 
+        internal void SetPeerData(PeerData peerData)
+        {
+            if (this.PeerData != null)
+            {
+                throw new InvalidOperationException("Shouldn't be able to replace peer data");
+            }
+
+            this.PeerData = peerData;
+            this.State = ConnectionState.Connecting;
+        }
+
+        internal void SetHelloAsProcessed()
+        {
+            this.State = ConnectionState.Connected;
+            this.HelloProcessed = true;
+            this.InitializeKeepAliveTimer();
+        }
+
         /// <summary>
         ///     Sends a disconnect message to the end point.
         /// </summary>
         protected override bool SendDisconnect(MessageWriter data = null)
         {
-            lock (this)
-            {
-                if (this._state == ConnectionState.NotConnected || this._state == ConnectionState.Disconnected)
-                {
-                    return false;
-                }
+            if (!Listener.RemoveConnectionTo(this.EndPoint)) return false;
+            this._state = ConnectionState.Disconnected;
 
-                this._state = ConnectionState.Disconnected;
-            }
-            
             var bytes = EmptyDisconnectBytes;
             if (data != null && data.Length > 0)
             {
@@ -84,24 +111,17 @@ namespace Hazel.Udp
                 bytes[0] = (byte)UdpSendOption.Disconnect;
             }
 
-            try
-            {
-                Listener.SendDataSync(bytes, bytes.Length, EndPoint);
-            }
-            catch { }
+            this.Listener.QueuePlaintextAppData(bytes, this);
 
             return true;
         }
 
         protected override void Dispose(bool disposing)
         {
-            Listener.RemoveConnectionTo(EndPoint);
+            this.logger.WriteInfo("Disposed");
+            this.Listener.RemoveConnectionTo(this.EndPoint);
 
-            if (disposing)
-            {
-                SendDisconnect();
-            }
-
+            this.PeerData?.Dispose();
             base.Dispose(disposing);
         }
     }

@@ -11,6 +11,16 @@ namespace Hazel
     {
         private Thread[] threads;
 
+        public HazelThreadPool(int numThreads, Action<int> action)
+        {
+            this.threads = new Thread[numThreads];
+            for (int i = 0; i < this.threads.Length; ++i)
+            {
+                int tid = i;
+                this.threads[i] = new Thread(() => action(tid));
+            }
+        }
+
         public HazelThreadPool(int numThreads, ThreadStart action)
         {
             this.threads = new Thread[numThreads];

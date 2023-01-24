@@ -6,7 +6,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
@@ -14,7 +13,7 @@ using System.Threading;
 namespace Hazel.UnitTests.Dtls
 {
     [TestClass]
-    public class DtlsConnectionTests
+    public class LocklessDtlsConnectionTests
     {
         // Created with command line
         // openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 100000 -out certificate.pem
@@ -87,20 +86,27 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             return clientCertificates;
         }
 
-        protected DtlsConnectionListener CreateListener(int numWorkers, IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
+        private LocklessDtlsConnectionListener CreateListener(int numWorkers, IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
         {
-            DtlsConnectionListener listener = new DtlsConnectionListener(2, endPoint, logger, ipMode);
+            LocklessDtlsConnectionListener listener = new LocklessDtlsConnectionListener(2, endPoint, logger, ipMode);
             listener.SetCertificate(GetCertificateForServer());
             return listener;
 
         }
 
-        private ThreadLimitedDtlsUnityConnection[] CreateConnections(int num, IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
+        private ThreadLimitedDtlsUnityConnection CreateConnection(IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
+        {
+            ThreadLimitedDtlsUnityConnection connection = new ThreadLimitedDtlsUnityConnection(logger, endPoint, ipMode);
+            connection.SetValidServerCertificates(GetCertificateForClient());
+            return connection;
+        }
+
+        private ThreadLimitedDtlsUnityConnection[] CreateConnections(int num, IPEndPoint endPoint, IPMode ipMode = IPMode.IPv4)
         {
             ThreadLimitedDtlsUnityConnection[] output = new ThreadLimitedDtlsUnityConnection[num];
             for (int i = 0; i < output.Length; ++i)
             {
-                output[i] = CreateConnection(endPoint, logger, ipMode);
+                output[i] = CreateConnection(endPoint, new TestLogger("Client " + i), ipMode);
             }
 
             return output;
@@ -114,15 +120,8 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             }
         }
 
-        protected ThreadLimitedDtlsUnityConnection CreateConnection(IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
-        {
-            ThreadLimitedDtlsUnityConnection connection = new ThreadLimitedDtlsUnityConnection(logger, endPoint, ipMode);
-            connection.SetValidServerCertificates(GetCertificateForClient());
-            return connection;
-        }
-
         [TestMethod]
-        public void DtlsServerDisposeDisconnectsTest()
+        public void DtlsServerDisposeDoesNotDisconnectTest()
         {
             IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 27510);
 
@@ -139,11 +138,13 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 {
                     serverConnected = true;
                     signal.Release();
-                    evt.Connection.Disconnected += (o, et) => {
+                    evt.Connection.Disconnected += (o, et) =>
+                    {
                         serverDisconnected = true;
                     };
                 };
-                connection.Disconnected += (o, evt) => {
+                connection.Disconnected += (o, evt) =>
+                {
                     clientDisconnected = true;
                     signal.Release();
                 };
@@ -152,34 +153,36 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 connection.Connect();
 
                 // wait for the client to connect
-                signal.WaitOne(10);
+                signal.WaitOne(100);
+
+                Assert.AreEqual(connection.State, ConnectionState.Connected);
 
                 listener.Dispose();
 
                 // wait for the client to disconnect
-                signal.WaitOne(100);
+                Assert.IsFalse(signal.WaitOne(100));
 
-                Assert.IsTrue(serverConnected);
-                Assert.IsTrue(clientDisconnected);
-                Assert.IsFalse(serverDisconnected);
-                Assert.AreEqual(0, listener.PeerCount);
+                Assert.IsTrue(serverConnected, "Server connect event should fire");
+                Assert.IsFalse(clientDisconnected, "Client disconnect event shouldn't fire");
+                Assert.IsFalse(serverDisconnected, "Server disconnect event shouldn't fire");
+                Assert.AreEqual(0, listener.ConnectionCount);
             }
         }
 
-        class MalformedDTLSListener : DtlsConnectionListener
+        class MalformedDTLSListener : LocklessDtlsConnectionListener
         {
             public MalformedDTLSListener(int numWorkers, IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
                 : base(numWorkers, endPoint, logger, ipMode)
             {
             }
 
-            public void InjectPacket(ByteSpan packet, IPEndPoint peerAddress, ConnectionId connectionId)
+            public void InjectPacket(ByteSpan packet, LocklessDtlsServerConnection connection)
             {
                 MessageReader reader = MessageReader.GetSized(packet.Length);
                 reader.Length = packet.Length;
                 Array.Copy(packet.GetUnderlyingArray(), packet.Offset, reader.Buffer, reader.Offset, packet.Length);
 
-                base.ProcessIncomingMessageFromOtherThread(reader, peerAddress, connectionId);
+                this.EnqueueMessageReceived(reader, connection);
             }
         }
 
@@ -241,8 +244,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         {
             IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 27510);
 
-            IPEndPoint connectionEndPoint = ep;
-            DtlsConnectionListener.ConnectionId connectionId = new ThreadLimitedUdpConnectionListener.ConnectionId();
+            LocklessDtlsServerConnection serverConnection = null;
 
             Semaphore signal = new Semaphore(0, int.MaxValue);
 
@@ -254,8 +256,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
                 listener.NewConnection += (evt) =>
                 {
-                    connectionEndPoint = evt.Connection.EndPoint;
-                    connectionId = ((ThreadLimitedUdpServerConnection)evt.Connection).ConnectionId;
+                    serverConnection = (LocklessDtlsServerConnection)evt.Connection;
 
                     signal.Release();
                     evt.Connection.Disconnected += (o, et) => {
@@ -284,7 +285,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 record.Encode(encoded);
                 data.CopyTo(encoded.Slice(Record.Size));
 
-                listener.InjectPacket(encoded, connectionEndPoint, connectionId);
+                listener.InjectPacket(encoded, serverConnection);
 
                 // wait for the client to disconnect
                 listener.Dispose();
@@ -297,12 +298,10 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         {
             IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 27510);
 
-            IPEndPoint connectionEndPoint = ep;
-            DtlsConnectionListener.ConnectionId connectionId = new ThreadLimitedUdpConnectionListener.ConnectionId();
+            Connection serverConnection = null;
+            bool clientDisconnected = false;
 
-            Semaphore signal = new Semaphore(0, int.MaxValue);
-
-            using (DtlsConnectionListener listener = new DtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, ep.Port), new TestLogger()))
+            using (LocklessDtlsConnectionListener listener = new LocklessDtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, ep.Port), new TestLogger()))
             using (MalformedDTLSClient connection = new MalformedDTLSClient(new TestLogger(), ep))
             {
                 listener.SetCertificate(GetCertificateForServer());
@@ -310,15 +309,11 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
                 listener.NewConnection += (evt) =>
                 {
-                    connectionEndPoint = evt.Connection.EndPoint;
-                    connectionId = ((ThreadLimitedUdpServerConnection)evt.Connection).ConnectionId;
-
-                    signal.Release();
-                    evt.Connection.Disconnected += (o, et) => {
-                    };
+                    serverConnection = evt.Connection;
                 };
+
                 connection.Disconnected += (o, evt) => {
-                    signal.Release();
+                    clientDisconnected = true;
                 };
 
                 listener.Start();
@@ -326,12 +321,10 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
                 Assert.IsTrue(listener.ReceiveThreadRunning, "Listener should be able to handle a malformed hello packet");
                 Assert.AreEqual(ConnectionState.Disconnected, connection.State);
+                Assert.IsNull(serverConnection, "Server NewConnection event should not fire");
+                Assert.IsTrue(clientDisconnected, "Client disconnect event should fire");
 
-                Assert.AreEqual(0, listener.PeerCount);
-
-                // wait for the client to disconnect
-                listener.Dispose();
-                signal.WaitOne(100);
+                Assert.AreEqual(1, listener.ConnectionCount, "We expect the listener to count this connection until it times out server-side.");
             }
         }
 
@@ -347,7 +340,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             var logger = new TestLogger("Throttle");
 
             using (SocketCapture capture = new SocketCapture(captureEndPoint, listenerEndPoint, logger))
-            using (DtlsConnectionListener listener = new DtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, listenerEndPoint.Port), new TestLogger("Server")))
+            using (LocklessDtlsConnectionListener listener = new LocklessDtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, listenerEndPoint.Port), new TestLogger("Server")))
             using (DtlsUnityConnection connection = new DtlsUnityConnection(new TestLogger("Client "), captureEndPoint))
             {
                 Semaphore listenerToConnectionThrottle = new Semaphore(0, int.MaxValue);
@@ -408,7 +401,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             var logger = new TestLogger("Throttle");
 
             using (SocketCapture capture = new SocketCapture(captureEndPoint, listenerEndPoint, logger))
-            using (DtlsConnectionListener listener = new DtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, listenerEndPoint.Port), new TestLogger("Server")))
+            using (LocklessDtlsConnectionListener listener = new LocklessDtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, listenerEndPoint.Port), new TestLogger("Server")))
             using (DtlsUnityConnection connection = new DtlsUnityConnection(new TestLogger("Client "), captureEndPoint))
             {
                 Semaphore listenerToConnectionThrottle = new Semaphore(0, int.MaxValue);
@@ -460,7 +453,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             Semaphore signal = new Semaphore(0, int.MaxValue);
 
             using (SocketCapture capture = new SocketCapture(captureEndPoint, listenerEndPoint))
-            using (DtlsConnectionListener listener = new DtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, listenerEndPoint.Port), new TestLogger("Server")))
+            using (LocklessDtlsConnectionListener listener = new LocklessDtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, listenerEndPoint.Port), new TestLogger("Server")))
             using (DtlsUnityConnection connection = new DtlsUnityConnection(new TestLogger("Client "), captureEndPoint))
             {
                 Semaphore listenerToConnectionThrottle = new Semaphore(0, int.MaxValue);
@@ -514,7 +507,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             Semaphore signal = new Semaphore(0, int.MaxValue);
 
             using (SocketCapture capture = new SocketCapture(captureEndPoint, listenerEndPoint))
-            using (DtlsConnectionListener listener = new DtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, listenerEndPoint.Port), new TestLogger()))
+            using (LocklessDtlsConnectionListener listener = new LocklessDtlsConnectionListener(2, new IPEndPoint(IPAddress.Any, listenerEndPoint.Port), new TestLogger()))
             using (TestDtlsHandshakeDropUnityConnection connection = new TestDtlsHandshakeDropUnityConnection(new TestLogger(), captureEndPoint))
             {
                 connection.DropSendClientKeyExchangeFlightCount = 1;
@@ -541,14 +534,14 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 // wait for the client to connect
                 signal.WaitOne(10);
 
-                listener.Dispose();
+                listener.DisconnectAll();
 
                 // wait for the client to disconnect
                 signal.WaitOne(100);
 
                 Assert.IsTrue(serverConnected);
                 Assert.IsTrue(clientDisconnected);
-                Assert.IsFalse(serverDisconnected);
+                Assert.IsTrue(serverDisconnected);
             }
         }
 
@@ -556,29 +549,86 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         ///     Tests the keepalive functionality from the client,
         /// </summary>
         [TestMethod]
-        public void PingDisconnectClientTest()
+        public void ServerPingDisconnectsTest()
         {
 #if DEBUG
             IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 27510);
-            using (DtlsConnectionListener listener = CreateListener(2, new IPEndPoint(IPAddress.Any, ep.Port), new TestLogger()))
+            using (var listener = CreateListener(2, new IPEndPoint(IPAddress.Any, ep.Port), new TestLogger("Server")))
             {
-                // Adjust the ping rate to end the test faster
+                UdpConnection serverConn = null;
                 listener.NewConnection += (evt) =>
                 {
-                    var conn = (ThreadLimitedUdpServerConnection)evt.Connection;
+                    var conn = (UdpConnection)evt.Connection;
+                    conn.OnInternalDisconnect = (err) =>
+                    {
+                        Console.WriteLine("Disconnected for " + err);
+                        return null;
+                    };
+
                     conn.KeepAliveInterval = 100;
                     conn.MissingPingsUntilDisconnect = 3;
+
+                    serverConn = conn;
                 };
 
                 listener.Start();
 
                 for (int i = 0; i < 5; ++i)
                 {
-                    using (var connection = CreateConnection(ep, new TestLogger()))
+                    using (var connection = CreateConnection(ep, new TestLogger("Client " + i)))
+                    {
+                        // Server should disconnect us, client should be patient
+                        connection.KeepAliveInterval = int.MaxValue;
+                        connection.MissingPingsUntilDisconnect = int.MaxValue;
+                        connection.Connect(timeout: 1000);
+
+                        Assert.AreEqual(ConnectionState.Connected, connection.State);
+
+                        // After connecting, quietly stop responding to all messages to fake connection loss.
+                        serverConn.TestDropRate = 1;
+
+                        Thread.Sleep(500);    //Enough time for ~3 keep alive packets
+
+                        Assert.AreEqual(ConnectionState.Disconnected, connection.State);
+                    }
+                }
+
+                Assert.AreEqual(0, listener.ConnectionCount, "All clients disconnected, peer count should be zero.");
+            }
+#else
+            Assert.Inconclusive("Only works in DEBUG");
+#endif
+        }
+
+        /// <summary>
+        ///     Tests the keepalive functionality from the client,
+        /// </summary>
+        [TestMethod]
+        public void ClientPingDisconnectsTest()
+        {
+#if DEBUG
+            IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 27510);
+            using (var listener = CreateListener(2, new IPEndPoint(IPAddress.Any, ep.Port), new TestLogger("Server")))
+            {
+                // Client should disconnect us, server should be patient
+                listener.NewConnection += (evt) =>
+                {
+                    var conn = (UdpConnection)evt.Connection;
+                    conn.KeepAliveInterval = int.MaxValue;
+                    conn.MissingPingsUntilDisconnect = int.MaxValue;
+                };
+
+                listener.Start();
+
+                for (int i = 0; i < 5; ++i)
+                {
+                    using (var connection = CreateConnection(ep, new TestLogger("Client " + i)))
                     {
                         connection.KeepAliveInterval = 100;
                         connection.MissingPingsUntilDisconnect = 3;
-                        connection.Connect();
+                        connection.Connect(timeout: 1000);
+
+                        Thread.Sleep(10);
 
                         Assert.AreEqual(ConnectionState.Connected, connection.State);
 
@@ -591,10 +641,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                     }
                 }
 
-                listener.DisconnectOldConnections(TimeSpan.FromMilliseconds(500), null);
-
-                Assert.AreEqual(0, listener.ConnectionCount, "All clients disconnected, connection count should be zero.");
-                Assert.AreEqual(0, listener.PeerCount, "All clients disconnected, peer count should be zero.");
+                Assert.AreEqual(0, listener.ConnectionCount, "All clients disconnected, peer count should be zero.");
             }
 #else
             Assert.Inconclusive("Only works in DEBUG");
@@ -602,7 +649,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         }
 
         [TestMethod]
-        public void ServerDisposeDisconnectsTest()
+        public void ServerDisconnectAllTest()
         {
             IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 4296);
 
@@ -610,7 +657,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             bool serverDisconnected = false;
             bool clientDisconnected = false;
 
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger("SERVER")))
+            using (var listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger("SERVER")))
             using (UdpConnection connection = this.CreateConnection(ep, new TestLogger("CLIENT")))
             {
                 listener.NewConnection += (evt) =>
@@ -624,12 +671,12 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 connection.Connect();
 
                 Thread.Sleep(100); // Gotta wait for the server to set up the events.
-                listener.Dispose();
+                listener.DisconnectAll();
                 Thread.Sleep(100);
 
-                Assert.IsTrue(serverConnected);
-                Assert.IsTrue(clientDisconnected);
-                Assert.IsFalse(serverDisconnected);
+                Assert.IsTrue(serverConnected, "Server connect event should fire");
+                Assert.IsTrue(clientDisconnected, "Client disconnect event should fire");
+                Assert.IsTrue(serverDisconnected, "Server disconnect event shouldn't fire");
             }
         }
 
@@ -642,7 +689,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             bool serverDisconnected = false;
             bool clientDisconnected = false;
 
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (var listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
             using (UdpConnection connection = this.CreateConnection(ep, new TestLogger()))
             {
                 listener.NewConnection += (evt) =>
@@ -675,7 +722,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         {
             IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 4296);
 
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (var listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
             using (UdpConnection connection = this.CreateConnection(ep, new TestLogger()))
             {
                 listener.Start();
@@ -696,7 +743,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         public void DtlsHandshakeTest()
         {
             byte[] TestData = new byte[] { 1, 2, 3, 4, 5, 6 };
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (var listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
             using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
                 listener.Start();
@@ -721,7 +768,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         public void DtlsUnreliableMessageSendTest()
         {
             byte[] TestData = new byte[] { 1, 2, 3, 4, 5, 6 };
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (var listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
             using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
                 MessageReader output = null;
@@ -758,7 +805,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         [TestMethod]
         public void DtlsIPv4ConnectionTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (var listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
             using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
                 listener.Start();
@@ -773,6 +820,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         {
             public int[] Count;
             public ManualResetEventSlim Event;
+
             public ExchangeData(int numClients)
             {
                 this.Count = new int[numClients];
@@ -791,38 +839,40 @@ IsdbLCwHYD3GVgk/D7NVxyU=
             {
                 Connection[] serverConnections = new Connection[NumClients];
                 listener.NewConnection += (ncArgs) =>
-                {
-                    // Since we're expecting to be spammed, disable resends and never drop for missing acks/pings. They just add more spam.
-                    var udpConn = (UdpConnection)ncArgs.Connection;
-                    udpConn.ResendTimeoutMs = int.MaxValue; 
-                    udpConn.DisconnectTimeoutMs = int.MaxValue;
-                    udpConn.KeepAliveInterval = int.MaxValue;
-                    udpConn.Disconnected += (object sender, DisconnectedEventArgs dcArgs) =>
                     {
-                        Console.WriteLine("Server disconnected a client");
-                    };
-                    udpConn.DataReceived += (DataReceivedEventArgs data) =>
-                    {
-                        var tid = data.Message.ReadInt32();
-                        data.Message.Recycle();
-
-                        var msg = MessageWriter.Get(SendOption.Reliable);
-                        msg.Write(tid);
-                        for (int i = 0; i < serverConnections.Length; ++i)
+                        // Since we're expecting to be spammed, disable resends and never drop for missing acks/pings. They just add more spam.
+                        var udpConn = (UdpConnection)ncArgs.Connection;
+                        udpConn.ResendTimeoutMs = int.MaxValue;
+                        udpConn.DisconnectTimeoutMs = int.MaxValue;
+                        udpConn.KeepAliveInterval = int.MaxValue;
+                        udpConn.Disconnected += (object sender, DisconnectedEventArgs dcArgs) =>
                         {
-                            var conn = serverConnections[i];
-                            conn?.Send(msg);
-                        }
-                        msg.Recycle();
-                    };
+                            Console.WriteLine("Server disconnected a client because " + dcArgs.Reason);
+                        };
 
-                    serverConnections[ncArgs.HandshakeData.ReadByte()] = udpConn;
-                };
+                        udpConn.DataReceived += (DataReceivedEventArgs data) =>
+                        {
+                            var tid = data.Message.ReadInt32();
+                            data.Message.Recycle();
+                            var msg = MessageWriter.Get(SendOption.Reliable);
+                            msg.Write(tid);
+
+                            for (int i = 0; i < serverConnections.Length; ++i)
+                            {
+                                var conn = serverConnections[i];
+                                conn?.Send(msg);
+                            }
+
+                            msg.Recycle();
+                        };
+
+                        serverConnections[ncArgs.HandshakeData.ReadByte()] = udpConn;
+                    };
 
                 UdpConnection[] connections = null;
                 try
                 {
-                    connections = this.CreateConnections(NumClients, new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger("Client"));
+                    connections = this.CreateConnections(NumClients, new IPEndPoint(IPAddress.Loopback, 4296));
 
                     listener.Start();
 
@@ -839,6 +889,11 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                         connection.ResendTimeoutMs = int.MaxValue;
                         connection.DisconnectTimeoutMs = int.MaxValue;
                         connection.KeepAliveInterval = int.MaxValue;
+                        connection.Disconnected += (object sender, DisconnectedEventArgs dcArgs) =>
+                        {
+                            Console.WriteLine("Client disconnected because " + dcArgs.Reason);
+                        };
+
                         connection.DataReceived += (DataReceivedEventArgs data) =>
                         {
                             var tidReceived = data.Message.ReadInt32();
@@ -861,6 +916,8 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                             {
                                 connection.Send(msg);
                             }
+
+                            Console.WriteLine($"Thread {myTid} sent its stuff");
 
                             msg.Recycle();
                         });
@@ -889,6 +946,8 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                             Assert.AreEqual(1000, cnt);
                         }
                     }
+
+                    Console.WriteLine("Test complete");
                 }
                 finally
                 {
@@ -900,7 +959,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         [TestMethod]
         public void DtlsSessionV0ConnectionTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (var listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
             using (var connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
                 connection.HazelSessionVersion = 0;
@@ -946,7 +1005,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         [TestMethod]
         public void ConnectLikeAJerkTest()
         {
-            using (DtlsConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger("Server")))
+            using (var listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger("Server")))
             using (MultipleClientHelloDtlsConnection client = new MultipleClientHelloDtlsConnection(new TestLogger("Client "), new IPEndPoint(IPAddress.Loopback, 4296), IPMode.IPv4))
             {
                 client.SetValidServerCertificates(GetCertificateForClient());
@@ -975,7 +1034,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         [TestMethod]
         public void HandshakeLikeAJerkTest()
         {
-            using (DtlsConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger("Server")))
+            using (var listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger("Server")))
             using (MultipleClientKeyExchangeFlightDtlsConnection client = new MultipleClientKeyExchangeFlightDtlsConnection(new TestLogger("Client "), new IPEndPoint(IPAddress.Loopback, 4296), IPMode.IPv4))
             {
                 client.SetValidServerCertificates(GetCertificateForClient());
@@ -1004,7 +1063,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         [TestMethod]
         public void MixedConnectionTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener2 = this.CreateListener(4, new IPEndPoint(IPAddress.IPv6Any, 4296), new TestLogger(), IPMode.IPv6))
+            using (var listener2 = this.CreateListener(4, new IPEndPoint(IPAddress.IPv6Any, 4296), new TestLogger(), IPMode.IPv6))
             {
                 listener2.Start();
 
@@ -1033,7 +1092,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         [TestMethod]
         public void DtlsIPv6ConnectionTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.IPv6Any, 4296), new TestLogger(), IPMode.IPv6))
+            using (var listener = this.CreateListener(2, new IPEndPoint(IPAddress.IPv6Any, 4296), new TestLogger(), IPMode.IPv6))
             {
                 listener.Start();
 
@@ -1050,7 +1109,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         [TestMethod]
         public void DtlsUnreliableServerToClientTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (var listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
             using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
                 TestHelper.RunServerToClientTest(listener, connection, 10, SendOption.None);
@@ -1063,7 +1122,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         [TestMethod]
         public void DtlsReliableServerToClientTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (var listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
             using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
                 TestHelper.RunServerToClientTest(listener, connection, 10, SendOption.Reliable);
@@ -1076,7 +1135,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         [TestMethod]
         public void DtlsUnreliableClientToServerTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (var listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
             using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
                 TestHelper.RunClientToServerTest(listener, connection, 10, SendOption.None);
@@ -1089,7 +1148,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         [TestMethod]
         public void DtlsReliableClientToServerTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (var listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
             using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
                 TestHelper.RunClientToServerTest(listener, connection, 10, SendOption.Reliable);
@@ -1099,8 +1158,8 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         [TestMethod]
         public void KeepAliveClientTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
-            using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
+            using (var listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (var connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
                 listener.Start();
 
@@ -1111,9 +1170,8 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
                 Assert.AreEqual(ConnectionState.Connected, connection.State);
                 Assert.IsTrue(
-                    connection.Statistics.TotalBytesSent >= 500 &&
-                    connection.Statistics.TotalBytesSent <= 675,
-                    "Sent: " + connection.Statistics.TotalBytesSent
+                    connection.Statistics.PingMessagesSent >= 9,
+                    "Pings Sent: " + connection.Statistics.PingMessagesSent
                 );
             }
         }
@@ -1126,7 +1184,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         {
             ManualResetEvent mutex = new ManualResetEvent(false);
 
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (var listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
             using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
                 UdpConnection client = null;
@@ -1152,9 +1210,8 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 Assert.AreEqual(ConnectionState.Connected, client.State);
 
                 Assert.IsTrue(
-                    client.Statistics.TotalBytesSent >= 27 &&
-                    client.Statistics.TotalBytesSent <= 50,
-                    "Sent: " + client.Statistics.TotalBytesSent
+                    client.Statistics.PingMessagesSent >= 9,
+                    "Pings Sent: " + client.Statistics.PingMessagesSent
                 );
             }
         }
@@ -1171,9 +1228,11 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 ManualResetEvent mutex = new ManualResetEvent(false);
                 ManualResetEvent mutex2 = new ManualResetEvent(false);
 
+                Connection serverConnection = null;
                 listener.NewConnection += delegate (NewConnectionEventArgs args)
                 {
-                    args.Connection.Disconnected += delegate (object sender2, DisconnectedEventArgs args2)
+                    serverConnection = args.Connection;
+                    serverConnection.Disconnected += delegate (object sender2, DisconnectedEventArgs args2)
                     {
                         mutex2.Set();
                     };
@@ -1186,13 +1245,15 @@ IsdbLCwHYD3GVgk/D7NVxyU=
                 connection.Connect();
 
                 Assert.AreEqual(ConnectionState.Connected, connection.State);
+
                 mutex.WaitOne(1000);
-                Assert.AreEqual(ConnectionState.Connected, connection.State);
+                Assert.AreEqual(ConnectionState.Connected, serverConnection.State);
 
                 connection.Disconnect("Testing");
+                Assert.AreEqual(ConnectionState.Disconnected, connection.State);
 
                 mutex2.WaitOne(1000);
-                Assert.AreEqual(ConnectionState.Disconnected, connection.State);
+                Assert.AreEqual(ConnectionState.Disconnected, serverConnection.State);
             }
         }
 
@@ -1202,22 +1263,22 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         [TestMethod]
         public void ServerDisconnectTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger("Server")))
+            using (var listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger("Server")))
             using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger("Client")))
             {
-                SemaphoreSlim mutex = new SemaphoreSlim(0, 100);
+                SemaphoreSlim sem = new SemaphoreSlim(0, 100);
                 ManualResetEventSlim serverMutex = new ManualResetEventSlim(false);
 
                 connection.Disconnected += delegate (object sender, DisconnectedEventArgs args)
                 {
-                    mutex.Release();
+                    sem.Release();
                 };
 
                 listener.NewConnection += delegate (NewConnectionEventArgs args)
                 {
-                    mutex.Release();
+                    sem.Release();
 
-                    // This has to be on a new thread because the client will go straight from Connecting to NotConnected
+                    // This has to be on a new thread because the client will go straight from Connecting to Disconnected
                     ThreadPool.QueueUserWorkItem(_ =>
                     {
                         serverMutex.Wait(500);
@@ -1229,12 +1290,12 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
                 connection.Connect();
 
-                mutex.Wait(500);
+                Assert.IsTrue(sem.Wait(500), "Didn't connect");
                 Assert.AreEqual(ConnectionState.Connected, connection.State);
 
                 serverMutex.Set();
 
-                mutex.Wait(500);
+                Assert.IsTrue(sem.Wait(500), "Didn't disconnect");
                 Assert.AreEqual(ConnectionState.Disconnected, connection.State);
             }
         }
@@ -1245,7 +1306,7 @@ IsdbLCwHYD3GVgk/D7NVxyU=
         [TestMethod]
         public void ServerExtraDataDisconnectTest()
         {
-            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
+            using (var listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, 4296), new TestLogger()))
             using (UdpConnection connection = this.CreateConnection(new IPEndPoint(IPAddress.Loopback, 4296), new TestLogger()))
             {
                 string received = null;
@@ -1260,9 +1321,14 @@ IsdbLCwHYD3GVgk/D7NVxyU=
 
                 listener.NewConnection += delegate (NewConnectionEventArgs args)
                 {
-                    MessageWriter writer = MessageWriter.Get(SendOption.None);
-                    writer.Write("Goodbye");
-                    args.Connection.Disconnect("Testing", writer);
+                    // This has to be on a new thread because the client will go straight from Connecting to Disconnected
+                    ThreadPool.QueueUserWorkItem(_ =>
+                    {
+                        MessageWriter writer = MessageWriter.Get(SendOption.None);
+                        writer.Write("Goodbye");
+                        args.Connection.Disconnect("Testing", writer);
+
+                    });
                 };
 
                 listener.Start();

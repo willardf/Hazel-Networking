@@ -6,6 +6,7 @@ using System.Net;
 using System.Threading;
 using System.Diagnostics;
 using Hazel.Udp.FewerThreads;
+using System.Collections.Generic;
 
 namespace Hazel.UnitTests
 {
@@ -82,25 +83,19 @@ namespace Hazel.UnitTests
             listener.Start();
 
             DataReceivedEventArgs? result = null;
-            //Setup conneciton
             connection.DataReceived += delegate (DataReceivedEventArgs a)
             {
                 Trace.WriteLine("Data was received correctly.");
-
-                try
-                {
-                    result = a;
-                }
-                finally
-                {
-                    mutex.Set();
-                }
+                result = a;
+                mutex.Set();
             };
 
             connection.Connect();
 
             //Wait until data is received
-            mutex.WaitOne();
+            mutex.WaitOne(1000);
+
+            Assert.IsNotNull(result, "Data never received");
 
             var dataReader = ConvertToMessageReader(data);
             Assert.AreEqual(dataReader.Length, result.Value.Message.Length);
@@ -332,6 +327,18 @@ namespace Hazel.UnitTests
             }
 
             return output;
+        }
+
+        public static void WaitAll(IEnumerable<ManualResetEventSlim> events, TimeSpan MaxWait)
+        {
+            DateTime timeStart = DateTime.UtcNow;
+            foreach (var evt in events)
+            {
+                var timeSpent = DateTime.UtcNow - timeStart;
+                if (timeSpent > MaxWait) break;
+
+                evt.Wait(MaxWait - timeSpent);
+            }
         }
     }
 }

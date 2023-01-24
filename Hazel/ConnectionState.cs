@@ -11,7 +11,7 @@ namespace Hazel
     public enum ConnectionState
     {
         /// <summary>
-        ///     The Connection has either not been established yet or has been disconnected.
+        ///     The Connection has not been established yet.
         /// </summary>
         NotConnected,
         
@@ -24,5 +24,10 @@ namespace Hazel
         ///     The Connection is connected and data can be transfered.
         /// </summary>
         Connected,
+
+        /// <summary>
+        ///     The Connection was established, but is no longer.
+        /// </summary>
+        Disconnected
     }
 }

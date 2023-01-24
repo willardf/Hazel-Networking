@@ -63,7 +63,7 @@ namespace Hazel.Udp
         /// <inheritdoc/>
         public override SendErrors Send(MessageWriter msg)
         {
-            if (this._state != ConnectionState.Connected)
+            if (this._state == ConnectionState.NotConnected || this._state == ConnectionState.Disconnected)
             {
                 return SendErrors.Disconnected;
             }
@@ -128,6 +128,16 @@ namespace Hazel.Udp
         /// <param name="message">The buffer containing the bytes received.</param>
         protected internal virtual void HandleReceive(MessageReader message, int bytesReceived)
         {
+#if DEBUG
+            if (this.TestDropRate > 0)
+            {
+                if ((this.testDropCount++ % this.TestDropRate) == 0)
+                {
+                    return;
+                }
+            }
+#endif
+
             ushort id;
             switch (message.Buffer[0])
             {

@@ -1,29 +1,43 @@
+using Hazel.Tools;
+using Hazel.Udp;
 using System;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Threading;
 
-namespace Hazel.Udp.FewerThreads
+namespace Hazel.Dtls
 {
     /// <summary>
     ///     Listens for new UDP connections and creates UdpConnections for them.
     /// </summary>
     /// <inheritdoc />
-    public class ThreadLimitedUdpConnectionListener : NetworkConnectionListener
+    public partial class LocklessDtlsConnectionListener : NetworkConnectionListener
     {
         private struct SendMessageInfo
         {
             public ByteSpan Span;
             public IPEndPoint Recipient;
+
+            public SendMessageInfo(ByteSpan packet, IPEndPoint remoteEndPoint)
+            {
+                this.Span = packet;
+                this.Recipient = remoteEndPoint;
+            }
         }
 
         private struct ReceiveMessageInfo
         {
             public MessageReader Message;
-            public IPEndPoint Sender;
-            public ConnectionId ConnectionId;
+            public LocklessDtlsServerConnection Sender;
+
+            public ReceiveMessageInfo(MessageReader message, LocklessDtlsServerConnection sender)
+            {
+                this.Message = message;
+                this.Sender = sender;
+            }
         }
 
         private const int SendReceiveBufferSize = 1024 * 1024;
@@ -39,48 +53,9 @@ namespace Hazel.Udp.FewerThreads
 
         public bool ReceiveThreadRunning => this.receiveThread.ThreadState == ThreadState.Running;
 
-        public struct ConnectionId : IEquatable<ConnectionId>
-        {
-            public IPEndPoint EndPoint;
-            public int Serial;
+        protected ConcurrentDictionary<EndPoint, LocklessDtlsServerConnection> allConnections = new ConcurrentDictionary<EndPoint, LocklessDtlsServerConnection>();
 
-            public static ConnectionId Create(IPEndPoint endPoint, int serial)
-            {
-                return new ConnectionId{
-                    EndPoint = endPoint,
-                    Serial = serial,
-                };
-            }
-
-            public bool Equals(ConnectionId other)
-            {
-                return this.Serial == other.Serial
-                    && this.EndPoint.Equals(other.EndPoint)
-                    ;
-            }
-
-            public override bool Equals(object obj)
-            {
-                if (obj is ConnectionId)
-                {
-                    return this.Equals((ConnectionId)obj);
-                }
-
-                return false;
-            }
-
-            public override int GetHashCode()
-            {
-                ///NOTE(mendsley): We're only hashing the endpoint
-                /// here, as the common case will have one
-                /// connection per address+port tuple.
-                return this.EndPoint.GetHashCode();
-            }
-        }
-
-        protected ConcurrentDictionary<ConnectionId, ThreadLimitedUdpServerConnection> allConnections = new ConcurrentDictionary<ConnectionId, ThreadLimitedUdpServerConnection>();
-        
-        private BlockingCollection<ReceiveMessageInfo> receiveQueue;
+        private MultiQueue<LocklessDtlsServerConnection> receiveQueue;
         private BlockingCollection<SendMessageInfo> sendQueue = new BlockingCollection<SendMessageInfo>();
 
         public int MaxAge
@@ -106,13 +81,17 @@ namespace Hazel.Udp.FewerThreads
 
         private bool isActive;
 
-        public ThreadLimitedUdpConnectionListener(int numWorkers, IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
+        public LocklessDtlsConnectionListener(int numWorkers, IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
         {
             this.Logger = logger;
             this.EndPoint = endPoint;
             this.IPMode = ipMode;
 
-            this.receiveQueue = new BlockingCollection<ReceiveMessageInfo>(10000);
+            this.random = RandomNumberGenerator.Create();
+
+            this.hmacHelper = new ThreadedHmacHelper(logger);
+
+            this.receiveQueue = new MultiQueue<LocklessDtlsServerConnection>(numWorkers);
 
             this.socket = UdpConnection.CreateSocket(this.IPMode);
             this.socket.ExclusiveAddressUse = true;
@@ -127,33 +106,43 @@ namespace Hazel.Udp.FewerThreads
             this.processThreads = new HazelThreadPool(numWorkers, ProcessingLoop);
         }
 
-        ~ThreadLimitedUdpConnectionListener()
+        ~LocklessDtlsConnectionListener()
         {
             this.Dispose(false);
         }
 
-        // This is just for booting people after they've been connected a certain amount of time...
-        public void DisconnectOldConnections(TimeSpan maxAge, MessageWriter disconnectMessage)
+        public void DisconnectAll(MessageWriter disconnectMessage = null)
         {
-            var now = DateTime.UtcNow;
             foreach (var conn in this.allConnections.Values)
             {
-                if (now - conn.CreationTime > maxAge)
-                {
-                    conn.Disconnect("Stale Connection", disconnectMessage);
-                    conn.Dispose();
-                }
+                conn.Disconnect("MassRequest", disconnectMessage);
             }
         }
-        
+
         private void ManageReliablePackets()
         {
+            TimeSpan maxAge = TimeSpan.FromSeconds(2.5f);
+            DateTime now = DateTime.UtcNow;
+
             while (this.isActive)
             {
-                foreach (var kvp in this.allConnections)
+                foreach (var connection in this.allConnections.Values)
                 {
-                    var sock = kvp.Value;
-                    sock.ManageReliablePackets();
+                    connection.ManageReliablePackets();
+
+                    var peer = connection.PeerData;
+                    if (peer != null)
+                    {
+                        if (peer.Epoch == 0 || peer.NextEpoch.State != HandshakeState.ExpectingHello)
+                        {
+                            TimeSpan negotiationAge = now - peer.StartOfNegotiation;
+                            if (negotiationAge > maxAge
+                                && RemoveConnectionTo(connection.EndPoint))
+                            {
+                                connection.Disconnect("Stale Connection", null);
+                            }
+                        }
+                    }
                 }
 
                 Thread.Sleep(100);
@@ -211,34 +200,72 @@ namespace Hazel.Udp.FewerThreads
                         return;
                     }
 
-                    ConnectionId connectionId = ConnectionId.Create((IPEndPoint)remoteEP, 0);
-                    this.ProcessIncomingMessageFromOtherThread(message, (IPEndPoint)remoteEP, connectionId);
+                    LocklessDtlsServerConnection connection;
+                    if (!this.allConnections.TryGetValue(remoteEP, out connection))
+                    {
+                        ByteSpan span = new ByteSpan(message.Buffer, message.Offset + message.Position, message.BytesRemaining);
+                        if (!Record.Parse(out var record, expectedProtocolVersion: null, span))
+                        {
+                            this.Logger.WriteError($"Dropping malformed record from `{remoteEP}`");
+                            continue;
+                        }
+
+                        if (record.ContentType != ContentType.Handshake)
+                        {
+                            this.Logger.WriteVerbose($"Dropping non-handshake record from non-peer `{remoteEP}`");
+                            continue;
+                        }
+
+                        connection = new LocklessDtlsServerConnection(this, (IPEndPoint)remoteEP, this.IPMode, this.Logger);
+                        if (!this.allConnections.TryAdd(remoteEP, connection))
+                        {
+                            this.Logger.WriteError("Failed to add unique connection! This should never happen!");
+                        }
+                    }
+
+                    EnqueueMessageReceived(message, connection);
                 }
             }
         }
 
-        private void ProcessingLoop()
+        internal void EnqueueMessageReceived(MessageReader message, LocklessDtlsServerConnection connection)
         {
-            foreach (ReceiveMessageInfo msg in this.receiveQueue.GetConsumingEnumerable())
-            {
-                try
-                {
-                    this.ReadCallback(msg.Message, msg.Sender, msg.ConnectionId);
-                }
-                catch
-                {
-
-                }
-            }
+            connection.PacketsReceived.Enqueue(message);
+            this.receiveQueue.TryAdd(connection);
         }
 
-        protected void ProcessIncomingMessageFromOtherThread(MessageReader message, IPEndPoint remoteEndPoint, ConnectionId connectionId)
+        private void ProcessingLoop(int myTid)
         {
-            var info = new ReceiveMessageInfo() { Message = message, Sender = remoteEndPoint, ConnectionId = connectionId };
-            if (!this.receiveQueue.TryAdd(info))
+            while (this.receiveQueue.TryTake(myTid, out var sender))
             {
-                this.Statistics.AddReceiveThreadBlocking();
-                this.receiveQueue.Add(info);
+                while (sender.PacketsReceived.TryDequeue(out var message))
+                {
+                    try
+                    {
+                        this.ReadCallback(message, sender);
+                    }
+                    catch (Exception ex)
+                    {
+                        this.Logger.WriteError("Unhandled exception in ReadCallback: " + ex);
+                    }
+                }
+
+                while (sender.PacketsSent.TryDequeue(out var message))
+                {
+                    try
+                    {
+                        EncryptAndSendAppData(message, sender);
+                    }
+                    catch (Exception ex)
+                    {
+                        this.Logger.WriteError("Unhandled exception in EncryptAndSendAppData: " + ex);
+                    }
+                }
+
+                if (sender.State == ConnectionState.Disconnected)
+                {
+                    sender.Dispose();
+                }
             }
         }
 
@@ -267,57 +294,62 @@ namespace Hazel.Udp.FewerThreads
             }
         }
 
-        protected virtual void ReadCallback(MessageReader message, IPEndPoint remoteEndPoint, ConnectionId connectionId)
+        /// <summary>
+        /// Handle an incoming datagram from the network.
+        ///
+        /// This is primarily a wrapper around ProcessIncomingMessage
+        /// to ensure `reader.Recycle()` is always called
+        /// </summary>
+        private void ReadCallback(MessageReader reader, LocklessDtlsServerConnection connection)
+        {
+            try
+            {
+                ByteSpan message = new ByteSpan(reader.Buffer, reader.Offset + reader.Position, reader.BytesRemaining);
+                this.ProcessIncomingMessage(message, connection);
+            }
+            finally
+            {
+                reader.Recycle();
+            }
+        }
+
+        private void HandleApplicationData(MessageReader message, LocklessDtlsServerConnection connection)
         {
             int bytesReceived = message.Length;
-            bool aware = true;
+            bool aware = connection.HelloProcessed;
             bool isHello = message.Buffer[0] == (byte)UdpSendOption.Hello;
 
             // If we're aware of this connection use the one already
             // If this is a new client then connect with them!
-            ThreadLimitedUdpServerConnection connection;
-            if (!this.allConnections.TryGetValue(connectionId, out connection))
-            {
-                lock (this.allConnections)
-                {
-                    if (!this.allConnections.TryGetValue(connectionId, out connection))
-                    {
-                        // Check for malformed connection attempts
-                        if (!isHello)
-                        {
-                            message.Recycle();
-                            return;
-                        }
 
-                        if (AcceptConnection != null)
-                        {
-                            if (!AcceptConnection(remoteEndPoint, message.Buffer, out var response))
-                            {
-                                message.Recycle();
-                                if (response != null)
-                                {
-                                    SendDataRaw(response, remoteEndPoint);
-                                }
-
-                                return;
-                            }
-                        }
-
-                        aware = false;
-                        connection = new ThreadLimitedUdpServerConnection(this, connectionId, remoteEndPoint, this.IPMode, this.Logger);
-                        if (!this.allConnections.TryAdd(connectionId, connection))
-                        {
-                            throw new HazelException("Failed to add a connection. This should never happen.");
-                        }
-                    }
-                }
-            }
-
-            // If it's a new connection invoke the NewConnection event.
-            // This needs to happen before handling the message because in localhost scenarios, the ACK and
-            // subsequent messages can happen before the NewConnection event sets up OnDataRecieved handlers
             if (!aware)
             {
+                // Check for malformed connection attempts
+                if (!isHello)
+                {
+                    message.Recycle();
+                    return;
+                }
+
+                if (AcceptConnection != null)
+                {
+                    if (!AcceptConnection(connection.EndPoint, message.Buffer, out var response))
+                    {
+                        message.Recycle();
+                        if (response != null)
+                        {
+                            EncryptAndSendAppData(response, connection);
+                        }
+
+                        return;
+                    }
+                }
+
+                // If it's a new connection invoke the NewConnection event.
+                // This needs to happen before handling the message because in localhost scenarios, the ACK and
+                // subsequent messages can happen before the NewConnection event sets up OnDataRecieved handlers
+                connection.SetHelloAsProcessed();
+
                 // Skip header and hello byte;
                 message.Offset = 4;
                 message.Length = bytesReceived - 4;
@@ -336,47 +368,35 @@ namespace Hazel.Udp.FewerThreads
             connection.HandleReceive(message, bytesReceived);
         }
 
-        internal void SendDataRaw(byte[] response, IPEndPoint remoteEndPoint)
+        internal void QueuePlaintextAppData(byte[] response, LocklessDtlsServerConnection connection)
         {
-            QueueRawData(response, remoteEndPoint);
-        }
-
-        protected virtual void QueueRawData(ByteSpan span, IPEndPoint remoteEndPoint)
-        {
-            this.sendQueue.TryAdd(new SendMessageInfo() { Span = span, Recipient = remoteEndPoint });
+            connection.PacketsSent.Enqueue(response);
+            this.receiveQueue.TryAdd(connection);
         }
 
         /// <summary>
         ///     Removes a virtual connection from the list.
         /// </summary>
         /// <param name="endPoint">Connection key of the virtual connection.</param>
-        internal bool RemoveConnectionTo(ConnectionId connectionId)
+        internal bool RemoveConnectionTo(IPEndPoint endpoint)
         {
-            return this.allConnections.TryRemove(connectionId, out _);
-        }
-
-        /// <summary>
-        ///  This is after all messages could be sent. Clean up anything extra.
-        /// </summary>
-        internal virtual void RemovePeerRecord(ConnectionId connectionId)
-        {
+            return this.allConnections.TryRemove(endpoint, out _);
         }
 
         protected override void Dispose(bool disposing)
         {
-            foreach (var kvp in this.allConnections)
-            {
-                kvp.Value.Dispose();
-            }
-
             bool wasActive = this.isActive;
             this.isActive = false;
 
-            // Flush outgoing packets
-            this.sendQueue?.CompleteAdding();
-
             if (wasActive)
             {
+                this.receiveQueue.CompleteAdding();
+
+                this.reliablePacketThread.Join();
+                this.receiveThread.Join();
+                this.processThreads.Join();
+
+                this.sendQueue?.CompleteAdding();
                 this.sendThread.Join();
             }
 
@@ -384,19 +404,20 @@ namespace Hazel.Udp.FewerThreads
             try { this.socket.Close(); } catch { }
             try { this.socket.Dispose(); } catch { }
 
-            this.receiveQueue?.CompleteAdding();
-
-            if (wasActive)
+            foreach (var kvp in this.allConnections)
             {
-                this.reliablePacketThread.Join();
-                this.receiveThread.Join();
-                this.processThreads.Join();
+                kvp.Value.Dispose();
             }
 
-            this.receiveQueue?.Dispose();
             this.receiveQueue = null;
             this.sendQueue?.Dispose();
             this.sendQueue = null;
+
+            this.random?.Dispose();
+            this.random = null;
+
+            this.hmacHelper?.Dispose();
+            this.hmacHelper = null;
 
             base.Dispose(disposing);
         }
