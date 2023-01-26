@@ -174,6 +174,75 @@ namespace Hazel.UnitTests
             }
         }
 
+        [TestMethod]
+        public void UdpReliableMessageResendTest()
+        {
+            byte[] TestData = new byte[] { 1, 2, 3, 4, 5, 6 };
+
+            var listenerEp = new IPEndPoint(IPAddress.Loopback, 4296);
+            var captureEp = new IPEndPoint(IPAddress.Loopback, 4297);
+
+            using (SocketCapture capture = new SocketCapture(captureEp, listenerEp, new TestLogger()))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, listenerEp.Port), new TestLogger()))
+            using (UdpConnection connection = this.CreateConnection(captureEp, new TestLogger()))
+            using (SemaphoreSlim readLock = new SemaphoreSlim(0, 1))
+            {
+                connection.ResendTimeoutMs = 100;
+                connection.KeepAliveInterval = Timeout.Infinite; // Don't let pings interfere.
+
+                MessageReader output = null;
+                listener.NewConnection += delegate (NewConnectionEventArgs e)
+                {
+                    var udpConn = (UdpConnection)e.Connection;
+                    udpConn.KeepAliveInterval = Timeout.Infinite; // Don't let pings interfere.
+                    
+                    e.Connection.DataReceived += delegate (DataReceivedEventArgs evt)
+                    {
+                        output = evt.Message.Duplicate();
+                        readLock.Release();
+                    };
+                };
+
+                listener.Start();
+                connection.Connect();
+
+                capture.AssertPacketsToRemoteCountEquals(0);
+
+                const int NumberOfPacketsToResend = 4;
+                const int NumberOfTimesToResend = 3;
+                using (capture.SendToRemoteSemaphore = new Semaphore(0, int.MaxValue))
+                {
+                    for (int pktCnt = 0; pktCnt < NumberOfPacketsToResend; ++pktCnt)
+                    {
+                        Console.WriteLine("Send blocked pkt");
+                        var msg = MessageWriter.Get(SendOption.Reliable);
+                        msg.Write(TestData);
+                        connection.Send(msg);
+                        msg.Recycle();
+
+                        for (int drops = 0; drops < NumberOfTimesToResend; ++drops)
+                        {
+                            capture.AssertPacketsToRemoteCountEquals(1);
+                            capture.DiscardPacketForRemote();
+                        }
+
+                        capture.AssertPacketsToRemoteCountEquals(1);
+                        capture.SendToRemoteSemaphore.Release(); // Actually let it send.
+
+                        Assert.IsTrue(readLock.Wait(1000));
+                        for (int i = 0; i < TestData.Length; ++i)
+                        {
+                            Assert.AreEqual(TestData[i], output.ReadByte());
+                        }
+
+                        output = null;
+                    }
+                }
+
+                Assert.AreEqual(NumberOfPacketsToResend * NumberOfTimesToResend, connection.Statistics.MessagesResent);
+            }
+        }
+
         /// <summary>
         ///     Tests IPv4 connectivity.
         /// </summary>
