@@ -44,7 +44,7 @@ namespace Hazel.Udp
         /// <summary>
         ///     Holds the last ID allocated.
         /// </summary>
-        private int lastIDAllocated = 0;
+        private int lastIDAllocated = -1;
 
         /// <summary>
         ///     The packets of data that have been transmitted reliably and not acknowledged.
@@ -409,7 +409,7 @@ namespace Hazel.Udp
                 }
             }
 
-            Statistics.LogReliableReceive(0, bytesReceived);
+            Statistics.LogAcknowledgementReceive(bytesReceived);
         }
 
         private void AcknowledgeMessageId(ushort id)
@@ -417,6 +417,7 @@ namespace Hazel.Udp
             // Dispose of timer and remove from dictionary
             if (reliableDataPacketsSent.TryRemove(id, out Packet packet))
             {
+                this.Statistics.LogReliablePacketAcknowledged();
                 float rt = packet.Stopwatch.ElapsedMilliseconds;
 
                 packet.AckCallback?.Invoke();
@@ -429,6 +430,7 @@ namespace Hazel.Udp
             }
             else if (this.activePingPackets.TryRemove(id, out PingPacket pingPkt))
             {
+                this.Statistics.LogReliablePacketAcknowledged();
                 float rt = pingPkt.Stopwatch.ElapsedMilliseconds;
 
                 pingPkt.Recycle();

@@ -29,6 +29,9 @@ namespace Hazel
         private int packetsSent;
         public int PacketsSent => this.packetsSent;
 
+        private int reliablePacketsAcknowledged;
+        public int ReliablePacketsAcknowledged => this.reliablePacketsAcknowledged;
+
         /// <summary>
         ///     The number of messages sent larger than 576 bytes. This is smaller than most default MTUs.
         /// </summary>
@@ -527,6 +530,14 @@ namespace Hazel
         {
             Interlocked.Increment(ref acknowledgementMessagesReceived);
             Interlocked.Add(ref totalBytesReceived, totalLength);
+        }
+
+        /// <summary>
+        ///     Logs the unique acknowledgement of a ping or reliable data packet.
+        /// </summary>
+        internal void LogReliablePacketAcknowledged()
+        {
+            Interlocked.Increment(ref this.reliablePacketsAcknowledged);
         }
 
         /// <summary>

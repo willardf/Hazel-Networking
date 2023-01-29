@@ -166,7 +166,7 @@ namespace Hazel
 
         public override string ToString()
         {
-            return string.Join("", this.ToArray());
+            return string.Join(" ", this.ToArray());
         }
 
         /// <summary>

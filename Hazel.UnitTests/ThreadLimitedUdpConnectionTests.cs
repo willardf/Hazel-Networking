@@ -7,6 +7,7 @@ using Hazel.Udp.FewerThreads;
 using System.Net.Sockets;
 using System.Linq;
 using System.Collections;
+using System.Collections.Generic;
 
 namespace Hazel.UnitTests
 {
@@ -240,6 +241,211 @@ namespace Hazel.UnitTests
                 }
 
                 Assert.AreEqual(NumberOfPacketsToResend * NumberOfTimesToResend, connection.Statistics.MessagesResent);
+            }
+        }
+
+        [TestMethod]
+        public void UdpReliableMessageAckTest()
+        {
+            byte[] TestData = new byte[] { 1, 2, 3, 4, 5, 6 };
+
+            var listenerEp = new IPEndPoint(IPAddress.Loopback, 4296);
+            var captureEp = new IPEndPoint(IPAddress.Loopback, 4297);
+
+            using (SocketCapture capture = new SocketCapture(captureEp, listenerEp, new TestLogger()))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, listenerEp.Port), new TestLogger()))
+            using (UdpConnection connection = this.CreateConnection(captureEp, new TestLogger()))
+            {
+                connection.ResendTimeoutMs = 100;
+                connection.KeepAliveInterval = Timeout.Infinite; // Don't let pings interfere.
+
+                listener.NewConnection += delegate (NewConnectionEventArgs e)
+                {
+                    var udpConn = (UdpConnection)e.Connection;
+                    udpConn.KeepAliveInterval = Timeout.Infinite; // Don't let pings interfere.
+                };
+
+                listener.Start();
+                connection.Connect();
+
+                capture.AssertPacketsToLocalCountEquals(0);
+
+                const int NumberOfPacketsToSend = 4;
+                using (capture.SendToLocalSemaphore = new Semaphore(0, int.MaxValue))
+                {
+                    for (int pktCnt = 0; pktCnt < NumberOfPacketsToSend; ++pktCnt)
+                    {
+                        Console.WriteLine("Send blocked pkt");
+                        var msg = MessageWriter.Get(SendOption.Reliable);
+                        msg.Write(TestData);
+                        connection.Send(msg);
+
+                        msg.Recycle();
+
+                        capture.AssertPacketsToLocalCountEquals(1);
+
+                        var ack = capture.PeekPacketForLocal();
+                        Assert.AreEqual(10, ack[0]); // enum SendOptionInternal.Acknowledgement
+                        Assert.AreEqual(0, ack[1]);
+                        Assert.AreEqual(pktCnt + 1, ack[2]);
+                        Assert.AreEqual(255, ack[3]);
+
+                        capture.SendToLocalSemaphore.Release(); // Actually let it send.
+                        capture.AssertPacketsToLocalCountEquals(0);
+                    }
+                }
+
+                // +1 for Hello packet
+                Thread.Sleep(100); // The final ack has to actually be processed.
+                Assert.AreEqual(1 + NumberOfPacketsToSend, connection.Statistics.ReliablePacketsAcknowledged);
+            }
+        }
+
+        [TestMethod]
+        public void UdpReliableMessageAckWithDropTest()
+        {
+            byte[] TestData = new byte[] { 1, 2, 3, 4, 5, 6 };
+
+            var listenerEp = new IPEndPoint(IPAddress.Loopback, 4296);
+            var captureEp = new IPEndPoint(IPAddress.Loopback, 4297);
+
+            using (SocketCapture capture = new SocketCapture(captureEp, listenerEp, new TestLogger()))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, listenerEp.Port), new TestLogger()))
+            using (UdpConnection connection = this.CreateConnection(captureEp, new TestLogger()))
+            {
+                connection.ResendTimeoutMs = 10000; // No resends please
+                connection.KeepAliveInterval = Timeout.Infinite; // Don't let pings interfere.
+
+                listener.NewConnection += delegate (NewConnectionEventArgs e)
+                {
+                    var udpConn = (UdpConnection)e.Connection;
+                    udpConn.KeepAliveInterval = Timeout.Infinite; // Don't let pings interfere.
+                };
+
+                listener.Start();
+                connection.Connect();
+
+                capture.AssertPacketsToLocalCountEquals(0);
+
+                using (capture.SendToRemoteSemaphore = new Semaphore(0, int.MaxValue))
+                using (capture.SendToLocalSemaphore = new Semaphore(0, int.MaxValue))
+                {
+                    // Send 3 packets to remote
+                    for (int pktCnt = 0; pktCnt < 3; ++pktCnt)
+                    {
+                        var msg = MessageWriter.Get(SendOption.Reliable);
+                        msg.Write(TestData);
+                        connection.Send(msg);
+                        msg.Recycle();
+                    }
+
+                    // Drop the middle packet
+                    capture.AssertPacketsToRemoteCountEquals(3);
+                    capture.ReorderPacketsForRemote(list => list.Sort(SortByPacketId.Instance));
+
+                    capture.SendToRemoteSemaphore.Release();
+                    capture.DiscardPacketForRemote();
+                    capture.SendToRemoteSemaphore.Release();
+
+                    // Receive 2 acks
+                    capture.AssertPacketsToLocalCountEquals(2);
+                    capture.ReorderPacketsForLocal(list => list.Sort(SortByPacketId.Instance));
+
+                    var ack1 = capture.PeekPacketForLocal();
+                    Assert.AreEqual(10, ack1[0]); // enum SendOptionInternal.Acknowledgement
+                    Assert.AreEqual(0, ack1[1]);
+                    Assert.AreEqual(1, ack1[2]);
+                    Assert.AreEqual(255, ack1[3]);
+                    capture.ReleasePacketsToLocal(1);
+
+                    var ack2 = capture.PeekPacketForLocal();
+                    Assert.AreEqual(10, ack2[0]); // enum SendOptionInternal.Acknowledgement
+                    Assert.AreEqual(0, ack2[1]);
+                    Assert.AreEqual(3, ack2[2]);
+                    Assert.AreEqual(254, ack2[3]); // The server is expecting packet 2
+                    capture.ReleasePacketsToLocal(1);
+                }
+
+                // +1 for Hello packet, +2 for reliable
+                Thread.Sleep(100); // The final ack has to actually be processed.
+                Assert.AreEqual(3, connection.Statistics.ReliablePacketsAcknowledged);
+            }
+        }
+
+        [TestMethod]
+        public void UdpReliableMessageAckFillsDroppedAcksTest()
+        {
+            byte[] TestData = new byte[] { 1, 2, 3, 4, 5, 6 };
+
+            var listenerEp = new IPEndPoint(IPAddress.Loopback, 4296);
+            var captureEp = new IPEndPoint(IPAddress.Loopback, 4297);
+
+            using (SocketCapture capture = new SocketCapture(captureEp, listenerEp, new TestLogger()))
+            using (ThreadLimitedUdpConnectionListener listener = this.CreateListener(2, new IPEndPoint(IPAddress.Any, listenerEp.Port), new TestLogger()))
+            using (UdpConnection connection = this.CreateConnection(captureEp, new TestLogger("Client")))
+            {
+                connection.ResendTimeoutMs = 10000; // No resends please
+                connection.KeepAliveInterval = Timeout.Infinite; // Don't let pings interfere.
+
+                listener.NewConnection += delegate (NewConnectionEventArgs e)
+                {
+                    var udpConn = (UdpConnection)e.Connection;
+                    udpConn.KeepAliveInterval = Timeout.Infinite; // Don't let pings interfere.
+                };
+
+                listener.Start();
+                connection.Connect();
+
+                capture.AssertPacketsToLocalCountEquals(0);
+
+                using (capture.SendToLocalSemaphore = new Semaphore(0, int.MaxValue))
+                {
+                    // Send 4 packets to remote
+                    for (int pktCnt = 0; pktCnt < 4; ++pktCnt)
+                    {
+                        var msg = MessageWriter.Get(SendOption.Reliable);
+                        msg.Write(TestData);
+                        connection.Send(msg);
+                        msg.Recycle();
+                    }
+
+                    // Receive 4 acks, Drop the middle two
+                    capture.AssertPacketsToLocalCountEquals(4);
+                    capture.ReorderPacketsForLocal(list => list.Sort(SortByPacketId.Instance));
+
+                    var ack1 = capture.PeekPacketForLocal();
+                    Assert.AreEqual(10, ack1[0]); // enum SendOptionInternal.Acknowledgement
+                    Assert.AreEqual(0, ack1[1]);
+                    Assert.AreEqual(1, ack1[2]);
+                    Assert.AreEqual(255, ack1[3]);
+                    capture.ReleasePacketsToLocal(1);
+
+                    capture.DiscardPacketForLocal(2);
+
+                    var ack4 = capture.PeekPacketForLocal();
+                    Assert.AreEqual(10, ack4[0]); // enum SendOptionInternal.Acknowledgement
+                    Assert.AreEqual(0, ack4[1]);
+                    Assert.AreEqual(4, ack4[2]);
+                    Assert.AreEqual(255, ack4[3]);
+                    capture.ReleasePacketsToLocal(1);
+                }
+
+                // +1 for Hello packet, +4 for reliable despite the dropped ack
+                Thread.Sleep(100); // The final ack has to actually be processed.
+                Assert.AreEqual(3, connection.Statistics.AcknowledgementMessagesReceived);
+                Assert.AreEqual(5, connection.Statistics.ReliablePacketsAcknowledged);
+            }
+        }
+
+        private class SortByPacketId : IComparer<ByteSpan>
+        {
+            public static SortByPacketId Instance = new SortByPacketId();
+
+            public int Compare(ByteSpan x, ByteSpan y)
+            {
+                ushort xId = BitConverter.ToUInt16(x.GetUnderlyingArray(), 1);
+                ushort yId = BitConverter.ToUInt16(y.GetUnderlyingArray(), 1);
+                return xId.CompareTo(yId);
             }
         }
 

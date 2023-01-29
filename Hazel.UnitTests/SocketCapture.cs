@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -224,6 +225,22 @@ namespace Hazel.UnitTests
             }
         }
 
+        public ByteSpan PeekPacketForLocal()
+        {
+            return this.forLocal.First();
+        }
+
+        public void ReorderPacketsForRemote(Action<List<ByteSpan>> reorderCallback)
+        {
+            List<ByteSpan> buffer = new List<ByteSpan>();
+            while (this.forRemote.TryTake(out var pkt)) buffer.Add(pkt);
+            reorderCallback(buffer);
+            foreach (var item in buffer)
+            {
+                this.forRemote.Add(item);
+            }
+        }
+
         public void ReorderPacketsForLocal(Action<List<ByteSpan>> reorderCallback)
         {
             List<ByteSpan> buffer = new List<ByteSpan>();
@@ -233,6 +250,13 @@ namespace Hazel.UnitTests
             {
                 this.forLocal.Add(item);
             }
+        }
+
+        internal void ReleasePacketsToLocal(int numToSend)
+        {
+            var newExpected = this.forLocal.Count - numToSend;
+            this.SendToLocalSemaphore.Release();
+            this.AssertPacketsToLocalCountEquals(newExpected);
         }
     }
 }
