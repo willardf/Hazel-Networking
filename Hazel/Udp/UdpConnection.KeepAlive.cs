@@ -1,6 +1,6 @@
-﻿using System;
+﻿using Hazel.Tools;
+using System;
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Threading;
 
 
@@ -8,30 +8,6 @@ namespace Hazel.Udp
 {
     partial class UdpConnection
     {
-
-        /// <summary>
-        ///     Class to hold packet data
-        /// </summary>
-        public class PingPacket : IRecyclable
-        {
-            private static readonly ObjectPool<PingPacket> PacketPool = new ObjectPool<PingPacket>(() => new PingPacket());
-
-            public readonly Stopwatch Stopwatch = new Stopwatch();
-
-            internal static PingPacket GetObject()
-            {
-                return PacketPool.GetObject();
-            }
-
-            public void Recycle()
-            {
-                Stopwatch.Stop();
-                PacketPool.PutObject(this);
-            }
-        }
-
-        internal ConcurrentDictionary<ushort, PingPacket> activePingPackets = new ConcurrentDictionary<ushort, PingPacket>();
-
         /// <summary>
         ///     The interval from data being received or transmitted to a keepalive packet being sent in milliseconds.
         /// </summary>
@@ -62,6 +38,10 @@ namespace Hazel.Udp
 
         public int MissingPingsUntilDisconnect { get; set; } = 6;
         private volatile int pingsSinceAck = 0;
+
+        // TODO: Technically, Min(MissingPingsUntilDisconnect + 1, 16) would be better, but I don't want to mess with it.
+        // The real point is that we're bounding the number of active pings.
+        private PingBuffer activePings = new PingBuffer(16);
 
         /// <summary>
         ///     The timer creating keepalive pulses.
@@ -116,18 +96,9 @@ namespace Hazel.Udp
             bytes[1] = (byte)(id >> 8);
             bytes[2] = (byte)id;
 
-            PingPacket pkt;
-            if (!this.activePingPackets.TryGetValue(id, out pkt))
-            {
-                pkt = PingPacket.GetObject();
-                if (!this.activePingPackets.TryAdd(id, pkt))
-                {
-                    throw new Exception("This shouldn't be possible");
-                }
-            }
-
-            pkt.Stopwatch.Restart();
-
+            // TODO: This could overwrite a date, perhaps we should track pings that are simply never ack'd?
+            this.activePings.AddPing(id);
+            
             WriteBytesToConnection(bytes, bytes.Length);
 
             Statistics.LogReliableSend(0);
@@ -150,18 +121,7 @@ namespace Hazel.Udp
         /// </summary>
         private void DisposeKeepAliveTimer()
         {
-            if (this.keepAliveTimer != null)
-            {
-                this.keepAliveTimer.Dispose();
-            }
-
-            foreach (var kvp in activePingPackets)
-            {
-                if (this.activePingPackets.TryRemove(kvp.Key, out var pkt))
-                {
-                    pkt.Recycle();
-                }
-            }
+            this.keepAliveTimer?.Dispose();
         }
     }
 }

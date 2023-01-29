@@ -427,11 +427,9 @@ namespace Hazel.Udp
                     this._pingMs = this._pingMs * .7f + rt * .3f;
                 }
             }
-            else if (this.activePingPackets.TryRemove(id, out PingPacket pingPkt))
+            else if (this.activePings.TryFindPing(id, out DateTime pingPkt))
             {
-                float rt = pingPkt.Stopwatch.ElapsedMilliseconds;
-
-                pingPkt.Recycle();
+                float rt = (float)(DateTime.UtcNow - pingPkt).TotalMilliseconds;
 
                 lock (PingLock)
                 {
