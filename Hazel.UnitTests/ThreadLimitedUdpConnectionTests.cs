@@ -342,14 +342,16 @@ namespace Hazel.UnitTests
                     // Drop the middle packet
                     capture.AssertPacketsToRemoteCountEquals(3);
                     capture.ReorderPacketsForRemote(list => list.Sort(SortByPacketId.Instance));
+                    Console.WriteLine(capture.PacketsForRemoteToString());
 
-                    capture.SendToRemoteSemaphore.Release();
+                    capture.ReleasePacketsForRemote(1);
                     capture.DiscardPacketForRemote();
-                    capture.SendToRemoteSemaphore.Release();
+                    capture.ReleasePacketsForRemote(1);
 
                     // Receive 2 acks
                     capture.AssertPacketsToLocalCountEquals(2);
                     capture.ReorderPacketsForLocal(list => list.Sort(SortByPacketId.Instance));
+                    Console.WriteLine(capture.PacketsForLocalToString());
 
                     var ack1 = capture.PeekPacketForLocal();
                     Assert.AreEqual(10, ack1[0]); // enum SendOptionInternal.Acknowledgement
