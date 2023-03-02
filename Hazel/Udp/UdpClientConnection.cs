@@ -13,6 +13,18 @@ namespace Hazel.Udp
     public sealed class UdpClientConnection : UdpConnection
     {
         /// <summary>
+        /// The max size Hazel attempts to read from the network.
+        /// Defaults to 8096.
+        /// </summary>
+        /// <remarks>
+        /// 8096 is 5 times the standard modern MTU of 1500, so it's already too large imo.
+        /// If Hazel ever implements fragmented packets, then we might consider a larger value since combining 5 
+        /// packets into 1 reader would be realistic and would cause reallocations. That said, Hazel is not meant
+        /// for transferring large contiguous blocks of data, so... please don't?
+        /// </remarks>
+        public int ReceiveBufferSize = 8096;
+
+        /// <summary>
         ///     The socket we're connected via.
         /// </summary>
         private Socket socket;
@@ -193,7 +205,7 @@ namespace Hazel.Udp
             }
 #endif
 
-            var msg = MessageReader.GetSized(ushort.MaxValue);
+            var msg = MessageReader.GetSized(this.ReceiveBufferSize);
             try
             {
                 socket.BeginReceive(msg.Buffer, 0, msg.Buffer.Length, SocketFlags.None, ReadCallback, msg);

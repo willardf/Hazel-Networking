@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 
 namespace Hazel.UnitTests
@@ -252,11 +253,40 @@ namespace Hazel.UnitTests
             }
         }
 
+        internal void ReleasePacketsForRemote(int numToSend)
+        {
+            var newExpected = this.forRemote.Count - numToSend;
+            this.SendToRemoteSemaphore.Release(numToSend);
+            this.AssertPacketsToRemoteCountEquals(newExpected);
+        }
+
         internal void ReleasePacketsToLocal(int numToSend)
         {
             var newExpected = this.forLocal.Count - numToSend;
-            this.SendToLocalSemaphore.Release();
+            this.SendToLocalSemaphore.Release(numToSend);
             this.AssertPacketsToLocalCountEquals(newExpected);
+        }
+
+        internal string PacketsForRemoteToString()
+        {
+            StringBuilder sb = new StringBuilder();
+            foreach (var item in this.forRemote)
+            {
+                sb.AppendLine(item.ToString());
+            }
+
+            return sb.ToString();
+        }
+
+        internal string PacketsForLocalToString()
+        {
+            StringBuilder sb = new StringBuilder();
+            foreach(var item in this.forLocal)
+            {
+                sb.AppendLine(item.ToString());
+            }
+
+            return sb.ToString();
         }
     }
 }

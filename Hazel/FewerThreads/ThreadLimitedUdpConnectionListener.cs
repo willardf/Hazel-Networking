@@ -27,7 +27,6 @@ namespace Hazel.Udp.FewerThreads
         }
 
         private const int SendReceiveBufferSize = 1024 * 1024;
-        private const int BufferSize = ushort.MaxValue;
 
         private Socket socket;
         protected ILogger Logger;
@@ -186,7 +185,7 @@ namespace Hazel.Udp.FewerThreads
                     if (!isActive) break;
 
                     EndPoint remoteEP = new IPEndPoint(this.EndPoint.Address, this.EndPoint.Port);
-                    MessageReader message = MessageReader.GetSized(BufferSize);
+                    var message = MessageReader.GetSized(this.ReceiveBufferSize);
                     try
                     {
                         message.Length = socket.ReceiveFrom(message.Buffer, 0, message.Buffer.Length, SocketFlags.None, ref remoteEP);
