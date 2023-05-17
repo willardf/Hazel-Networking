@@ -1,8 +1,6 @@
 ﻿using Hazel.Udp;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
-using System.Linq;
-using System.Net;
 using System.Threading;
 
 namespace Hazel.UnitTests
@@ -32,7 +30,7 @@ namespace Hazel.UnitTests
                     Assert.AreEqual(TestData, p.Data);
                 }
 
-                Assert.AreEqual(1, pkt.Length);
+                Assert.IsTrue(pkt.Length >= 1);
             }
         }
     }

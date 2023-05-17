@@ -1,26 +1,50 @@
-﻿using System;
+﻿using Hazel.UPnP;
+using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
 namespace Hazel.Udp
 {
-    ///
     public class UdpBroadcaster : IDisposable
     {
-        private Socket socket;
+        private SocketBroadcast[] socketBroadcasts;
         private byte[] data;
-        private EndPoint endpoint;
         private Action<string> logger;
 
         ///
         public UdpBroadcaster(int port, Action<string> logger = null)
         {
             this.logger = logger;
-            this.socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-            this.socket.EnableBroadcast = true;
-            this.socket.MulticastLoopback = false;
-            this.endpoint = new IPEndPoint(IPAddress.Broadcast, port);
+
+            var addresses = NetUtility.GetAddressesFromNetworkInterfaces(AddressFamily.InterNetwork);
+            this.socketBroadcasts = new SocketBroadcast[addresses.Count > 0 ? addresses.Count : 1];
+
+            int count = 0;
+            foreach (var addressInformation in addresses)
+            {
+                Socket socket = CreateSocket(new IPEndPoint(addressInformation.Address, 0));
+                IPAddress broadcast = NetUtility.GetBroadcastAddress(addressInformation);
+
+                this.socketBroadcasts[count] = new SocketBroadcast(socket, new IPEndPoint(broadcast, port));
+                count++;
+            }
+            if (count == 0)
+            {
+                Socket socket = CreateSocket(new IPEndPoint(IPAddress.Any, 0));
+
+                this.socketBroadcasts[0] = new SocketBroadcast(socket, new IPEndPoint(IPAddress.Broadcast, port));
+            }
+        }
+
+        private static Socket CreateSocket(IPEndPoint endPoint)
+        {
+            var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            socket.EnableBroadcast = true;
+            socket.MulticastLoopback = false;
+            socket.Bind(endPoint);
+
+            return socket;
         }
 
         ///
@@ -42,13 +66,17 @@ namespace Hazel.Udp
                 return;
             }
 
-            try
+            foreach (SocketBroadcast socketBroadcast in this.socketBroadcasts)
             {
-                this.socket.BeginSendTo(data, 0, data.Length, SocketFlags.None, this.endpoint, this.FinishSendTo, null);
-            }
-            catch (Exception e)
-            {
-                this.logger?.Invoke("BroadcastListener: " + e);
+                try
+                {
+                    Socket socket = socketBroadcast.Socket;
+                    socket.BeginSendTo(data, 0, data.Length, SocketFlags.None, socketBroadcast.Broadcast, this.FinishSendTo, socket);
+                }
+                catch (Exception e)
+                {
+                    this.logger?.Invoke("BroadcastListener: " + e);
+                }
             }
         }
 
@@ -56,7 +84,8 @@ namespace Hazel.Udp
         {
             try
             {
-                this.socket.EndSendTo(evt);
+                Socket socket = (Socket)evt.AsyncState;
+                socket.EndSendTo(evt);
             }
             catch (Exception e)
             {
@@ -67,12 +96,31 @@ namespace Hazel.Udp
         ///
         public void Dispose()
         {
-            if (this.socket != null)
+            if (this.socketBroadcasts != null)
             {
-                try { this.socket.Shutdown(SocketShutdown.Both); } catch { }
-                try { this.socket.Close(); } catch { }
-                try { this.socket.Dispose(); } catch { }
-                this.socket = null;
+                foreach (SocketBroadcast socketBroadcast in this.socketBroadcasts)
+                {
+                    Socket socket = socketBroadcast.Socket;
+                    if (socket != null)
+                    {
+                        try { socket.Shutdown(SocketShutdown.Both); } catch { }
+                        try { socket.Close(); } catch { }
+                        try { socket.Dispose(); } catch { }
+                    }
+                }
+                Array.Clear(this.socketBroadcasts, 0, this.socketBroadcasts.Length);
+            }
+        }
+
+        private struct SocketBroadcast
+        {
+            public Socket Socket;
+            public IPEndPoint Broadcast;
+
+            public SocketBroadcast(Socket socket, IPEndPoint broadcast)
+            {
+                Socket = socket;
+                Broadcast = broadcast;
             }
         }
     }
