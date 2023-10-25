@@ -41,7 +41,7 @@ namespace Hazel.Udp.FewerThreads
         }
 
         /// <inheritdoc />
-        protected override void WriteBytesToConnection(byte[] bytes, int length)
+        protected override void WriteBytesToConnection(SmartBuffer bytes, int length)
         {
             if (bytes.Length != length) throw new ArgumentException("I made an assumption here. I hope you see this error.");
 
@@ -77,19 +77,20 @@ namespace Hazel.Udp.FewerThreads
         {
             if (!Listener.RemoveConnectionTo(this.ConnectionId)) return false;
             this._state = ConnectionState.NotConnected;
-            
-            var bytes = EmptyDisconnectBytes;
+
+            SmartBuffer buffer = this.bufferPool.GetObject();
+            buffer.CopyFrom(EmptyDisconnectBytes);
             if (data != null && data.Length > 0)
             {
                 if (data.SendOption != SendOption.None) throw new ArgumentException("Disconnect messages can only be unreliable.");
 
-                bytes = data.ToByteArray(true);
-                bytes[0] = (byte)UdpSendOption.Disconnect;
+                buffer.CopyFrom(data);
+                buffer[0] = (byte)UdpSendOption.Disconnect;
             }
 
             try
             {
-                this.WriteBytesToConnection(bytes, bytes.Length);
+                this.WriteBytesToConnection(buffer, buffer.Length);
             }
             catch { }
 

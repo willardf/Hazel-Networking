@@ -15,7 +15,7 @@ namespace Hazel.Udp.FewerThreads
     {
         private struct SendMessageInfo
         {
-            public ByteSpan Span;
+            public SmartBuffer Span;
             public IPEndPoint Recipient;
         }
 
@@ -248,8 +248,8 @@ namespace Hazel.Udp.FewerThreads
                 {
                     if (this.socket.Poll(Timeout.Infinite, SelectMode.SelectWrite))
                     {
-                        this.socket.SendTo(msg.Span.GetUnderlyingArray(), msg.Span.Offset, msg.Span.Length, SocketFlags.None, msg.Recipient);
-                        this.Statistics.AddBytesSent(msg.Span.Length - msg.Span.Offset);
+                        this.socket.SendTo((byte[])msg.Span, 0, msg.Span.Length, SocketFlags.None, msg.Recipient);
+                        this.Statistics.AddBytesSent(msg.Span.Length);
                     }
                     else
                     {
@@ -261,6 +261,10 @@ namespace Hazel.Udp.FewerThreads
                 {
                     this.Logger.WriteError("Error in loop while sending: " + e.Message);
                     Thread.Sleep(1);
+                }
+                finally
+                {
+                    msg.Span.Recycle();
                 }
             }
         }
@@ -289,12 +293,14 @@ namespace Hazel.Udp.FewerThreads
 
                         if (AcceptConnection != null)
                         {
-                            if (!AcceptConnection(remoteEndPoint, message.Buffer, out var response))
+                            if (!AcceptConnection(remoteEndPoint, message.Buffer, out byte[] response))
                             {
                                 message.Recycle();
                                 if (response != null)
                                 {
-                                    SendDataRaw(response, remoteEndPoint);
+                                    var buffer = this.bufferPool.GetObject();
+                                    buffer.CopyFrom(response);
+                                    SendDataRaw(buffer, remoteEndPoint);
                                 }
 
                                 return;
@@ -334,13 +340,14 @@ namespace Hazel.Udp.FewerThreads
             connection.HandleReceive(message, bytesReceived);
         }
 
-        internal void SendDataRaw(byte[] response, IPEndPoint remoteEndPoint)
+        internal void SendDataRaw(SmartBuffer response, IPEndPoint remoteEndPoint)
         {
             QueueRawData(response, remoteEndPoint);
         }
 
-        protected virtual void QueueRawData(ByteSpan span, IPEndPoint remoteEndPoint)
+        protected virtual void QueueRawData(SmartBuffer span, IPEndPoint remoteEndPoint)
         {
+            span.AddUsage();
             this.sendQueue.TryAdd(new SendMessageInfo() { Span = span, Recipient = remoteEndPoint });
         }
 

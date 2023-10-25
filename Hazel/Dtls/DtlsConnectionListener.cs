@@ -94,7 +94,7 @@ namespace Hazel.Dtls
 
             public ConnectionId ConnectionId;
 
-            public readonly List<ByteSpan> QueuedApplicationDataMessage = new List<ByteSpan>();
+            public readonly List<SmartBuffer> QueuedApplicationDataMessage = new List<SmartBuffer>();
             public readonly ConcurrentBag<MessageReader> ApplicationData = new ConcurrentBag<MessageReader>();
             public readonly ProtocolVersion ProtocolVersion;
 
@@ -736,7 +736,9 @@ namespace Hazel.Dtls
                         ++peer.CurrentEpoch.NextOutgoingSequence;
 
                         // Encode the flight into wire format
-                        packet = new byte[Record.Size + changeCipherSpecRecord.Length + Record.Size + finishedRecord.Length];
+                        SmartBuffer buffer = this.bufferPool.GetObject();
+                        buffer.Length = Record.Size + changeCipherSpecRecord.Length + Record.Size + finishedRecord.Length;
+                        packet = (ByteSpan)buffer;
                         writer = packet;
                         changeCipherSpecRecord.Encode(writer);
                         writer = writer.Slice(Record.Size);
@@ -767,7 +769,7 @@ namespace Hazel.Dtls
                         // Current epoch can now handle application data
                         peer.CanHandleApplicationData = true;
 
-                        base.QueueRawData(packet, peerAddress);
+                        base.QueueRawData(buffer, peerAddress);
                         break;
 
                     // Drop messages that we do not support
@@ -996,7 +998,9 @@ namespace Hazel.Dtls
 
             // Convert initial record of the flight to
             // wire format
-            ByteSpan packet = new byte[Record.Size + initialRecord.Length];
+            SmartBuffer buffer = this.bufferPool.GetObject();
+            buffer.Length = Record.Size + initialRecord.Length;
+            ByteSpan packet = (ByteSpan)buffer;
             ByteSpan writer = packet;
             initialRecord.Encode(writer);
             writer = writer.Slice(Record.Size);
@@ -1016,7 +1020,7 @@ namespace Hazel.Dtls
                 ref initialRecord
             );
 
-            base.QueueRawData(packet, peerAddress);
+            base.QueueRawData(buffer, peerAddress);
 
             // Record record payload for verification
             if (recordMessagesForVerifyData)
@@ -1059,7 +1063,9 @@ namespace Hazel.Dtls
                 ++peer.CurrentEpoch.NextOutgoingSequence;
 
                 // Convert record to wire format
-                packet = new byte[Record.Size + additionalRecord.Length];
+                buffer = this.bufferPool.GetObject();
+                buffer.Length = Record.Size + additionalRecord.Length;
+                packet = (ByteSpan)buffer;
                 writer = packet;
                 additionalRecord.Encode(writer);
                 writer = writer.Slice(Record.Size);
@@ -1076,7 +1082,7 @@ namespace Hazel.Dtls
                     ref additionalRecord
                 );
 
-                base.QueueRawData(packet, peerAddress);
+                base.QueueRawData(buffer, peerAddress);
             }
 
             // Describe final record of the flight
@@ -1108,7 +1114,9 @@ namespace Hazel.Dtls
 
             // Convert final record of the flight to wire
             // format
-            packet = new byte[Record.Size + finalRecord.Length];
+            buffer = this.bufferPool.GetObject();
+            buffer.Length = Record.Size + finalRecord.Length;
+            packet = (ByteSpan)buffer;
             writer = packet;
             finalRecord.Encode(writer);
             writer = writer.Slice(Record.Size);
@@ -1136,7 +1144,7 @@ namespace Hazel.Dtls
                 ref finalRecord
             );
 
-            base.QueueRawData(packet, peerAddress);
+            base.QueueRawData(buffer, peerAddress);
 
             return true;
         }
@@ -1260,7 +1268,9 @@ namespace Hazel.Dtls
             record.Length = (ushort)recordProtection.GetEncryptedSize(plaintextPayloadSize);
 
             // Encode record to wire format
-            ByteSpan packet = new byte[Record.Size + record.Length];
+            SmartBuffer buffer = this.bufferPool.GetObject();
+            buffer.Length = Record.Size + record.Length;
+            ByteSpan packet = (ByteSpan)buffer;
             ByteSpan writer = packet;
             record.Encode(writer);
             writer = writer.Slice(Record.Size);
@@ -1275,13 +1285,13 @@ namespace Hazel.Dtls
                 ref record
             );
 
-            base.QueueRawData(packet, peerAddress);
+            base.QueueRawData(buffer, peerAddress);
         }
 
         /// <summary>
         /// Handle a requrest to send a datagram to the network
         /// </summary>
-        protected override void QueueRawData(ByteSpan span, IPEndPoint remoteEndPoint)
+        protected override void QueueRawData(SmartBuffer span, IPEndPoint remoteEndPoint)
         {
             PeerData peer;
             if (!this.existingPeers.TryGetValue(remoteEndPoint, out peer))
@@ -1295,10 +1305,7 @@ namespace Hazel.Dtls
                 // If we're negotiating a new epoch, queue data
                 if (peer.Epoch == 0 || peer.NextEpoch.State != HandshakeState.ExpectingHello)
                 {
-                    ByteSpan copyOfSpan = new byte[span.Length];
-                    span.CopyTo(copyOfSpan);
-
-                    peer.QueuedApplicationDataMessage.Add(copyOfSpan);
+                    peer.QueuedApplicationDataMessage.Add(span);
                     return;
                 }
 
@@ -1307,7 +1314,7 @@ namespace Hazel.Dtls
                 // Send any queued application data now
                 for (int ii = 0, nn = peer.QueuedApplicationDataMessage.Count; ii != nn; ++ii)
                 {
-                    ByteSpan queuedSpan = peer.QueuedApplicationDataMessage[ii];
+                    SmartBuffer queuedSpan = peer.QueuedApplicationDataMessage[ii];
 
                     Record outgoingRecord = new Record();
                     outgoingRecord.ContentType = ContentType.ApplicationData;
@@ -1318,11 +1325,13 @@ namespace Hazel.Dtls
                     ++peer.CurrentEpoch.NextOutgoingSequence;
 
                     // Encode the record to wire format
-                    ByteSpan packet = new byte[Record.Size + outgoingRecord.Length];
+                    SmartBuffer buffer = this.bufferPool.GetObject();
+                    buffer.Length = Record.Size + outgoingRecord.Length;
+                    ByteSpan packet = (ByteSpan)buffer;
                     ByteSpan writer = packet;
                     outgoingRecord.Encode(writer);
                     writer = writer.Slice(Record.Size);
-                    queuedSpan.CopyTo(writer);
+                    ((ByteSpan)queuedSpan).CopyTo(writer);
 
                     // Protect the record
                     peer.CurrentEpoch.RecordProtection.EncryptServerPlaintext(
@@ -1331,7 +1340,8 @@ namespace Hazel.Dtls
                         ref outgoingRecord
                     );
 
-                    base.QueueRawData(packet, remoteEndPoint);
+                    queuedSpan.Recycle();
+                    base.QueueRawData(buffer, remoteEndPoint);
                 }
                 peer.QueuedApplicationDataMessage.Clear();
 
@@ -1345,11 +1355,13 @@ namespace Hazel.Dtls
                     ++peer.CurrentEpoch.NextOutgoingSequence;
 
                     // Encode the record to wire format
-                    ByteSpan packet = new byte[Record.Size + outgoingRecord.Length];
+                    SmartBuffer buffer = this.bufferPool.GetObject();
+                    buffer.Length = Record.Size + outgoingRecord.Length;
+                    ByteSpan packet = (ByteSpan)buffer;
                     ByteSpan writer = packet;
                     outgoingRecord.Encode(writer);
                     writer = writer.Slice(Record.Size);
-                    span.CopyTo(writer);
+                    ((ByteSpan)span).CopyTo(writer);
 
                     // Protect the record
                     peer.CurrentEpoch.RecordProtection.EncryptServerPlaintext(
@@ -1358,7 +1370,8 @@ namespace Hazel.Dtls
                         ref outgoingRecord
                     );
 
-                    base.QueueRawData(packet, remoteEndPoint);
+                    span.Recycle();
+                    base.QueueRawData(buffer, remoteEndPoint);
                 }
             }
         }

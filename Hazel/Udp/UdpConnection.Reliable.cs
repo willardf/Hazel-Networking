@@ -89,12 +89,12 @@ namespace Hazel.Udp
         public class Packet : IRecyclable
         {
             public ushort Id;
-            private byte[] Data;
+            private SmartBuffer Data;
             private readonly UdpConnection Connection;
             private int Length;
 
             public int NextTimeoutMs;
-            public volatile bool Acknowledged;
+            private volatile bool Acknowledged;
 
             public Action AckCallback;
 
@@ -106,10 +106,12 @@ namespace Hazel.Udp
                 this.Connection = connection;
             }
 
-            internal void Set(ushort id, byte[] data, int length, int timeout, Action ackCallback)
+            internal void Set(ushort id, SmartBuffer data, int length, int timeout, Action ackCallback)
             {
                 this.Id = id;
                 this.Data = data;
+                this.Data.AddUsage();
+
                 this.Length = length;
 
                 this.Acknowledged = false;
@@ -178,7 +180,7 @@ namespace Hazel.Udp
             public void Recycle()
             {
                 this.Acknowledged = true;
-
+                this.Data.Recycle();
                 this.Connection.PacketPool.PutObject(this);
             }
         }
@@ -209,7 +211,7 @@ namespace Hazel.Udp
         /// <param name="buffer">The buffer to attach to.</param>
         /// <param name="offset">The offset to attach at.</param>
         /// <param name="ackCallback">The callback to make once the packet has been acknowledged.</param>
-        protected void AttachReliableID(byte[] buffer, int offset, Action ackCallback = null)
+        protected void AttachReliableID(SmartBuffer buffer, int offset, int length, Action ackCallback = null)
         {
             ushort id = (ushort)Interlocked.Increment(ref lastIDAllocated);
 
@@ -226,7 +228,7 @@ namespace Hazel.Udp
             packet.Set(
                 id,
                 buffer,
-                buffer.Length,
+                length,
                 resendDelayMs,
                 ackCallback);
 
@@ -251,24 +253,28 @@ namespace Hazel.Udp
         /// <param name="ackCallback">The callback to make once the packet has been acknowledged.</param>
         private void ReliableSend(byte sendOption, byte[] data, Action ackCallback = null)
         {
-            //Inform keepalive not to send for a while
+            // Inform keepalive not to send for a while
             ResetKeepAliveTimer();
 
-            byte[] bytes = new byte[data.Length + 3];
+            SmartBuffer buffer = this.bufferPool.GetObject();
+            buffer.Length = data.Length + 3;
+            buffer.AddUsage();
 
-            //Add message type
-            bytes[0] = sendOption;
+            // Add message type, reliable id, and data
+            buffer[0] = sendOption;
+            AttachReliableID(buffer, 1, buffer.Length, ackCallback);
+            Buffer.BlockCopy(data, 0, (byte[])buffer, 3, data.Length);
 
-            //Add reliable ID
-            AttachReliableID(bytes, 1, ackCallback);
-
-            //Copy data into new array
-            Buffer.BlockCopy(data, 0, bytes, bytes.Length - data.Length, data.Length);
-
-            //Write to connection
-            WriteBytesToConnection(bytes, bytes.Length);
-
-            Statistics.LogReliableSend(data.Length);
+            // Write to connection
+            try
+            {
+                WriteBytesToConnection(buffer, buffer.Length);
+                Statistics.LogReliableSend(data.Length);
+            }
+            finally
+            {
+                buffer.Recycle();
+            }
         }
 
         /// <summary>
@@ -461,19 +467,23 @@ namespace Hazel.Udp
                 }
             }
 
-            byte[] bytes = new byte[]
-            {
-                (byte)UdpSendOption.Acknowledgement,
-                (byte)(id >> 8),
-                (byte)(id >> 0),
-                recentPackets
-            };
+            SmartBuffer buffer = this.bufferPool.GetObject();
+            buffer.Length = 4;
+            buffer.AddUsage();
+            buffer[0] = (byte)UdpSendOption.Acknowledgement;
+            buffer[1] = (byte)(id >> 8);
+            buffer[2] = (byte)(id >> 0);
+            buffer[3] = recentPackets;
 
             try
             {
-                WriteBytesToConnection(bytes, bytes.Length);
+                WriteBytesToConnection(buffer, buffer.Length);
             }
             catch (InvalidOperationException) { }
+            finally
+            {
+                buffer.Recycle();
+            }
         }
 
         private void DisposeReliablePackets()

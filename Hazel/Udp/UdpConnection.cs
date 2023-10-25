@@ -9,6 +9,8 @@ namespace Hazel.Udp
     /// <inheritdoc />
     public abstract partial class UdpConnection : NetworkConnection
     {
+        protected readonly ObjectPool<SmartBuffer> bufferPool;
+
         public static readonly byte[] EmptyDisconnectBytes = new byte[] { (byte)UdpSendOption.Disconnect };
 
         public override float AveragePingMs => this._pingMs;
@@ -17,6 +19,8 @@ namespace Hazel.Udp
 
         public UdpConnection(ILogger logger) : base()
         {
+            this.bufferPool = new ObjectPool<SmartBuffer>(() => new SmartBuffer(this.bufferPool, 1024));
+
             this.logger = logger;
             this.PacketPool = new ObjectPool<Packet>(() => new Packet(this));
         }
@@ -57,7 +61,7 @@ namespace Hazel.Udp
         ///     Writes the given bytes to the connection.
         /// </summary>
         /// <param name="bytes">The bytes to write.</param>
-        protected abstract void WriteBytesToConnection(byte[] bytes, int length);
+        protected abstract void WriteBytesToConnection(SmartBuffer bytes, int length);
 
         /// <inheritdoc/>
         public override SendErrors Send(MessageWriter msg)
@@ -67,24 +71,28 @@ namespace Hazel.Udp
                 return SendErrors.Disconnected;
             }
 
+            SmartBuffer buffer = this.bufferPool.GetObject();
+            buffer.Length = msg.Length;
+            buffer.AddUsage();
+
             try
             {
-                byte[] buffer = new byte[msg.Length];
-                Buffer.BlockCopy(msg.Buffer, 0, buffer, 0, msg.Length);
+
+                Buffer.BlockCopy(msg.Buffer, 0, (byte[])buffer, 0, msg.Length);
 
                 switch (msg.SendOption)
                 {
                     case SendOption.Reliable:
                         ResetKeepAliveTimer();
 
-                        AttachReliableID(buffer, 1);
-                        WriteBytesToConnection(buffer, buffer.Length);
-                        Statistics.LogReliableSend(buffer.Length - 3);
+                        AttachReliableID(buffer, 1, msg.Length);
+                        WriteBytesToConnection(buffer, msg.Length);
+                        Statistics.LogReliableSend(msg.Length - 3);
                         break;
 
                     default:
-                        WriteBytesToConnection(buffer, buffer.Length);
-                        Statistics.LogUnreliableSend(buffer.Length - 1);
+                        WriteBytesToConnection(buffer, msg.Length);
+                        Statistics.LogUnreliableSend(msg.Length - 1);
                         break;
                 }
             }
@@ -92,6 +100,10 @@ namespace Hazel.Udp
             {
                 this.logger?.WriteError("Unknown exception while sending: " + e);
                 return SendErrors.Unknown;
+            }
+            finally
+            {
+                buffer.Recycle();
             }
 
             return SendErrors.None;
@@ -194,18 +206,23 @@ namespace Hazel.Udp
         /// <param name="length"></param>
         void UnreliableSend(byte sendOption, byte[] data, int offset, int length)
         {
-            byte[] bytes = new byte[length + 1];
+            SmartBuffer buffer = this.bufferPool.GetObject();
+            buffer.Length = length + 1;
+            buffer.AddUsage();
 
-            //Add message type
-            bytes[0] = sendOption;
+            // Add message type and data
+            buffer[0] = sendOption;
+            Buffer.BlockCopy(data, offset, (byte[])buffer, buffer.Length - length, length);
 
-            //Copy data into new array
-            Buffer.BlockCopy(data, offset, bytes, bytes.Length - length, length);
-
-            //Write to connection
-            WriteBytesToConnection(bytes, bytes.Length);
-
-            Statistics.LogUnreliableSend(length);
+            try
+            {
+                WriteBytesToConnection(buffer, buffer.Length);
+                Statistics.LogUnreliableSend(length);
+            }
+            finally
+            {
+                buffer.Recycle();
+            }
         }
 
         /// <summary>

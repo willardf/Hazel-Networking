@@ -43,9 +43,12 @@ namespace Hazel.UnitTests
             return true;
         }
 
-        protected override void WriteBytesToConnection(byte[] bytes, int length)
+        protected override void WriteBytesToConnection(SmartBuffer bytes, int length)
         {
-            this.BytesSent.Add(MessageReader.Get(bytes));
+            var buffer = new byte[bytes.Length];
+            Buffer.BlockCopy((byte[])bytes, 0, buffer, 0, bytes.Length);
+
+            this.BytesSent.Add(MessageReader.Get(buffer));
         }
 
         public void Test_Receive(MessageWriter msg)

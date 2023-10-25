@@ -111,26 +111,33 @@ namespace Hazel.Udp
         {
             ushort id = (ushort)Interlocked.Increment(ref lastIDAllocated);
 
-            byte[] bytes = new byte[3];
-            bytes[0] = (byte)UdpSendOption.Ping;
-            bytes[1] = (byte)(id >> 8);
-            bytes[2] = (byte)id;
+            var buffer = this.bufferPool.GetObject();
+            buffer.Length = 3;
+            buffer.AddUsage();
+            buffer[0] = (byte)UdpSendOption.Ping;
+            buffer[1] = (byte)(id >> 8);
+            buffer[2] = (byte)id;
 
-            PingPacket pkt;
-            if (!this.activePingPackets.TryGetValue(id, out pkt))
+            if (!this.activePingPackets.TryGetValue(id, out var ping))
             {
-                pkt = PingPacket.GetObject();
-                if (!this.activePingPackets.TryAdd(id, pkt))
+                ping = PingPacket.GetObject();
+                if (!this.activePingPackets.TryAdd(id, ping))
                 {
                     throw new Exception("This shouldn't be possible");
                 }
             }
 
-            pkt.Stopwatch.Restart();
+            ping.Stopwatch.Restart();
 
-            WriteBytesToConnection(bytes, bytes.Length);
-
-            Statistics.LogReliableSend(0);
+            try
+            {
+                WriteBytesToConnection(buffer, buffer.Length);
+                Statistics.LogReliableSend(0);
+            }
+            finally
+            {
+                buffer.Recycle();
+            }
         }
 
         /// <summary>
