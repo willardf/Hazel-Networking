@@ -137,6 +137,8 @@ namespace Hazel.UnitTests
                 {
                     Assert.AreEqual(TestData[i], output.ReadByte());
                 }
+
+                Assert.AreEqual(0, listener.BuffersInUse, "Some listener buffers are still in use...");
             }
         }
 
@@ -172,6 +174,8 @@ namespace Hazel.UnitTests
                 {
                     Assert.AreEqual(TestData[i], output.ReadByte());
                 }
+
+                Assert.AreEqual(0, listener.BuffersInUse, "Some listener buffers are still in use...");
             }
         }
 
@@ -241,6 +245,7 @@ namespace Hazel.UnitTests
                 }
 
                 Assert.AreEqual(NumberOfPacketsToResend * NumberOfTimesToResend, connection.Statistics.MessagesResent);
+                Assert.AreEqual(0, listener.BuffersInUse, "Some listener buffers are still in use...");
             }
         }
 
@@ -298,6 +303,7 @@ namespace Hazel.UnitTests
                 // +1 for Hello packet
                 Thread.Sleep(100); // The final ack has to actually be processed.
                 Assert.AreEqual(1 + NumberOfPacketsToSend, connection.Statistics.ReliablePacketsAcknowledged);
+                Assert.AreEqual(0, listener.BuffersInUse, "Some listener buffers are still in use...");
             }
         }
 
@@ -371,6 +377,7 @@ namespace Hazel.UnitTests
                 // +1 for Hello packet, +2 for reliable
                 Thread.Sleep(100); // The final ack has to actually be processed.
                 Assert.AreEqual(3, connection.Statistics.ReliablePacketsAcknowledged);
+                Assert.AreEqual(0, listener.BuffersInUse, "Some listener buffers are still in use...");
             }
         }
 

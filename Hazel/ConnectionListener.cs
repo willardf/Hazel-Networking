@@ -38,8 +38,9 @@ namespace Hazel
         public abstract int ConnectionCount { get; }
         public abstract int SendQueueLength { get; }
         public abstract int ReceiveQueueLength { get; }
+        public int BuffersInUse => this.bufferPool.NumberInUse;
 
-        protected ObjectPool<SmartBuffer> bufferPool;
+        protected readonly ObjectPool<SmartBuffer> bufferPool;
 
         public ConnectionListener()
         {

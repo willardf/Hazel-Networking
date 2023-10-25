@@ -1,11 +1,8 @@
-using System;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-
-using Hazel;
-using System.Net;
-using System.Threading;
-using System.Diagnostics;
 using Hazel.Udp.FewerThreads;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
+using System.Diagnostics;
+using System.Threading;
 
 namespace Hazel.UnitTests
 {
@@ -60,6 +57,7 @@ namespace Hazel.UnitTests
             }
 
             Assert.AreEqual(sendOption, result.Value.SendOption);
+            Assert.AreEqual(0, listener.BuffersInUse, "Some listener buffers are still in use...");
         }
 
         /// <summary>
@@ -110,6 +108,7 @@ namespace Hazel.UnitTests
             }
 
             Assert.AreEqual(sendOption, result.Value.SendOption);
+            Assert.AreEqual(0, listener.BuffersInUse, "Some listener buffers are still in use...");
         }
 
         /// <summary>
@@ -160,6 +159,7 @@ namespace Hazel.UnitTests
             }
 
             Assert.AreEqual(sendOption, result.Value.SendOption);
+            Assert.AreEqual(0, listener.BuffersInUse, "Some listener buffers are still in use...");
         }
 
 
@@ -211,6 +211,7 @@ namespace Hazel.UnitTests
             }
 
             Assert.AreEqual(sendOption, result.Value.SendOption);
+            Assert.AreEqual(0, listener.BuffersInUse, "Some listener buffers are still in use...");
         }
 
         /// <summary>
