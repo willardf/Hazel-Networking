@@ -1293,10 +1293,11 @@ namespace Hazel.Dtls
         /// </summary>
         protected override void QueueRawData(SmartBuffer span, IPEndPoint remoteEndPoint)
         {
-            PeerData peer;
-            if (!this.existingPeers.TryGetValue(remoteEndPoint, out peer))
+            span.AddUsage();
+            if (!this.existingPeers.TryGetValue(remoteEndPoint, out PeerData peer))
             {
                 // Drop messages if we don't know how to send them
+                span.Recycle();
                 return;
             }
 
@@ -1343,6 +1344,7 @@ namespace Hazel.Dtls
                     queuedSpan.Recycle();
                     base.QueueRawData(buffer, remoteEndPoint);
                 }
+
                 peer.QueuedApplicationDataMessage.Clear();
 
                 {
