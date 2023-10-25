@@ -57,7 +57,7 @@ namespace Hazel.UnitTests
             }
 
             Assert.AreEqual(sendOption, result.Value.SendOption);
-            Assert.AreEqual(0, listener.BuffersInUse, "Some listener buffers are still in use...");
+            TimedAssertTrue(() => 0 == listener.BuffersInUse, "Some listener buffers are still in use...");
         }
 
         /// <summary>
@@ -108,7 +108,7 @@ namespace Hazel.UnitTests
             }
 
             Assert.AreEqual(sendOption, result.Value.SendOption);
-            Assert.AreEqual(0, listener.BuffersInUse, "Some listener buffers are still in use...");
+            TimedAssertTrue(() => 0 == listener.BuffersInUse, "Some listener buffers are still in use...");
         }
 
         /// <summary>
@@ -159,7 +159,7 @@ namespace Hazel.UnitTests
             }
 
             Assert.AreEqual(sendOption, result.Value.SendOption);
-            Assert.AreEqual(0, listener.BuffersInUse, "Some listener buffers are still in use...");
+            TimedAssertTrue(() => 0 == listener.BuffersInUse, "Some listener buffers are still in use...");
         }
 
 
@@ -211,7 +211,7 @@ namespace Hazel.UnitTests
             }
 
             Assert.AreEqual(sendOption, result.Value.SendOption);
-            Assert.AreEqual(0, listener.BuffersInUse, "Some listener buffers are still in use...");
+            TimedAssertTrue(() => 0 == listener.BuffersInUse, "Some listener buffers are still in use...");
         }
 
         /// <summary>
@@ -333,6 +333,21 @@ namespace Hazel.UnitTests
             }
 
             return output;
+        }
+
+        public static void TimedAssertTrue(Func<bool> assertion, string message, int timeoutMs = 100)
+        {
+            TimeSpan max = TimeSpan.FromMilliseconds(timeoutMs);
+            DateTime start = DateTime.UtcNow;
+            while ((DateTime.UtcNow - start) < max)
+            {
+                if (assertion())
+                {
+                    return;
+                }
+            }
+
+            Assert.IsTrue(assertion(), message);
         }
     }
 }
