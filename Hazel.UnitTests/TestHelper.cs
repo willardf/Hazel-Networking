@@ -47,7 +47,7 @@ namespace Hazel.UnitTests
             connection.Connect();
 
             //Wait until data is received
-            mutex.WaitOne();
+            mutex.WaitOne(100);
 
             var dataReader = ConvertToMessageReader(data);
             Assert.AreEqual(dataReader.Length, result.Value.Message.Length);

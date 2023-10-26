@@ -78,7 +78,7 @@ namespace Hazel.Udp.FewerThreads
             if (!Listener.RemoveConnectionTo(this.ConnectionId)) return false;
             this._state = ConnectionState.NotConnected;
 
-            SmartBuffer buffer = this.bufferPool.GetObject();
+            using SmartBuffer buffer = this.bufferPool.GetObject();
             buffer.CopyFrom(EmptyDisconnectBytes);
             if (data != null && data.Length > 0)
             {

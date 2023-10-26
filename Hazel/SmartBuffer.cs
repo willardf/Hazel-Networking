@@ -3,7 +3,7 @@ using System.Threading;
 
 namespace Hazel
 {
-    public class SmartBuffer : IRecyclable
+    public class SmartBuffer : IRecyclable, IDisposable
     {
         private readonly ObjectPool<SmartBuffer> parent;
 
@@ -29,6 +29,7 @@ namespace Hazel
         {
             this.parent = parent;
             this.buffer = new byte[size];
+            this.usageCount = 1;
         }
 
         public byte this[int i]
@@ -53,11 +54,25 @@ namespace Hazel
             Interlocked.Increment(ref this.usageCount);
         }
 
+        public void Dispose()
+        {
+            this.Recycle();
+        }
+
         public void Recycle()
         {
-            if (Interlocked.Decrement(ref this.usageCount) == 0)
+            int lockValue = Interlocked.Decrement(ref this.usageCount);
+            if (lockValue == 0)
             {
+                // I had to think about if this is safe and it is.
+                // If I'm in here, then I am the last one out the door.
+                // No one can come after me until PutObject/GetObject are called
+                this.usageCount = 1;
                 parent.PutObject(this);
+            }
+            else if (lockValue < 0)
+            {
+                throw new HazelException("UH OH! SmartBuffer was used without calling AddUsage?");
             }
         }
 

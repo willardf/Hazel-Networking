@@ -246,10 +246,11 @@ namespace Hazel.Udp.FewerThreads
             {
                 try
                 {
+                    using var buffer = msg.Span;
                     if (this.socket.Poll(Timeout.Infinite, SelectMode.SelectWrite))
                     {
-                        this.socket.SendTo((byte[])msg.Span, 0, msg.Span.Length, SocketFlags.None, msg.Recipient);
-                        this.Statistics.AddBytesSent(msg.Span.Length);
+                        this.socket.SendTo((byte[])buffer, 0, buffer.Length, SocketFlags.None, msg.Recipient);
+                        this.Statistics.AddBytesSent(buffer.Length);
                     }
                     else
                     {
@@ -261,10 +262,6 @@ namespace Hazel.Udp.FewerThreads
                 {
                     this.Logger.WriteError("Error in loop while sending: " + e.Message);
                     Thread.Sleep(1);
-                }
-                finally
-                {
-                    msg.Span.Recycle();
                 }
             }
         }
@@ -298,7 +295,7 @@ namespace Hazel.Udp.FewerThreads
                                 message.Recycle();
                                 if (response != null)
                                 {
-                                    var buffer = this.bufferPool.GetObject();
+                                    using SmartBuffer buffer = this.bufferPool.GetObject();
                                     buffer.CopyFrom(response);
                                     SendDataRaw(buffer, remoteEndPoint);
                                 }

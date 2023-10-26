@@ -71,15 +71,11 @@ namespace Hazel.Udp
                 return SendErrors.Disconnected;
             }
 
-            SmartBuffer buffer = this.bufferPool.GetObject();
-            buffer.Length = msg.Length;
-            buffer.AddUsage();
+            using SmartBuffer buffer = this.bufferPool.GetObject();
+            buffer.CopyFrom(msg);
 
             try
             {
-
-                Buffer.BlockCopy(msg.Buffer, 0, (byte[])buffer, 0, msg.Length);
-
                 switch (msg.SendOption)
                 {
                     case SendOption.Reliable:
@@ -100,10 +96,6 @@ namespace Hazel.Udp
             {
                 this.logger?.WriteError("Unknown exception while sending: " + e);
                 return SendErrors.Unknown;
-            }
-            finally
-            {
-                buffer.Recycle();
             }
 
             return SendErrors.None;
@@ -206,23 +198,15 @@ namespace Hazel.Udp
         /// <param name="length"></param>
         void UnreliableSend(byte sendOption, byte[] data, int offset, int length)
         {
-            SmartBuffer buffer = this.bufferPool.GetObject();
+            using SmartBuffer buffer = this.bufferPool.GetObject();
             buffer.Length = length + 1;
-            buffer.AddUsage();
 
             // Add message type and data
             buffer[0] = sendOption;
             Buffer.BlockCopy(data, offset, (byte[])buffer, buffer.Length - length, length);
 
-            try
-            {
-                WriteBytesToConnection(buffer, buffer.Length);
-                Statistics.LogUnreliableSend(length);
-            }
-            finally
-            {
-                buffer.Recycle();
-            }
+            WriteBytesToConnection(buffer, buffer.Length);
+            Statistics.LogUnreliableSend(length);
         }
 
         /// <summary>

@@ -198,7 +198,7 @@ namespace Hazel.Udp
                                 message.Recycle();
                                 if (response != null)
                                 {
-                                    var buffer = this.bufferPool.GetObject();
+                                    using SmartBuffer buffer = this.bufferPool.GetObject();
                                     buffer.CopyFrom(response);
                                     SendData(buffer, buffer.Length, remoteEndPoint);
                                 }

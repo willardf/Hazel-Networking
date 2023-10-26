@@ -100,13 +100,18 @@ namespace Hazel.Udp
                     HandleSendTo,
                     bytes);
             }
-            catch (NullReferenceException) { }
+            catch (NullReferenceException)
+            {
+                bytes.Recycle();
+            }
             catch (ObjectDisposedException)
             {
                 // Already disposed and disconnected...
+                bytes.Recycle();
             }
             catch (SocketException ex)
             {
+                bytes.Recycle();
                 DisconnectInternal(HazelInternalErrors.SocketExceptionSend, "Could not send data as a SocketException occurred: " + ex.Message);
             }
         }
@@ -327,7 +332,7 @@ namespace Hazel.Udp
                 this._state = ConnectionState.NotConnected;
             }
 
-            SmartBuffer buffer = this.bufferPool.GetObject();
+            using SmartBuffer buffer = this.bufferPool.GetObject();
             buffer.CopyFrom(EmptyDisconnectBytes);
 
             if (data != null && data.Length > 0)

@@ -111,9 +111,8 @@ namespace Hazel.Udp
         {
             ushort id = (ushort)Interlocked.Increment(ref lastIDAllocated);
 
-            var buffer = this.bufferPool.GetObject();
+            using SmartBuffer buffer = this.bufferPool.GetObject();
             buffer.Length = 3;
-            buffer.AddUsage();
             buffer[0] = (byte)UdpSendOption.Ping;
             buffer[1] = (byte)(id >> 8);
             buffer[2] = (byte)id;
@@ -129,15 +128,8 @@ namespace Hazel.Udp
 
             ping.Stopwatch.Restart();
 
-            try
-            {
-                WriteBytesToConnection(buffer, buffer.Length);
-                Statistics.LogReliableSend(0);
-            }
-            finally
-            {
-                buffer.Recycle();
-            }
+            WriteBytesToConnection(buffer, buffer.Length);
+            Statistics.LogReliableSend(0);
         }
 
         /// <summary>

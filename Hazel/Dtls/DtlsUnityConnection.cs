@@ -354,29 +354,23 @@ namespace Hazel.Dtls
         /// <inheritdoc />
         protected override void WriteBytesToConnection(SmartBuffer bytes, int length)
         {
-            SmartBuffer wireData = this.WriteBytesToConnectionInternal(bytes, length);
-            bytes.Recycle();
-            wireData.AddUsage();
+            using SmartBuffer wireData = this.WriteBytesToConnectionInternal(bytes, length);
+            
             if (wireData.Length > 0)
             {
                 base.WriteBytesToConnection(wireData, wireData.Length);
             }
-
-            wireData.Recycle();
         }
 
         /// <inheritdoc />
         protected override void WriteBytesToConnectionSync(SmartBuffer bytes, int length)
         {
-            SmartBuffer wireData = this.WriteBytesToConnectionInternal(bytes, length);
-            bytes.Recycle();
-            wireData.AddUsage();
+            using SmartBuffer wireData = this.WriteBytesToConnectionInternal(bytes, length);
+            
             if (wireData.Length > 0)
             {
                 base.WriteBytesToConnectionSync(wireData, wireData.Length);
             }
-
-            wireData.Recycle();
         }
 
         /// <inheritdoc />
@@ -996,7 +990,7 @@ namespace Hazel.Dtls
             ++this.currentEpoch.NextOutgoingSequence;
 
             // Convert the record to wire format
-            SmartBuffer buffer = this.bufferPool.GetObject();
+            using SmartBuffer buffer = this.bufferPool.GetObject();
             buffer.Length = Record.Size + outgoingRecord.Length;
             ByteSpan packet = (ByteSpan)buffer;
             ByteSpan writer = packet;
@@ -1069,7 +1063,7 @@ namespace Hazel.Dtls
             ++this.currentEpoch.NextOutgoingSequence;
 
             // Convert the record to wire format
-            SmartBuffer buffer = this.bufferPool.GetObject();
+            using SmartBuffer buffer = this.bufferPool.GetObject();
             buffer.Length = Record.Size + outgoingRecord.Length;
             ByteSpan packet = (ByteSpan)buffer;
             ByteSpan writer = packet;
@@ -1165,7 +1159,7 @@ namespace Hazel.Dtls
                 + Record.Size + finishedRecord.Length;
                 ;
 
-            SmartBuffer buffer = this.bufferPool.GetObject();
+            using SmartBuffer buffer = this.bufferPool.GetObject();
             buffer.Length = packetLength;
             ByteSpan packet = (ByteSpan)buffer;
             ByteSpan writer = packet;

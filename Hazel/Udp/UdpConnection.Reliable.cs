@@ -256,25 +256,16 @@ namespace Hazel.Udp
             // Inform keepalive not to send for a while
             ResetKeepAliveTimer();
 
-            SmartBuffer buffer = this.bufferPool.GetObject();
+            using SmartBuffer buffer = this.bufferPool.GetObject();
             buffer.Length = data.Length + 3;
-            buffer.AddUsage();
-
+            
             // Add message type, reliable id, and data
             buffer[0] = sendOption;
             AttachReliableID(buffer, 1, buffer.Length, ackCallback);
             Buffer.BlockCopy(data, 0, (byte[])buffer, 3, data.Length);
 
-            // Write to connection
-            try
-            {
-                WriteBytesToConnection(buffer, buffer.Length);
-                Statistics.LogReliableSend(data.Length);
-            }
-            finally
-            {
-                buffer.Recycle();
-            }
+            WriteBytesToConnection(buffer, buffer.Length);
+            Statistics.LogReliableSend(data.Length);
         }
 
         /// <summary>
@@ -467,9 +458,8 @@ namespace Hazel.Udp
                 }
             }
 
-            SmartBuffer buffer = this.bufferPool.GetObject();
+            using SmartBuffer buffer = this.bufferPool.GetObject();
             buffer.Length = 4;
-            buffer.AddUsage();
             buffer[0] = (byte)UdpSendOption.Acknowledgement;
             buffer[1] = (byte)(id >> 8);
             buffer[2] = (byte)(id >> 0);
@@ -480,10 +470,6 @@ namespace Hazel.Udp
                 WriteBytesToConnection(buffer, buffer.Length);
             }
             catch (InvalidOperationException) { }
-            finally
-            {
-                buffer.Recycle();
-            }
         }
 
         private void DisposeReliablePackets()
