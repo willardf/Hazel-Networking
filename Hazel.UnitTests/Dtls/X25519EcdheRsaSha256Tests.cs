@@ -10,12 +10,14 @@ namespace Hazel.UnitTests.Dtls
         private readonly RandomNumberGenerator random = RandomNumberGenerator.Create();
         private readonly RSA privateKey = RSA.Create();
         private readonly RSA publicKey;
+        private readonly ObjectPool<SmartBuffer> bufferPool;
 
         public X25519EcdheRsaSha256Tests()
         {
             RSAParameters keyParameters = this.privateKey.ExportParameters(false);
             this.publicKey = RSA.Create();
             this.publicKey.ImportParameters(keyParameters);
+            this.bufferPool = new ObjectPool<SmartBuffer>(() => new SmartBuffer(this.bufferPool, 1024));
         }
 
         [TestMethod]
@@ -23,7 +25,7 @@ namespace Hazel.UnitTests.Dtls
         {
             byte[] data;
 
-            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.random))
+            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.bufferPool, this.random))
             {
                 int expectedSize = cipherSuite.CalculateServerMessageSize(this.privateKey);
                 Assert.IsTrue(expectedSize/2 > 1);
@@ -32,7 +34,7 @@ namespace Hazel.UnitTests.Dtls
                 random.GetBytes(data);
             }
 
-            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.random))
+            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.bufferPool, this.random))
             {
                 byte[] sharedKey = new byte[cipherSuite.SharedKeySize()];
                 Assert.IsFalse(cipherSuite.VerifyServerMessageAndGenerateSharedKey(sharedKey, data, this.publicKey));
@@ -44,7 +46,7 @@ namespace Hazel.UnitTests.Dtls
         {
             byte[] data;
 
-            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.random))
+            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.bufferPool, this.random))
             {
                 int expectedSize = cipherSuite.CalculateServerMessageSize(this.privateKey);
                 Assert.IsTrue(expectedSize > 0);
@@ -53,7 +55,7 @@ namespace Hazel.UnitTests.Dtls
                 random.GetBytes(data);
             }
 
-            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.random))
+            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.bufferPool, this.random))
             {
                 byte[] sharedKey = new byte[cipherSuite.SharedKeySize()];
                 Assert.IsFalse(cipherSuite.VerifyServerMessageAndGenerateSharedKey(sharedKey, data, this.publicKey));
@@ -65,7 +67,7 @@ namespace Hazel.UnitTests.Dtls
         {
             byte[] data;
 
-            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.random))
+            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.bufferPool, this.random))
             {
                 int expectedSize = cipherSuite.CalculateServerMessageSize(this.privateKey);
                 Assert.IsTrue(expectedSize > 0);
@@ -74,7 +76,7 @@ namespace Hazel.UnitTests.Dtls
                 random.GetBytes(data);
             }
 
-            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.random))
+            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.bufferPool, this.random))
             {
                 byte[] sharedKey = new byte[cipherSuite.SharedKeySize()];
                 Assert.IsFalse(cipherSuite.VerifyServerMessageAndGenerateSharedKey(sharedKey, data, this.publicKey));
@@ -86,7 +88,7 @@ namespace Hazel.UnitTests.Dtls
         {
             byte[] data;
 
-            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.random))
+            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.bufferPool, this.random))
             {
                 int expectedSize = cipherSuite.CalculateClientMessageSize();
                 Assert.IsTrue(expectedSize / 2 > 1);
@@ -95,7 +97,7 @@ namespace Hazel.UnitTests.Dtls
                 random.GetBytes(data);
             }
 
-            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.random))
+            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.bufferPool, this.random))
             {
                 byte[] sharedKey = new byte[cipherSuite.SharedKeySize()];
                 Assert.IsFalse(cipherSuite.VerifyClientMessageAndGenerateSharedKey(sharedKey, data));
@@ -107,7 +109,7 @@ namespace Hazel.UnitTests.Dtls
         {
             byte[] data;
 
-            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.random))
+            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.bufferPool, this.random))
             {
                 int expectedSize = cipherSuite.CalculateClientMessageSize();
                 Assert.IsTrue(expectedSize > 0);
@@ -116,7 +118,7 @@ namespace Hazel.UnitTests.Dtls
                 random.GetBytes(data);
             }
 
-            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.random))
+            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.bufferPool, this.random))
             {
                 byte[] sharedKey = new byte[cipherSuite.SharedKeySize()];
                 Assert.IsFalse(cipherSuite.VerifyClientMessageAndGenerateSharedKey(sharedKey, data));
@@ -128,7 +130,7 @@ namespace Hazel.UnitTests.Dtls
         {
             byte[] data;
 
-            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.random))
+            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.bufferPool, this.random))
             {
                 int expectedSize = cipherSuite.CalculateClientMessageSize();
                 Assert.IsTrue(expectedSize > 0);
@@ -137,7 +139,7 @@ namespace Hazel.UnitTests.Dtls
                 random.GetBytes(data);
             }
 
-            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.random))
+            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.bufferPool, this.random))
             {
                 byte[] sharedKey = new byte[cipherSuite.SharedKeySize()];
                 Assert.IsFalse(cipherSuite.VerifyClientMessageAndGenerateSharedKey(sharedKey, data));
@@ -149,7 +151,7 @@ namespace Hazel.UnitTests.Dtls
         {
             byte[] data;
 
-            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.random))
+            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.bufferPool, this.random))
             {
                 int expectedSize = cipherSuite.CalculateServerMessageSize(this.privateKey);
                 Assert.IsTrue(expectedSize > 0);
@@ -163,7 +165,7 @@ namespace Hazel.UnitTests.Dtls
             random.GetBytes(randomSignature);
             new ByteSpan(randomSignature).CopyTo(new ByteSpan(data, data.Length - randomSignature.Length, randomSignature.Length));
 
-            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.random))
+            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.bufferPool, this.random))
             {
                 byte[] sharedKey = new byte[cipherSuite.SharedKeySize()];
                 Assert.IsFalse(cipherSuite.VerifyServerMessageAndGenerateSharedKey(sharedKey, data, this.publicKey));
@@ -175,7 +177,7 @@ namespace Hazel.UnitTests.Dtls
         {
             byte[] data;
 
-            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.random))
+            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.bufferPool, this.random))
             {
                 int expectedSize = cipherSuite.CalculateServerMessageSize(this.privateKey);
                 Assert.IsTrue(expectedSize > 0);
@@ -184,7 +186,7 @@ namespace Hazel.UnitTests.Dtls
                 cipherSuite.EncodeServerKeyExchangeMessage(data, this.privateKey);
             }
 
-            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.random))
+            using (X25519EcdheRsaSha256 cipherSuite = new X25519EcdheRsaSha256(this.bufferPool, this.random))
             {
                 byte[] sharedKey = new byte[cipherSuite.SharedKeySize()];
                 Assert.IsTrue(cipherSuite.VerifyServerMessageAndGenerateSharedKey(sharedKey, data, this.publicKey));
@@ -197,7 +199,7 @@ namespace Hazel.UnitTests.Dtls
             byte[] serverSharedSecret;
             byte[] clientSharedSecret;
 
-            using (X25519EcdheRsaSha256 serverCipherSuite = new X25519EcdheRsaSha256(this.random))
+            using (X25519EcdheRsaSha256 serverCipherSuite = new X25519EcdheRsaSha256(this.bufferPool, this.random))
             {
                 int expectedSize = serverCipherSuite.CalculateServerMessageSize(this.privateKey);
                 Assert.IsTrue(expectedSize > 0);
@@ -207,7 +209,7 @@ namespace Hazel.UnitTests.Dtls
 
                 byte[] clientKeyExchange;
 
-                using (X25519EcdheRsaSha256 clientCipherSuite = new X25519EcdheRsaSha256(this.random))
+                using (X25519EcdheRsaSha256 clientCipherSuite = new X25519EcdheRsaSha256(this.bufferPool, this.random))
                 {
                     clientSharedSecret = new byte[clientCipherSuite.SharedKeySize()];
                     Assert.IsTrue(clientCipherSuite.VerifyServerMessageAndGenerateSharedKey(clientSharedSecret, serverKeyExchangeMessage, this.publicKey));

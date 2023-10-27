@@ -655,7 +655,7 @@ namespace Hazel.Dtls
                         switch (serverHello.CipherSuite)
                         {
                             case CipherSuite.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:
-                                this.nextEpoch.Handshake = new X25519EcdheRsaSha256(this.random);
+                                this.nextEpoch.Handshake = new X25519EcdheRsaSha256(this.bufferPool, this.random);
                                 break;
 
                             default:
@@ -824,10 +824,11 @@ namespace Hazel.Dtls
                         const int MasterSecretSize = 48;
                         ByteSpan masterSecret = new byte[MasterSecretSize];
                         PrfSha256.ExpandSecret(
-                              masterSecret
-                            , sharedSecret
-                            , PrfLabel.MASTER_SECRET
-                            , randomSeed
+                            this.bufferPool,
+                            masterSecret,
+                            sharedSecret,
+                            PrfLabel.MASTER_SECRET,
+                            randomSeed
                         );
 
                         // Create record protection for the upcoming epoch
@@ -835,10 +836,10 @@ namespace Hazel.Dtls
                         {
                             case CipherSuite.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:
                                 this.nextEpoch.RecordProtection = new Aes128GcmRecordProtection(
-                                      masterSecret
-                                    , this.nextEpoch.ServerRandom
-                                    , this.nextEpoch.ClientRandom
-                                );
+                                    this.bufferPool,
+                                    masterSecret,
+                                    this.nextEpoch.ServerRandom,
+                                    this.nextEpoch.ClientRandom);
                                 break;
 
                             default:
@@ -1189,11 +1190,8 @@ namespace Hazel.Dtls
             if (!isRetransmit)
             {
                 this.nextEpoch.VerificationStream.AddData(
-                    packet.Slice(
-                          Record.Size
-                        , Handshake.Size + (int)keyExchangeHandshake.Length
-                    )
-                );
+                    packet.Slice(Record.Size, Handshake.Size + (int)keyExchangeHandshake.Length)
+                    );
             }
 
             // Calculate the hash of the verification stream
@@ -1202,18 +1200,19 @@ namespace Hazel.Dtls
 
             // Expand our master secret into Finished digests for the client and server
             PrfSha256.ExpandSecret(
-                  this.nextEpoch.ServerVerification
-                , this.nextEpoch.MasterSecret
-                , PrfLabel.SERVER_FINISHED
-                , handshakeHash
-            );
+                this.bufferPool,
+                this.nextEpoch.ServerVerification,
+                this.nextEpoch.MasterSecret,
+                PrfLabel.SERVER_FINISHED,
+                handshakeHash);
 
             PrfSha256.ExpandSecret(
-                  writer.Slice(0, Finished.Size)
-                , this.nextEpoch.MasterSecret
-                , PrfLabel.CLIENT_FINISHED
-                , handshakeHash
-            );
+                this.bufferPool,
+                writer.Slice(0, Finished.Size),
+                this.nextEpoch.MasterSecret,
+                PrfLabel.CLIENT_FINISHED,
+                handshakeHash);
+
             writer = writer.Slice(Finished.Size);
 
             // Protect the ClientKeyExchange record

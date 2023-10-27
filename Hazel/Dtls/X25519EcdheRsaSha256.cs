@@ -12,13 +12,15 @@ namespace Hazel.Dtls
     {
         private readonly ByteSpan privateAgreementKey;
         private SHA256 sha256 = SHA256.Create();
-
+        private X25519 x25519;
         /// <summary>
         /// Create a new instance of the x25519 key exchange
         /// </summary>
         /// <param name="random">Random data source</param>
-        public X25519EcdheRsaSha256(RandomNumberGenerator random)
+        public X25519EcdheRsaSha256(ObjectPool<SmartBuffer> bufferPool, RandomNumberGenerator random)
         {
+            this.x25519 = new X25519(bufferPool);
+
             byte[] buffer = new byte[X25519.KeySize];
             random.GetBytes(buffer);
             this.privateAgreementKey = buffer;
@@ -85,7 +87,7 @@ namespace Hazel.Dtls
             output[0] = (byte)ECCurveType.NamedCurve;
             output.WriteBigEndian16((ushort)NamedCurve.x25519, 1);
             output[3] = (byte)X25519.KeySize;
-            X25519.Func(output.Slice(4, X25519.KeySize), this.privateAgreementKey);
+            this.x25519.Func(output.Slice(4, X25519.KeySize), this.privateAgreementKey);
 
             // Hash the key parameters
             byte[] paramterDigest = this.sha256.ComputeHash(output.GetUnderlyingArray(), output.Offset, 4 + X25519.KeySize);
@@ -163,7 +165,7 @@ namespace Hazel.Dtls
             }
 
             // Signature has been validated, generate the shared key
-            return X25519.Func(output, this.privateAgreementKey, othersPublicKey);
+            return this.x25519.Func(output, this.privateAgreementKey, othersPublicKey);
         }
 
         private static int ClientMessageSize = 0
@@ -180,7 +182,7 @@ namespace Hazel.Dtls
         public void EncodeClientKeyExchangeMessage(ByteSpan output)
         {
             output[0] = (byte)X25519.KeySize;
-            X25519.Func(output.Slice(1, X25519.KeySize), this.privateAgreementKey);
+            this.x25519.Func(output.Slice(1, X25519.KeySize), this.privateAgreementKey);
         }
 
         /// <inheritdoc />
@@ -196,7 +198,7 @@ namespace Hazel.Dtls
             }
 
             ByteSpan othersPublicKey = clientKeyExchangeMessage.Slice(1);
-            return X25519.Func(output, this.privateAgreementKey, othersPublicKey);
+            return this.x25519.Func(output, this.privateAgreementKey, othersPublicKey);
         }
     }
 }

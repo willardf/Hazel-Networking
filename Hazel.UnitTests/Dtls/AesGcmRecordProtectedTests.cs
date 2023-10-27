@@ -8,6 +8,7 @@ namespace Hazel.UnitTests.Dtls
     [TestClass]
     public class AesGcmRecordProtectedTests
     {
+        private readonly ObjectPool<SmartBuffer> bufferPool;
         private readonly ByteSpan masterSecret;
         private readonly ByteSpan serverRandom;
         private readonly ByteSpan clientRandom;
@@ -16,6 +17,7 @@ namespace Hazel.UnitTests.Dtls
 
         public AesGcmRecordProtectedTests()
         {
+            this.bufferPool = new ObjectPool<SmartBuffer>(() => new SmartBuffer(this.bufferPool, 1024));
             this.masterSecret = new byte[48];
             this.serverRandom = new byte[32];
             this.clientRandom = new byte[32];
@@ -31,7 +33,7 @@ namespace Hazel.UnitTests.Dtls
         [TestMethod]
         public void ServerCanEncryptAndDecryptData()
         {
-            using (Aes128GcmRecordProtection recordProtection = new Aes128GcmRecordProtection(this.masterSecret, this.serverRandom, this.clientRandom))
+            using (Aes128GcmRecordProtection recordProtection = new Aes128GcmRecordProtection(this.bufferPool, this.masterSecret, this.serverRandom, this.clientRandom))
             {
                 byte[] messageAsBytes = Encoding.UTF8.GetBytes(TestMessage);
 
@@ -56,7 +58,7 @@ namespace Hazel.UnitTests.Dtls
         [TestMethod]
         public void ClientCanEncryptAndDecryptData()
         {
-            using (Aes128GcmRecordProtection recordProtection = new Aes128GcmRecordProtection(this.masterSecret, this.serverRandom, this.clientRandom))
+            using (Aes128GcmRecordProtection recordProtection = new Aes128GcmRecordProtection(this.bufferPool, this.masterSecret, this.serverRandom, this.clientRandom))
             {
                 byte[] messageAsBytes = Encoding.UTF8.GetBytes(TestMessage);
 
@@ -81,7 +83,7 @@ namespace Hazel.UnitTests.Dtls
         [TestMethod]
         public void ServerDecryptionFailsWhenRecordModified()
         {
-            using (Aes128GcmRecordProtection recordProtection = new Aes128GcmRecordProtection(this.masterSecret, this.serverRandom, this.clientRandom))
+            using (Aes128GcmRecordProtection recordProtection = new Aes128GcmRecordProtection(this.bufferPool, this.masterSecret, this.serverRandom, this.clientRandom))
             {
                 byte[] messageAsBytes = Encoding.UTF8.GetBytes(TestMessage);
 
@@ -117,7 +119,7 @@ namespace Hazel.UnitTests.Dtls
         [TestMethod]
         public void ClientDecryptionFailsWhenRecordModified()
         {
-            using (Aes128GcmRecordProtection recordProtection = new Aes128GcmRecordProtection(this.masterSecret, this.serverRandom, this.clientRandom))
+            using (Aes128GcmRecordProtection recordProtection = new Aes128GcmRecordProtection(this.bufferPool, this.masterSecret, this.serverRandom, this.clientRandom))
             {
                 byte[] messageAsBytes = Encoding.UTF8.GetBytes(TestMessage);
 
@@ -153,7 +155,7 @@ namespace Hazel.UnitTests.Dtls
         [TestMethod]
         public void ServerEncryptionCanoverlap()
         {
-            using (Aes128GcmRecordProtection recordProtection = new Aes128GcmRecordProtection(this.masterSecret, this.serverRandom, this.clientRandom))
+            using (Aes128GcmRecordProtection recordProtection = new Aes128GcmRecordProtection(this.bufferPool, this.masterSecret, this.serverRandom, this.clientRandom))
             {
                 ByteSpan messageAsBytes = Encoding.UTF8.GetBytes(TestMessage);
 
@@ -179,7 +181,7 @@ namespace Hazel.UnitTests.Dtls
         [TestMethod]
         public void ClientEncryptionCanoverlap()
         {
-            using (Aes128GcmRecordProtection recordProtection = new Aes128GcmRecordProtection(this.masterSecret, this.serverRandom, this.clientRandom))
+            using (Aes128GcmRecordProtection recordProtection = new Aes128GcmRecordProtection(this.bufferPool, this.masterSecret, this.serverRandom, this.clientRandom))
             {
                 ByteSpan messageAsBytes = Encoding.UTF8.GetBytes(TestMessage);
 

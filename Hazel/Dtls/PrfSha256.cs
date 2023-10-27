@@ -16,7 +16,7 @@ namespace Hazel.Dtls
         /// <summary>
         /// Convert a text label to a byte sequence
         /// </summary>
-        public static ByteSpan LabelToBytes(string label)
+        private static ByteSpan LabelToBytes(string label)
         {
             return Encoding.ASCII.GetBytes(label);
         }
@@ -34,9 +34,12 @@ namespace Hazel.Dtls
         /// <param name="key">Original key to expand</param>
         /// <param name="label">Label (treated as a salt)</param>
         /// <param name="initialSeed">Seed for expansion (treated as a salt)</param>
-        public static void ExpandSecret(ByteSpan output, ByteSpan key, string label, ByteSpan initialSeed)
+        public static void ExpandSecret(ObjectPool<SmartBuffer> bufferPool, ByteSpan output, ByteSpan key, string label, ByteSpan initialSeed)
         {
-            ExpandSecret(output, key, PrfLabel.LabelToBytes(label), initialSeed);
+            using SmartBuffer labelBuffer = bufferPool.GetObject();
+            labelBuffer.Length = Encoding.ASCII.GetBytes(label, 0, label.Length, (byte[])labelBuffer, 0);
+
+            ExpandSecret(bufferPool, output, key, (ByteSpan)labelBuffer, initialSeed);
         }
 
         /// <summary>
@@ -46,30 +49,36 @@ namespace Hazel.Dtls
         /// <param name="key">Original key to expand</param>
         /// <param name="label">Label (treated as a salt)</param>
         /// <param name="initialSeed">Seed for expansion (treated as a salt)</param>
-        public static void ExpandSecret(ByteSpan output, ByteSpan key, ByteSpan label, ByteSpan initialSeed)
+        public static void ExpandSecret(ObjectPool<SmartBuffer> bufferPool, ByteSpan output, ByteSpan key, ByteSpan label, ByteSpan initialSeed)
         {
             ByteSpan writer = output;
 
-            byte[] roundSeed = new byte[label.Length + initialSeed.Length];
-            label.CopyTo(roundSeed);
-            initialSeed.CopyTo(roundSeed, label.Length);
+            using SmartBuffer roundSeedBuffer = bufferPool.GetObject();
+            roundSeedBuffer.Length = label.Length + initialSeed.Length;
 
-            byte[] hashA = roundSeed;
+            ByteSpan roundSeed = (ByteSpan)roundSeedBuffer;
+            label.CopyTo(roundSeed);
+            initialSeed.CopyTo(roundSeed.Slice(label.Length));
+
+            ByteSpan hashA = roundSeed;
 
             using (HMACSHA256 hmac = new HMACSHA256(key.ToArray()))
             {
-                byte[] input = new byte[hmac.OutputBlockSize + roundSeed.Length];
-                new ByteSpan(roundSeed).CopyTo(input, hmac.OutputBlockSize);
+                using SmartBuffer inputBuffer = bufferPool.GetObject();
+                inputBuffer.Length = hmac.OutputBlockSize + roundSeed.Length;
+
+                ByteSpan input = (ByteSpan)inputBuffer;
+                roundSeed.CopyTo(input.Slice(hmac.OutputBlockSize));
 
                 while (writer.Length > 0)
                 {
                     // Update hashA
-                    hashA = hmac.ComputeHash(hashA);
+                    hashA = hmac.ComputeHash(hashA.GetUnderlyingArray(), hashA.Offset, hashA.Length);
 
                     // generate hash input
-                    new ByteSpan(hashA).CopyTo(input);
+                    hashA.CopyTo(input);
 
-                    ByteSpan roundOutput = hmac.ComputeHash(input);
+                    ByteSpan roundOutput = hmac.ComputeHash(input.GetUnderlyingArray(), input.Offset, input.Length);
                     if (roundOutput.Length > writer.Length)
                     {
                         roundOutput = roundOutput.Slice(0, writer.Length);

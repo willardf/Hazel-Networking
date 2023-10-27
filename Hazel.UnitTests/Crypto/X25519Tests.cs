@@ -22,9 +22,18 @@ namespace Hazel.UnitTests.Crypto
             new byte[]{0xee, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f},
         };
 
+        private ObjectPool<SmartBuffer> bufferPool;
+
+        public X25519Tests()
+        {
+            this.bufferPool = new ObjectPool<SmartBuffer>(() => new SmartBuffer(this.bufferPool, 1024));
+        }
+
         [TestMethod]
         public void TestLowOrderPoints()
         {
+            var x25519 = new X25519(this.bufferPool);
+
             using (RandomNumberGenerator random = RandomNumberGenerator.Create())
             {
                 byte[] scalar = new byte[X25519.KeySize];
@@ -33,7 +42,7 @@ namespace Hazel.UnitTests.Crypto
                 for (int ii = 0, nn = LowOrderPoints.Length; ii != nn; ++ii)
                 {
                     ByteSpan output = new byte[X25519.KeySize];
-                    bool result = X25519.Func(output, scalar, LowOrderPoints[ii]);
+                    bool result = x25519.Func(output, scalar, LowOrderPoints[ii]);
                     Assert.IsFalse(result, $"Multiplication by low order point {ii} succeeded: should have failed");
                 }
             }
@@ -42,10 +51,11 @@ namespace Hazel.UnitTests.Crypto
         [TestMethod]
         public void TestVectors()
         {
+            var x25519 = new X25519(this.bufferPool);
             for (int ii = 0, nn = TestVectorData.Length; ii != nn; ++ii)
             {
                 byte[] actual = new byte[32];
-                bool result = X25519.Func(actual, TestVectorData[ii].In, TestVectorData[ii].Base);
+                bool result = x25519.Func(actual, TestVectorData[ii].In, TestVectorData[ii].Base);
                 Assert.IsTrue(result);
                 CollectionAssert.AreEqual(TestVectorData[ii].Expect, actual, $"Test vector {ii} mismatch");
             }
@@ -54,27 +64,28 @@ namespace Hazel.UnitTests.Crypto
         [TestMethod]
         public void TestAgreement()
         {
+            var x25519 = new X25519(this.bufferPool);
             using (RandomNumberGenerator random = RandomNumberGenerator.Create())
             {
                 byte[] clientPrivateKey = new byte[X25519.KeySize];
                 random.GetBytes(clientPrivateKey);
 
                 byte[] clientPublicKey = new byte[X25519.KeySize];
-                X25519.Func(clientPublicKey, clientPrivateKey);
+                x25519.Func(clientPublicKey, clientPrivateKey);
 
                 byte[] serverPrivateKey = new byte[X25519.KeySize];
                 random.GetBytes(serverPrivateKey);
 
                 byte[] serverPublickey = new byte[X25519.KeySize];
-                X25519.Func(serverPublickey, serverPrivateKey);
+                x25519.Func(serverPublickey, serverPrivateKey);
 
                 // client key aggreement
                 byte[] clientSharedSecret = new byte[X25519.KeySize];
-                Assert.IsTrue(X25519.Func(clientSharedSecret, clientPrivateKey, serverPublickey));
+                Assert.IsTrue(x25519.Func(clientSharedSecret, clientPrivateKey, serverPublickey));
 
                 // server key agreement
                 byte[] serverSharedSecret = new byte[X25519.KeySize];
-                Assert.IsTrue(X25519.Func(serverSharedSecret, serverPrivateKey, clientPublicKey));
+                Assert.IsTrue(x25519.Func(serverSharedSecret, serverPrivateKey, clientPublicKey));
 
                 CollectionAssert.AreEqual(clientSharedSecret, serverSharedSecret);
             }

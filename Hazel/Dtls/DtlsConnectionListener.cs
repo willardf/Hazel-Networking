@@ -94,7 +94,7 @@ namespace Hazel.Dtls
 
             public ConnectionId ConnectionId;
 
-            public readonly List<SmartBuffer> QueuedApplicationDataMessage = new List<SmartBuffer>();
+            public readonly Queue<SmartBuffer> QueuedApplicationDataMessage = new Queue<SmartBuffer>();
             public readonly ConcurrentBag<MessageReader> ApplicationData = new ConcurrentBag<MessageReader>();
             public readonly ProtocolVersion ProtocolVersion;
 
@@ -114,6 +114,8 @@ namespace Hazel.Dtls
             {
                 Dispose();
 
+                ByteSpan block = new byte[Random.Size * 2 + Finished.Size * 2];
+
                 this.Epoch = 0;
                 this.CanHandleApplicationData = false;
                 this.QueuedApplicationDataMessage.Clear();
@@ -129,11 +131,11 @@ namespace Hazel.Dtls
                 this.NextEpoch.State = HandshakeState.ExpectingHello;
                 this.NextEpoch.RecordProtection = null;
                 this.NextEpoch.Handshake = null;
-                this.NextEpoch.ClientRandom = new byte[Random.Size];
-                this.NextEpoch.ServerRandom = new byte[Random.Size];
+                this.NextEpoch.ClientRandom = block.Slice(0, Random.Size);
+                this.NextEpoch.ServerRandom = block.Slice(Random.Size, Random.Size);
                 this.NextEpoch.VerificationStream = new Sha256Stream();
-                this.NextEpoch.ClientVerification = new byte[Finished.Size];
-                this.NextEpoch.ServerVerification = new byte[Finished.Size];
+                this.NextEpoch.ClientVerification = block.Slice(Random.Size * 2, Finished.Size);
+                this.NextEpoch.ServerVerification = block.Slice(Random.Size * 2 + Finished.Size, Finished.Size);
 
                 this.ConnectionId = connectionId;
 
@@ -586,20 +588,21 @@ namespace Hazel.Dtls
                         const int MasterSecretSize = 48;
                         ByteSpan masterSecret = new byte[MasterSecretSize];
                         PrfSha256.ExpandSecret(
-                            masterSecret
-                            , sharedSecret
-                            , PrfLabel.MASTER_SECRET
-                            , randomSeed
-                        );
+                            this.bufferPool,
+                            masterSecret,
+                            sharedSecret,
+                            PrfLabel.MASTER_SECRET,
+                            randomSeed);
 
                         // Create the record protection for the upcoming epoch
                         switch (peer.NextEpoch.SelectedCipherSuite)
                         {
                             case CipherSuite.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:
                                 peer.NextEpoch.RecordProtection = new Aes128GcmRecordProtection(
-                                    masterSecret
-                                    , peer.NextEpoch.ServerRandom
-                                    , peer.NextEpoch.ClientRandom);
+                                    this.bufferPool,
+                                    masterSecret,
+                                    peer.NextEpoch.ServerRandom,
+                                    peer.NextEpoch.ClientRandom);
                                 break;
 
                             default:
@@ -613,16 +616,18 @@ namespace Hazel.Dtls
                         peer.NextEpoch.VerificationStream.CopyOrCalculateFinalHash(handshakeStreamHash);
 
                         PrfSha256.ExpandSecret(
-                            peer.NextEpoch.ClientVerification
-                            , masterSecret
-                            , PrfLabel.CLIENT_FINISHED
-                            , handshakeStreamHash
+                            this.bufferPool,
+                            peer.NextEpoch.ClientVerification,
+                            masterSecret,
+                            PrfLabel.CLIENT_FINISHED,
+                            handshakeStreamHash
                         );
                         PrfSha256.ExpandSecret(
-                            peer.NextEpoch.ServerVerification
-                            , masterSecret
-                            , PrfLabel.SERVER_FINISHED
-                            , handshakeStreamHash
+                            this.bufferPool,
+                            peer.NextEpoch.ServerVerification,
+                            masterSecret,
+                            PrfLabel.SERVER_FINISHED,
+                            handshakeStreamHash
                         );
 
 
@@ -891,7 +896,7 @@ namespace Hazel.Dtls
                     case CipherSuite.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:
                         if (clientHello.ContainsCurve(NamedCurve.x25519))
                         {
-                            handshakeCipherSuite = new X25519EcdheRsaSha256(this.random);
+                            handshakeCipherSuite = new X25519EcdheRsaSha256(this.bufferPool, this.random);
                         }
                         else
                         {
@@ -1031,19 +1036,22 @@ namespace Hazel.Dtls
             // Record record payload for verification
             if (recordMessagesForVerifyData)
             {
-                Handshake fullCeritficateHandshake = certificateHandshake;
-                fullCeritficateHandshake.FragmentLength = fullCeritficateHandshake.Length;
+                Handshake fullCertHandshake = certificateHandshake;
+                fullCertHandshake.FragmentLength = fullCertHandshake.Length;
 
-                packet = new byte[Handshake.Size + ServerHello.MinSize + Handshake.Size];
-                writer = packet;
-                serverHelloHandshake.Encode(writer);
-                writer = writer.Slice(Handshake.Size);
-                serverHello.Encode(writer);
-                writer = writer.Slice(ServerHello.MinSize);
-                fullCeritficateHandshake.Encode(writer);
-                writer = writer.Slice(Handshake.Size);
+                using SmartBuffer certBuffer = this.bufferPool.GetObject();
+                certBuffer.Length = Handshake.Size + ServerHello.MinSize + Handshake.Size;
+                ByteSpan certPacket = (ByteSpan)certBuffer;
+                ByteSpan certWriter = certPacket;
 
-                peer.NextEpoch.VerificationStream.AddData(packet);
+                serverHelloHandshake.Encode(certWriter);
+                certWriter = certWriter.Slice(Handshake.Size);
+                serverHello.Encode(certWriter);
+                certWriter = certWriter.Slice(ServerHello.MinSize);
+                fullCertHandshake.Encode(certWriter);
+                certWriter = certWriter.Slice(Handshake.Size);
+
+                peer.NextEpoch.VerificationStream.AddData(certPacket);
                 peer.NextEpoch.VerificationStream.AddData(this.encodedCertificate);
             }
 
@@ -1310,16 +1318,16 @@ namespace Hazel.Dtls
                 if (peer.Epoch == 0 || peer.NextEpoch.State != HandshakeState.ExpectingHello)
                 {
                     span.AddUsage();
-                    peer.QueuedApplicationDataMessage.Add(span);
+                    peer.QueuedApplicationDataMessage.Enqueue(span);
                     return;
                 }
 
                 ProtocolVersion protocolVersion = peer.ProtocolVersion;
 
                 // Send any queued application data now
-                for (int ii = 0, nn = peer.QueuedApplicationDataMessage.Count; ii != nn; ++ii)
+                while (peer.QueuedApplicationDataMessage.Count > 0)
                 {
-                    using SmartBuffer queuedSpan = peer.QueuedApplicationDataMessage[ii];
+                    using SmartBuffer queuedSpan = peer.QueuedApplicationDataMessage.Dequeue();
 
                     Record outgoingRecord = new Record();
                     outgoingRecord.ContentType = ContentType.ApplicationData;
@@ -1347,8 +1355,6 @@ namespace Hazel.Dtls
 
                     base.QueueRawData(buffer, remoteEndPoint);
                 }
-
-                peer.QueuedApplicationDataMessage.Clear();
 
                 {
                     Record outgoingRecord = new Record();

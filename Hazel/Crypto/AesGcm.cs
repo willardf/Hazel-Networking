@@ -170,14 +170,14 @@ namespace Hazel.Crypto
             // into `blockS`
             {
                 // Clear hash output block
-                SetSpanToZeros(this.blockS_);
+                this.blockS_.SecureClear();
 
                 // Write associated data blocks to hash
                 int fullBlocks = associatedData.Length / 16;
                 GHASH(this.blockS_, associatedData, fullBlocks);
                 if (fullBlocks * 16 < associatedData.Length)
                 {
-                    SetSpanToZeros(this.blockScratch_);
+                    this.blockScratch_.SecureClear();
                     associatedData.Slice(fullBlocks * 16).CopyTo(this.blockScratch_);
                     GHASH(this.blockS_, this.blockScratch_, 1);
                 }
@@ -187,7 +187,7 @@ namespace Hazel.Crypto
                 GHASH(this.blockS_, ciphertext, fullBlocks);
                 if (fullBlocks * 16 < ciphertext.Length)
                 {
-                    SetSpanToZeros(this.blockScratch_);
+                    this.blockScratch_.SecureClear();
                     ciphertext.Slice(fullBlocks * 16).CopyTo(this.blockScratch_);
                     GHASH(this.blockS_, this.blockScratch_, 1);
                 }
@@ -264,7 +264,7 @@ namespace Hazel.Crypto
         // Multiply two Galois field elements `X` and `Y` together and store
         // the result in `X` such that at the end of the function:
         //      X = X·Y
-        static void MultiplyGF128Elements(ByteSpan X, ByteSpan Y, ByteSpan scratchZ, ByteSpan scratchV)
+        static unsafe void MultiplyGF128Elements(ByteSpan X, ByteSpan Y, ByteSpan scratchZ, ByteSpan scratchV)
         {
             Debug.Assert(X.Length == 16);
             Debug.Assert(Y.Length == 16);
@@ -322,48 +322,59 @@ namespace Hazel.Crypto
             //   irreducible polynomial is represented by the bit string:
             //   `11100001` followed by 120 `0`s. We can add this value to `V`
             //   by: `V[0] = V[0] ^ 0xE1`.
-            SetSpanToZeros(scratchZ);
+            scratchZ.SecureClear();
             X.CopyTo(scratchV);
 
-            for (int ii = 0; ii != 128; ++ii)
+            unchecked
             {
-                int bitIndex = 7 - (ii % 8);
-                if ((Y[ii / 8] & (1 << bitIndex)) != 0)
+                fixed (byte* scratchZPtr = &scratchZ.GetUnderlyingArray()[scratchZ.Offset])
+                fixed (byte* scratchVPtr = &scratchV.GetUnderlyingArray()[scratchV.Offset])
+                fixed (byte* YPtr = &Y.GetUnderlyingArray()[Y.Offset])
                 {
-                    for (int jj = 0; jj != 16; ++jj)
+                    for (int ii = 0; ii != 128; ++ii)
                     {
-                        scratchZ[jj] ^= scratchV[jj];
-                    }
-                }
+                        int bitIndex = 7 - (ii % 8);
+                        if ((YPtr[ii / 8] & (1 << bitIndex)) != 0)
+                        {
+                            scratchZPtr[0] ^= scratchVPtr[0];
+                            scratchZPtr[1] ^= scratchVPtr[1];
+                            scratchZPtr[2] ^= scratchVPtr[2];
+                            scratchZPtr[3] ^= scratchVPtr[3];
+                            scratchZPtr[4] ^= scratchVPtr[4];
+                            scratchZPtr[5] ^= scratchVPtr[5];
+                            scratchZPtr[6] ^= scratchVPtr[6];
+                            scratchZPtr[7] ^= scratchVPtr[7];
+                            scratchZPtr[8] ^= scratchVPtr[8];
+                            scratchZPtr[9] ^= scratchVPtr[9];
+                            scratchZPtr[10] ^= scratchVPtr[10];
+                            scratchZPtr[11] ^= scratchVPtr[11];
+                            scratchZPtr[12] ^= scratchVPtr[12];
+                            scratchZPtr[13] ^= scratchVPtr[13];
+                            scratchZPtr[14] ^= scratchVPtr[14];
+                            scratchZPtr[15] ^= scratchVPtr[15];
+                        }
 
-                bool carry = false;
-                for (int jj = 0; jj != 16; ++jj)
-                {
-                    bool newCarry = (scratchV[jj] & 0x01) != 0;
-                    scratchV[jj] >>= 1;
-                    if (carry)
-                    {
-                        scratchV[jj] |= 0x80;
-                    }
-                    carry = newCarry;
-                }
+                        bool carry = false;
+                        for (int jj = 0; jj != 16; ++jj)
+                        {
+                            bool newCarry = (scratchVPtr[jj] & 0x01) != 0;
+                            scratchVPtr[jj] >>= 1;
+                            if (carry)
+                            {
+                                scratchVPtr[jj] |= 0x80;
+                            }
+                            carry = newCarry;
+                        }
 
-                if (carry)
-                {
-                    scratchV[0] ^= 0xE1;
+                        if (carry)
+                        {
+                            scratchVPtr[0] ^= 0xE1;
+                        }
+                    }
                 }
             }
 
             scratchZ.CopyTo(X);
-        }
-
-        // Set the contents of a span to all zero
-        static void SetSpanToZeros(ByteSpan span)
-        {
-            for (int ii = 0, nn = span.Length; ii != nn; ++ii)
-            {
-                span[ii] = 0;
-            }
         }
     }
 }

@@ -10,6 +10,16 @@ namespace Hazel
         private readonly byte[] array_;
 
         /// <summary>
+        /// Returns the offset into the underlying array
+        /// </summary>
+        public readonly int Offset;
+
+        /// <summary>
+        /// Returns the length of the current span
+        /// </summary>
+        public readonly int Length;
+
+        /// <summary>
         /// Createa a new span object containing an entire array
         /// </summary>
         public ByteSpan(byte[] array)
@@ -78,16 +88,6 @@ namespace Hazel
         {
             return this.array_;
         }
-
-        /// <summary>
-        /// Returns the offset into the underlying array
-        /// </summary>
-        public int Offset { get; }
-
-        /// <summary>
-        /// Returns the length of the current span
-        /// </summary>
-        public int Length { get; }
 
         /// <summary>
         /// Gets the span element at the specified index

@@ -6,7 +6,7 @@ namespace Hazel.Crypto
     /// <summary>
     /// The x25519 key agreement algorithm
     /// </summary>
-    public static class X25519
+    public class X25519
     {
         public const int KeySize = 32;
 
@@ -20,11 +20,17 @@ namespace Hazel.Crypto
         };
 
         private static readonly byte[] BasePoint = {9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        private readonly ObjectPool<SmartBuffer> bufferPool;
+
+        public X25519(ObjectPool<SmartBuffer> bufferPool)
+        {
+            this.bufferPool = bufferPool;
+        }
 
         /// <summary>
         /// Performs the core x25519 function: Multiplying an EC point by a scalar value
         /// </summary>
-        public static bool Func(ByteSpan output, ByteSpan scalar, ByteSpan point)
+        public bool Func(ByteSpan output, ByteSpan scalar, ByteSpan point)
         {
             InternalFunc(output, scalar, point);
             if (Const.ConstantCompareZeroSpan(output) == 1)
@@ -38,7 +44,7 @@ namespace Hazel.Crypto
         /// <summary>
         /// Multiplies the base x25519 point by the provided scalar value
         /// </summary>
-        public static void Func(ByteSpan output, ByteSpan scalar)
+        public void Func(ByteSpan output, ByteSpan scalar)
         {
             InternalFunc(output, scalar, BasePoint);
         }
@@ -49,23 +55,17 @@ namespace Hazel.Crypto
         //
         // See: https://cr.yp.to/ecdh.html
 
-        private static void InternalFunc(ByteSpan output, ByteSpan scalar, ByteSpan point)
+        private void InternalFunc(ByteSpan output, ByteSpan scalar, ByteSpan point)
         {
-            if (output.Length != KeySize)
-            {
-                throw new ArgumentException("Invalid output size", nameof(output));
-            }
-            else if (scalar.Length != KeySize)
-            {
-                throw new ArgumentException("Invalid scalar size", nameof(scalar));
-            }
-            else if (point.Length != KeySize)
-            {
-                throw new ArgumentException("Invalid point size", nameof(point));
-            }
+            Debug.Assert(output.Length == KeySize, $"Invalid output size {nameof(output)}");
+            Debug.Assert(scalar.Length == KeySize, $"Invalid scalar size {nameof(scalar)}");
+            Debug.Assert(point.Length == KeySize, $"Invalid point size {nameof(point)}");
 
             // copy the scalar so we can properly mask it
-            ByteSpan maskedScalar = new byte[32];
+            using SmartBuffer scalarBuffer = this.bufferPool.GetObject();
+            scalarBuffer.Length = KeySize;
+
+            ByteSpan maskedScalar = (ByteSpan)scalarBuffer;
             scalar.CopyTo(maskedScalar);
             maskedScalar[0] &= 248;
             maskedScalar[31] &= 127;
