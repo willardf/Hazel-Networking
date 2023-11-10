@@ -1,15 +1,31 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Threading;
 
 namespace Hazel
 {
     ///
     public class MessageWriter : IRecyclable
     {
+        public const int HighestCallSiteIndexPlusOne = 80;
         public static int BufferSize = 64000;
         public static readonly ObjectPool<MessageWriter> WriterPool = new ObjectPool<MessageWriter>(() => new MessageWriter(BufferSize));
+        public static readonly int[] CallSiteCounters = new int[HighestCallSiteIndexPlusOne];
+
+        public static string GetCallSitesReport()
+        {
+            StringBuilder builder = new StringBuilder();
+            builder.Append("\n\n");
+            for (int i = 0; i < HighestCallSiteIndexPlusOne; ++i)
+            {
+                builder.Append($"{i}:\t\t{CallSiteCounters[i]}\n");
+            }
+            builder.Append("\n\n");
+            return builder.ToString();
+        }
 
         public byte[] Buffer;
         public int Length;
@@ -61,11 +77,15 @@ namespace Hazel
             throw new NotImplementedException();
         }
 
+        private int callsite;
+
         ///
         /// <param name="sendOption">The option specifying how the message should be sent.</param>
-        public static MessageWriter Get(SendOption sendOption = SendOption.None)
+        public static MessageWriter Get(int callSite, SendOption sendOption = SendOption.None)
         {
+            Interlocked.Increment(ref CallSiteCounters[callSite]);
             var output = WriterPool.GetObject();
+            output.callsite = callSite;
             output.Clear(sendOption);
 
             return output;
@@ -129,6 +149,7 @@ namespace Hazel
         ///
         public void Recycle()
         {
+            Interlocked.Decrement(ref CallSiteCounters[callsite]);
             this.Position = this.Length = 0;
             WriterPool.PutObject(this);
         }
