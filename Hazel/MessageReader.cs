@@ -3,12 +3,28 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 
 namespace Hazel
 {
     public class MessageReader : IRecyclable
     {
+        public const int HighestCallSiteIndexPlusOne = 30;
         public static readonly ObjectPool<MessageReader> ReaderPool = new ObjectPool<MessageReader>(() => new MessageReader());
+        public static readonly int[] CallSiteCounters = new int[HighestCallSiteIndexPlusOne];
+        private int callsite;
+
+        public static string GetCallSitesReport()
+        {
+            StringBuilder builder = new StringBuilder();
+            builder.Append("\n\n");
+            for (int i = 0; i < HighestCallSiteIndexPlusOne; ++i)
+            {
+                builder.Append($"{i}:\t\t{CallSiteCounters[i]}\n");
+            }
+            builder.Append("\n\n");
+            return builder.ToString();
+        }
 
         public byte[] Buffer;
         public byte Tag;
@@ -33,9 +49,11 @@ namespace Hazel
         private int _position;
         private int readHead;
 
-        public static MessageReader GetSized(int minSize)
+        public static MessageReader GetSized(int callSite, int minSize)
         {
+            Interlocked.Increment(ref CallSiteCounters[callSite]);
             var output = ReaderPool.GetObject();
+            output.callsite = callSite;
 
             if (output.Buffer == null || output.Buffer.Length < minSize)
             {
@@ -52,9 +70,11 @@ namespace Hazel
             return output;
         }
 
-        public static MessageReader Get(byte[] buffer)
+        public static MessageReader Get(int callSite, byte[] buffer)
         {
+            Interlocked.Increment(ref CallSiteCounters[callSite]);
             var output = ReaderPool.GetObject();
+            output.callsite = callSite;
 
             output.Buffer = buffer;
             output.Offset = 0;
@@ -65,9 +85,9 @@ namespace Hazel
             return output;
         }
 
-        public static MessageReader CopyMessageIntoParent(MessageReader source)
+        public static MessageReader CopyMessageIntoParent(int callSite, MessageReader source)
         {
-            var output = MessageReader.GetSized(source.Length + 3);
+            var output = MessageReader.GetSized(callSite, source.Length + 3);
             System.Buffer.BlockCopy(source.Buffer, source.Offset - 3, output.Buffer, 0, source.Length + 3);
 
             output.Offset = 0;
@@ -77,9 +97,9 @@ namespace Hazel
             return output;
         }
 
-        public static MessageReader Get(MessageReader source)
+        public static MessageReader Get(int callSite, MessageReader source)
         {
-            var output = MessageReader.GetSized(source.Buffer.Length);
+            var output = MessageReader.GetSized(callSite, source.Buffer.Length);
             System.Buffer.BlockCopy(source.Buffer, 0, output.Buffer, 0, source.Buffer.Length);
 
             output.Offset = source.Offset;
@@ -93,12 +113,14 @@ namespace Hazel
             return output;
         }
 
-        public static MessageReader Get(byte[] buffer, int offset)
+        public static MessageReader Get(int callSite, byte[] buffer, int offset)
         {
             // Ensure there is at least a header
             if (offset + 3 > buffer.Length) return null;
 
+            Interlocked.Increment(ref CallSiteCounters[callSite]);
             var output = ReaderPool.GetObject();
+            output.callsite = callSite;
 
             output.Buffer = buffer;
             output.Offset = offset;
@@ -143,7 +165,7 @@ namespace Hazel
         /// <summary>
         /// Produces a MessageReader with a new buffer. This MessageReader should be recycled.
         /// </summary>
-        public MessageReader ReadMessageAsNewBuffer()
+        public MessageReader ReadMessageAsNewBuffer(int callSite)
         {
             if (this.BytesRemaining < 3) throw new InvalidDataException($"ReadMessage header is longer than message length: 3 of {this.BytesRemaining}");
 
@@ -152,7 +174,7 @@ namespace Hazel
 
             if (this.BytesRemaining < len) throw new InvalidDataException($"Message Length at Position {this.readHead} is longer than message length: {len} of {this.BytesRemaining}");
 
-            var output = MessageReader.GetSized(len);
+            var output = MessageReader.GetSized(callSite, len);
 
             Array.Copy(this.Buffer, this.readHead, output.Buffer, 0, len);
 
@@ -170,9 +192,9 @@ namespace Hazel
             return output;
         }
 
-        public MessageReader Duplicate()
+        public MessageReader Duplicate(int callSite)
         {
-            var output = GetSized(this.Length);
+            var output = GetSized(callSite, this.Length);
             Array.Copy(this.Buffer, this.Offset, output.Buffer, 0, this.Length);
             output.Length = this.Length;
             output.Offset = 0;
@@ -181,9 +203,9 @@ namespace Hazel
             return output;
         }
 
-        public void RemoveMessage(MessageReader reader)
+        public void RemoveMessage(int callSite, MessageReader reader)
         {
-            var temp = MessageReader.GetSized(reader.Buffer.Length);
+            var temp = MessageReader.GetSized(callSite, reader.Buffer.Length);
             try
             {
                 var headerOffset = reader.Offset - 3;
@@ -201,9 +223,9 @@ namespace Hazel
             }
         }
 
-        public void InsertMessage(MessageReader reader, MessageWriter writer)
+        public void InsertMessage(int callSite, MessageReader reader, MessageWriter writer)
         {
-            var temp = MessageReader.GetSized(reader.Buffer.Length);
+            var temp = MessageReader.GetSized(callSite, reader.Buffer.Length);
             try 
             {
                 var headerOffset = reader.Offset - 3;
@@ -262,6 +284,7 @@ namespace Hazel
 
         public void Recycle()
         {
+            Interlocked.Decrement(ref CallSiteCounters[callsite]);
             this.Parent = null;
             ReaderPool.PutObject(this);
         }

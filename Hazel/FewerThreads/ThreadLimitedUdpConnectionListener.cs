@@ -185,7 +185,7 @@ namespace Hazel.Udp.FewerThreads
                     if (!isActive) break;
 
                     EndPoint remoteEP = new IPEndPoint(this.EndPoint.Address, this.EndPoint.Port);
-                    var message = MessageReader.GetSized(this.ReceiveBufferSize);
+                    var message = MessageReader.GetSized(3, this.ReceiveBufferSize);
                     try
                     {
                         message.Length = socket.ReceiveFrom(message.Buffer, 0, message.Buffer.Length, SocketFlags.None, ref remoteEP);

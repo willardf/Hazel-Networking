@@ -90,7 +90,7 @@ namespace Hazel.Udp
             MessageReader message = null;
             try
             {
-                message = MessageReader.GetSized(this.ReceiveBufferSize);
+                message = MessageReader.GetSized(13, this.ReceiveBufferSize);
                 socket.BeginReceiveFrom(message.Buffer, 0, message.Buffer.Length, SocketFlags.None, ref remoteEP, ReadCallback, message);
             }
             catch (SocketException sx)

@@ -522,7 +522,7 @@ namespace Hazel.Dtls
 
                     case ContentType.ApplicationData:
                         // Forward data to the application
-                        MessageReader reader = MessageReader.GetSized(recordPayload.Length);
+                        MessageReader reader = MessageReader.GetSized(8, recordPayload.Length);
                         reader.Length = recordPayload.Length;
                         recordPayload.CopyTo(reader.Buffer);
 

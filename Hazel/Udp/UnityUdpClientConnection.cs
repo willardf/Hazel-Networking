@@ -217,7 +217,7 @@ namespace Hazel.Udp
         /// </summary>
         void StartListeningForData()
         {
-            var msg = MessageReader.GetSized(this.ReceiveBufferSize);
+            var msg = MessageReader.GetSized(10, this.ReceiveBufferSize);
             try
             {
                 EndPoint ep = this.EndPoint;

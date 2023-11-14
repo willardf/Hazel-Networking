@@ -205,7 +205,7 @@ namespace Hazel.Udp
             }
 #endif
 
-            var msg = MessageReader.GetSized(this.ReceiveBufferSize);
+            var msg = MessageReader.GetSized(9, this.ReceiveBufferSize);
             try
             {
                 socket.BeginReceive(msg.Buffer, 0, msg.Buffer.Length, SocketFlags.None, ReadCallback, msg);
