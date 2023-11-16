@@ -1,8 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
     <PropertyGroup>
         <TargetFrameworks>netstandard2.0;net472</TargetFrameworks>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<PackRelease>true</PackRelease>
+		<PackageId>innersloth.Hazel-Networking</PackageId>
+		<Authors>Innersloth LLC</Authors>
+		<Company>Innersloth LLC</Company>
+		<Product>Hazel Networking</Product>
+		<Title>Hazel Networking</Title>
+		<Description>
+Hazel Networking is a low-level networking library for C# providing connection-oriented, message based communication via UDP, RUDP and/or DTLS.
+		</Description>
     </PropertyGroup>
 
     <ItemGroup>
