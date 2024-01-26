@@ -297,7 +297,7 @@ namespace Hazel.Dtls
         /// Encrypted data to put on the wire if appropriate,
         /// otherwise an empty span
         /// </returns>
-        private ByteSpan WriteBytesToConnectionInternal(byte[] bytes, int length)
+        private SmartBuffer WriteBytesToConnectionInternal(SmartBuffer bytes, int length)
         {
             lock (this.syncRoot)
             {
@@ -310,11 +310,14 @@ namespace Hazel.Dtls
                 ++this.currentEpoch.NextOutgoingSequence;
 
                 // Encode the record to wire format
-                ByteSpan packet = new byte[Record.Size + outgoinRecord.Length];
+                SmartBuffer buffer = this.bufferPool.GetObject();
+
+                buffer.Length = Record.Size + outgoinRecord.Length;
+                ByteSpan packet = (ByteSpan)buffer;
                 ByteSpan writer = packet;
                 outgoinRecord.Encode(writer);
                 writer = writer.Slice(Record.Size);
-                new ByteSpan(bytes, 0, length).CopyTo(writer);
+                new ByteSpan((byte[])bytes, 0, length).CopyTo(writer);
 
                 // Protect the record
                 this.currentEpoch.RecordProtection.EncryptClientPlaintext(
@@ -323,7 +326,7 @@ namespace Hazel.Dtls
                     ref outgoinRecord
                 );
 
-                return packet;
+                return buffer;
             }
         }
 
@@ -349,24 +352,24 @@ namespace Hazel.Dtls
         }
 
         /// <inheritdoc />
-        protected override void WriteBytesToConnection(byte[] bytes, int length)
+        protected override void WriteBytesToConnection(SmartBuffer bytes, int length)
         {
-            ByteSpan wireData = this.WriteBytesToConnectionInternal(bytes, length);
+            using SmartBuffer wireData = this.WriteBytesToConnectionInternal(bytes, length);
+            
             if (wireData.Length > 0)
             {
-                Debug.Assert(wireData.Offset == 0, "Got a non-zero write data offset");
-                base.WriteBytesToConnection(wireData.GetUnderlyingArray(), wireData.Length);
+                base.WriteBytesToConnection(wireData, wireData.Length);
             }
         }
 
         /// <inheritdoc />
-        protected override void WriteBytesToConnectionSync(byte[] bytes, int length)
+        protected override void WriteBytesToConnectionSync(SmartBuffer bytes, int length)
         {
-            ByteSpan wireData = this.WriteBytesToConnectionInternal(bytes, length);
+            using SmartBuffer wireData = this.WriteBytesToConnectionInternal(bytes, length);
+            
             if (wireData.Length > 0)
             {
-                Debug.Assert(wireData.Offset == 0, "Got a non-zero write data offset");
-                base.WriteBytesToConnectionSync(wireData.GetUnderlyingArray(), wireData.Length);
+                base.WriteBytesToConnectionSync(wireData, wireData.Length);
             }
         }
 
@@ -987,7 +990,9 @@ namespace Hazel.Dtls
             ++this.currentEpoch.NextOutgoingSequence;
 
             // Convert the record to wire format
-            ByteSpan packet = new byte[Record.Size + outgoingRecord.Length];
+            using SmartBuffer buffer = this.bufferPool.GetObject();
+            buffer.Length = Record.Size + outgoingRecord.Length;
+            ByteSpan packet = (ByteSpan)buffer;
             ByteSpan writer = packet;
             outgoingRecord.Encode(packet);
             writer = writer.Slice(Record.Size);
@@ -1023,7 +1028,7 @@ namespace Hazel.Dtls
             if (this.nextEpoch.NegotiationStartTime == DateTime.MinValue) this.nextEpoch.NegotiationStartTime = DateTime.UtcNow;
             this.nextEpoch.NextPacketResendTime = DateTime.UtcNow + this.handshakeResendTimeout;
 
-            base.WriteBytesToConnection(packet.GetUnderlyingArray(), packet.Length);
+            base.WriteBytesToConnection(buffer, packet.Length);
         }
 
         protected void Test_SendClientHello(Func<ClientHello, ByteSpan, ByteSpan> encodeCallback)
@@ -1058,7 +1063,9 @@ namespace Hazel.Dtls
             ++this.currentEpoch.NextOutgoingSequence;
 
             // Convert the record to wire format
-            ByteSpan packet = new byte[Record.Size + outgoingRecord.Length];
+            using SmartBuffer buffer = this.bufferPool.GetObject();
+            buffer.Length = Record.Size + outgoingRecord.Length;
+            ByteSpan packet = (ByteSpan)buffer;
             ByteSpan writer = packet;
             outgoingRecord.Encode(packet);
             writer = writer.Slice(Record.Size);
@@ -1085,7 +1092,7 @@ namespace Hazel.Dtls
             this.nextEpoch.State = HandshakeState.ExpectingServerHello;
             if (this.nextEpoch.NegotiationStartTime == DateTime.MinValue) this.nextEpoch.NegotiationStartTime = DateTime.UtcNow;
             this.nextEpoch.NextPacketResendTime = DateTime.UtcNow + this.handshakeResendTimeout;
-            base.WriteBytesToConnection(packet.GetUnderlyingArray(), packet.Length);
+            base.WriteBytesToConnection(buffer, packet.Length);
         }
 
         /// <summary>
@@ -1151,7 +1158,10 @@ namespace Hazel.Dtls
                 + Record.Size + changeCipherSpecRecord.Length
                 + Record.Size + finishedRecord.Length;
                 ;
-            ByteSpan packet = new byte[packetLength];
+
+            using SmartBuffer buffer = this.bufferPool.GetObject();
+            buffer.Length = packetLength;
+            ByteSpan packet = (ByteSpan)buffer;
             ByteSpan writer = packet;
 
             keyExchangeRecord.Encode(writer);
@@ -1235,7 +1245,7 @@ namespace Hazel.Dtls
                 return;
             }
 #endif
-            base.WriteBytesToConnection(packet.GetUnderlyingArray(), packet.Length);
+            base.WriteBytesToConnection(buffer, packet.Length);
         }
 
         protected virtual bool DropClientKeyExchangeFlight()

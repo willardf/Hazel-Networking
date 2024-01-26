@@ -193,12 +193,14 @@ namespace Hazel.Udp
 
                         if (AcceptConnection != null)
                         {
-                            if (!AcceptConnection((IPEndPoint)remoteEndPoint, message.Buffer, out var response))
+                            if (!AcceptConnection((IPEndPoint)remoteEndPoint, message.Buffer, out byte[] response))
                             {
                                 message.Recycle();
                                 if (response != null)
                                 {
-                                    SendData(response, response.Length, remoteEndPoint);
+                                    using SmartBuffer buffer = this.bufferPool.GetObject();
+                                    buffer.CopyFrom(response);
+                                    SendData(buffer, buffer.Length, remoteEndPoint);
                                 }
 
                                 return;
@@ -241,9 +243,12 @@ namespace Hazel.Udp
         /// </summary>
         /// <param name="bytes">The bytes to send.</param>
         /// <param name="endPoint">The endpoint to send to.</param>
-        internal void SendData(byte[] bytes, int length, EndPoint endPoint)
+        internal void SendData(SmartBuffer bytes, int length, EndPoint endPoint)
         {
-            if (length > bytes.Length) return;
+            if (length > bytes.Length)
+            {
+                return;
+            }
 
 #if DEBUG
             if (TestDropRate > 0)
@@ -257,14 +262,15 @@ namespace Hazel.Udp
 
             try
             {
+                bytes.AddUsage();
                 socket.BeginSendTo(
-                    bytes,
+                    (byte[])bytes,
                     0,
                     length,
                     SocketFlags.None,
                     endPoint,
                     SendCallback,
-                    null);
+                    bytes);
 
                 this.Statistics.AddBytesSent(length);
             }
@@ -286,6 +292,10 @@ namespace Hazel.Udp
                 socket.EndSendTo(result);
             }
             catch { }
+            finally
+            {
+                ((SmartBuffer)result.AsyncState).Recycle();
+            }
         }
 
         /// <summary>

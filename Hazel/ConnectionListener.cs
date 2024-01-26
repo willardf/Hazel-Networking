@@ -38,6 +38,14 @@ namespace Hazel
         public abstract int ConnectionCount { get; }
         public abstract int SendQueueLength { get; }
         public abstract int ReceiveQueueLength { get; }
+        public int BuffersInUse => this.bufferPool.NumberInUse;
+
+        protected readonly ObjectPool<SmartBuffer> bufferPool;
+
+        public ConnectionListener()
+        {
+            this.bufferPool = new ObjectPool<SmartBuffer>(() => new SmartBuffer(this.bufferPool, 1024));
+        }
 
         /// <summary>
         /// A callback for early connection rejection. 

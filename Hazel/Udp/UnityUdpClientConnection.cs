@@ -71,7 +71,7 @@ namespace Hazel.Udp
         }
 
         /// <inheritdoc />
-        protected override void WriteBytesToConnection(byte[] bytes, int length)
+        protected override void WriteBytesToConnection(SmartBuffer bytes, int length)
         {
 #if DEBUG
             if (TestLagMs > 0)
@@ -85,27 +85,33 @@ namespace Hazel.Udp
             }
         }
 
-        private void WriteBytesToConnectionReal(byte[] bytes, int length)
+        private void WriteBytesToConnectionReal(SmartBuffer bytes, int length)
         {
             try
             {
+                bytes.AddUsage();
                 this.Statistics.LogPacketSend(length);
                 socket.BeginSendTo(
-                    bytes,
+                    (byte[])bytes,
                     0,
                     length,
                     SocketFlags.None,
                     EndPoint,
                     HandleSendTo,
-                    null);
+                    bytes);
             }
-            catch (NullReferenceException) { }
+            catch (NullReferenceException)
+            {
+                bytes.Recycle();
+            }
             catch (ObjectDisposedException)
             {
                 // Already disposed and disconnected...
+                bytes.Recycle();
             }
             catch (SocketException ex)
             {
+                bytes.Recycle();
                 DisconnectInternal(HazelInternalErrors.SocketExceptionSend, "Could not send data as a SocketException occurred: " + ex.Message);
             }
         }
@@ -114,12 +120,13 @@ namespace Hazel.Udp
         ///     Synchronously writes the given bytes to the connection.
         /// </summary>
         /// <param name="bytes">The bytes to write.</param>
-        protected virtual void WriteBytesToConnectionSync(byte[] bytes, int length)
+        protected virtual void WriteBytesToConnectionSync(SmartBuffer bytes, int length)
         {
+            bytes.AddUsage();
             try
             {
                 socket.SendTo(
-                    bytes,
+                    (byte[])bytes,
                     0,
                     length,
                     SocketFlags.None,
@@ -133,6 +140,10 @@ namespace Hazel.Udp
             catch (SocketException ex)
             {
                 DisconnectInternal(HazelInternalErrors.SocketExceptionSend, "Could not send data as a SocketException occurred: " + ex.Message);
+            }
+            finally
+            {
+                bytes.Recycle();
             }
         }
 
@@ -150,6 +161,10 @@ namespace Hazel.Udp
             catch (SocketException ex)
             {
                 DisconnectInternal(HazelInternalErrors.SocketExceptionSend, "Could not send data as a SocketException occurred: " + ex.Message);
+            }
+            finally
+            {
+                ((SmartBuffer)result.AsyncState).Recycle();
             }
         }
 
@@ -317,18 +332,20 @@ namespace Hazel.Udp
                 this._state = ConnectionState.NotConnected;
             }
 
-            var bytes = EmptyDisconnectBytes;
+            using SmartBuffer buffer = this.bufferPool.GetObject();
+            buffer.CopyFrom(EmptyDisconnectBytes);
+
             if (data != null && data.Length > 0)
             {
                 if (data.SendOption != SendOption.None) throw new ArgumentException("Disconnect messages can only be unreliable.");
 
-                bytes = data.ToByteArray(true);
-                bytes[0] = (byte)UdpSendOption.Disconnect;
+                buffer.CopyFrom(data);
+                buffer[0] = (byte)UdpSendOption.Disconnect;
             }
 
             try
             {
-                this.WriteBytesToConnectionSync(bytes, bytes.Length);
+                this.WriteBytesToConnectionSync(buffer, buffer.Length);
             }
             catch { }
 

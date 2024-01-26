@@ -1,11 +1,8 @@
-using System;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-
-using Hazel;
-using System.Net;
-using System.Threading;
-using System.Diagnostics;
 using Hazel.Udp.FewerThreads;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
+using System.Diagnostics;
+using System.Threading;
 
 namespace Hazel.UnitTests
 {
@@ -50,7 +47,7 @@ namespace Hazel.UnitTests
             connection.Connect();
 
             //Wait until data is received
-            mutex.WaitOne();
+            mutex.WaitOne(100);
 
             var dataReader = ConvertToMessageReader(data);
             Assert.AreEqual(dataReader.Length, result.Value.Message.Length);
@@ -60,6 +57,7 @@ namespace Hazel.UnitTests
             }
 
             Assert.AreEqual(sendOption, result.Value.SendOption);
+            TimedAssertTrue(() => 0 == listener.BuffersInUse, "Some listener buffers are still in use...");
         }
 
         /// <summary>
@@ -110,6 +108,7 @@ namespace Hazel.UnitTests
             }
 
             Assert.AreEqual(sendOption, result.Value.SendOption);
+            TimedAssertTrue(() => 0 == listener.BuffersInUse, "Some listener buffers are still in use...");
         }
 
         /// <summary>
@@ -160,6 +159,7 @@ namespace Hazel.UnitTests
             }
 
             Assert.AreEqual(sendOption, result.Value.SendOption);
+            TimedAssertTrue(() => 0 == listener.BuffersInUse, "Some listener buffers are still in use...");
         }
 
 
@@ -211,6 +211,7 @@ namespace Hazel.UnitTests
             }
 
             Assert.AreEqual(sendOption, result.Value.SendOption);
+            TimedAssertTrue(() => 0 == listener.BuffersInUse, "Some listener buffers are still in use...");
         }
 
         /// <summary>
@@ -332,6 +333,21 @@ namespace Hazel.UnitTests
             }
 
             return output;
+        }
+
+        public static void TimedAssertTrue(Func<bool> assertion, string message, int timeoutMs = 100)
+        {
+            TimeSpan max = TimeSpan.FromMilliseconds(timeoutMs);
+            DateTime start = DateTime.UtcNow;
+            while ((DateTime.UtcNow - start) < max)
+            {
+                if (assertion())
+                {
+                    return;
+                }
+            }
+
+            Assert.IsTrue(assertion(), message);
         }
     }
 }

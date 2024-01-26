@@ -15,7 +15,7 @@ namespace Hazel.Udp.FewerThreads
     {
         private struct SendMessageInfo
         {
-            public ByteSpan Span;
+            public SmartBuffer Span;
             public IPEndPoint Recipient;
         }
 
@@ -246,10 +246,11 @@ namespace Hazel.Udp.FewerThreads
             {
                 try
                 {
+                    using var buffer = msg.Span;
                     if (this.socket.Poll(Timeout.Infinite, SelectMode.SelectWrite))
                     {
-                        this.socket.SendTo(msg.Span.GetUnderlyingArray(), msg.Span.Offset, msg.Span.Length, SocketFlags.None, msg.Recipient);
-                        this.Statistics.AddBytesSent(msg.Span.Length - msg.Span.Offset);
+                        this.socket.SendTo((byte[])buffer, 0, buffer.Length, SocketFlags.None, msg.Recipient);
+                        this.Statistics.AddBytesSent(buffer.Length);
                     }
                     else
                     {
@@ -289,12 +290,14 @@ namespace Hazel.Udp.FewerThreads
 
                         if (AcceptConnection != null)
                         {
-                            if (!AcceptConnection(remoteEndPoint, message.Buffer, out var response))
+                            if (!AcceptConnection(remoteEndPoint, message.Buffer, out byte[] response))
                             {
                                 message.Recycle();
                                 if (response != null)
                                 {
-                                    SendDataRaw(response, remoteEndPoint);
+                                    using SmartBuffer buffer = this.bufferPool.GetObject();
+                                    buffer.CopyFrom(response);
+                                    SendDataRaw(buffer, remoteEndPoint);
                                 }
 
                                 return;
@@ -334,13 +337,14 @@ namespace Hazel.Udp.FewerThreads
             connection.HandleReceive(message, bytesReceived);
         }
 
-        internal void SendDataRaw(byte[] response, IPEndPoint remoteEndPoint)
+        internal void SendDataRaw(SmartBuffer response, IPEndPoint remoteEndPoint)
         {
             QueueRawData(response, remoteEndPoint);
         }
 
-        protected virtual void QueueRawData(ByteSpan span, IPEndPoint remoteEndPoint)
+        protected virtual void QueueRawData(SmartBuffer span, IPEndPoint remoteEndPoint)
         {
+            span.AddUsage();
             this.sendQueue.TryAdd(new SendMessageInfo() { Span = span, Recipient = remoteEndPoint });
         }
 
