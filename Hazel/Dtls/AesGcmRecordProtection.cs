@@ -12,6 +12,8 @@ namespace Hazel.Dtls
         private const int ImplicitNonceSize = 4;
         private const int ExplicitNonceSize = 8;
 
+        private readonly ObjectPool<SmartBuffer> bufferPool;
+
         private readonly Aes128Gcm serverWriteCipher;
         private readonly Aes128Gcm clientWriteCipher;
 
@@ -24,9 +26,14 @@ namespace Hazel.Dtls
         /// <param name="masterSecret">Shared secret</param>
         /// <param name="serverRandom">Server random data</param>
         /// <param name="clientRandom">Client random data</param>
-        public Aes128GcmRecordProtection(ByteSpan masterSecret, ByteSpan serverRandom, ByteSpan clientRandom)
+        public Aes128GcmRecordProtection(ObjectPool<SmartBuffer> bufferPool, ByteSpan masterSecret, ByteSpan serverRandom, ByteSpan clientRandom)
         {
-            ByteSpan combinedRandom = new byte[serverRandom.Length + clientRandom.Length];
+            this.bufferPool = bufferPool;
+
+            using SmartBuffer randomBuffer = this.bufferPool.GetObject();
+            randomBuffer.Length = serverRandom.Length + clientRandom.Length;
+
+            ByteSpan combinedRandom = (ByteSpan)randomBuffer;
             serverRandom.CopyTo(combinedRandom);
             clientRandom.CopyTo(combinedRandom.Slice(serverRandom.Length));
 
@@ -41,7 +48,7 @@ namespace Hazel.Dtls
                 ;
 
             ByteSpan expandedKey = new byte[ExpandedSize];
-            PrfSha256.ExpandSecret(expandedKey, masterSecret, PrfLabel.KEY_EXPANSION, combinedRandom);
+            PrfSha256.ExpandSecret(bufferPool, expandedKey, masterSecret, PrfLabel.KEY_EXPANSION, combinedRandom);
 
             ByteSpan clientWriteKey = expandedKey.Slice(0, Aes128Gcm.KeySize);
             ByteSpan serverWriteKey = expandedKey.Slice(Aes128Gcm.KeySize, Aes128Gcm.KeySize);
@@ -94,12 +101,15 @@ namespace Hazel.Dtls
             EncryptPlaintext(output, input, ref record, this.clientWriteCipher, this.clientWriteIV);
         }
 
-        private static void EncryptPlaintext(ByteSpan output, ByteSpan input, ref Record record, Aes128Gcm cipher, ByteSpan writeIV)
+        private void EncryptPlaintext(ByteSpan output, ByteSpan input, ref Record record, Aes128Gcm cipher, ByteSpan writeIV)
         {
             Debug.Assert(output.Length >= GetEncryptedSizeImpl(input.Length));
 
             // Build GCM nonce (authenticated data)
-            ByteSpan nonce = new byte[ImplicitNonceSize + ExplicitNonceSize];
+            using SmartBuffer nonceBuffer = this.bufferPool.GetObject();
+            nonceBuffer.Length = ImplicitNonceSize + ExplicitNonceSize;
+
+            ByteSpan nonce = (ByteSpan)nonceBuffer;
             writeIV.CopyTo(nonce);
             nonce.WriteBigEndian16(record.Epoch, ImplicitNonceSize);
             nonce.WriteBigEndian48(record.SequenceNumber, ImplicitNonceSize + 2);
@@ -107,7 +117,11 @@ namespace Hazel.Dtls
             // Serialize record as additional data
             Record plaintextRecord = record;
             plaintextRecord.Length = (ushort)input.Length;
-            ByteSpan associatedData = new byte[Record.Size];
+
+            using SmartBuffer adataBuffer = this.bufferPool.GetObject();
+            adataBuffer.Length = Record.Size;
+
+            ByteSpan associatedData = (ByteSpan)adataBuffer;
             plaintextRecord.Encode(associatedData);
 
             cipher.Seal(output, nonce, input, associatedData);
@@ -125,12 +139,15 @@ namespace Hazel.Dtls
             return DecryptCiphertext(output, input, ref record, this.clientWriteCipher, this.clientWriteIV);
         }
 
-        private static bool DecryptCiphertext(ByteSpan output, ByteSpan input, ref Record record, Aes128Gcm cipher, ByteSpan writeIV)
+        private bool DecryptCiphertext(ByteSpan output, ByteSpan input, ref Record record, Aes128Gcm cipher, ByteSpan writeIV)
         {
             Debug.Assert(output.Length >= GetDecryptedSizeImpl(input.Length));
 
             // Build GCM nonce (authenticated data)
-            ByteSpan nonce = new byte[ImplicitNonceSize + ExplicitNonceSize];
+            using SmartBuffer nonceBuffer = this.bufferPool.GetObject();
+            nonceBuffer.Length = ImplicitNonceSize + ExplicitNonceSize;
+
+            ByteSpan nonce = (ByteSpan)nonceBuffer;
             writeIV.CopyTo(nonce);
             nonce.WriteBigEndian16(record.Epoch, ImplicitNonceSize);
             nonce.WriteBigEndian48(record.SequenceNumber, ImplicitNonceSize + 2);
@@ -138,7 +155,11 @@ namespace Hazel.Dtls
             // Serialize record as additional data
             Record plaintextRecord = record;
             plaintextRecord.Length = (ushort)GetDecryptedSizeImpl(input.Length);
-            ByteSpan associatedData = new byte[Record.Size];
+
+            using SmartBuffer adataBuffer = this.bufferPool.GetObject();
+            adataBuffer.Length = Record.Size;
+
+            ByteSpan associatedData = (ByteSpan)adataBuffer;
             plaintextRecord.Encode(associatedData);
 
             return cipher.Open(output, nonce, input, associatedData);

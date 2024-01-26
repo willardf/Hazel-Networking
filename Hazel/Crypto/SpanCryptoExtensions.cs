@@ -22,15 +22,7 @@ namespace Hazel.Crypto
         /// <param name="random">Entropy source</param>
         public static void FillWithRandom(this ByteSpan span, RandomNumberGenerator random)
         {
-            if (span.Offset == 0 && span.Length == span.GetUnderlyingArray().Length)
-            {
-                random.GetBytes(span.GetUnderlyingArray());
-                return;
-            }
-
-            byte[] temp = new byte[span.Length];
-            random.GetBytes(temp);
-            new ByteSpan(temp).CopyTo(span);
+            random.GetBytes(span.GetUnderlyingArray(), span.Offset, span.Length);
         }
     }
 }

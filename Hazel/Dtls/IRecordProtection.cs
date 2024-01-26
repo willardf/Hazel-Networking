@@ -69,15 +69,15 @@ namespace Hazel.Dtls
     /// </summary>
     public sealed class RecordProtectionFactory
     {
-        public static IRecordProtection Create(CipherSuite cipherSuite, ByteSpan masterSecret, ByteSpan serverRandom, ByteSpan clientRandom)
+        public static IRecordProtection Create(ObjectPool<SmartBuffer> bufferPool, CipherSuite cipherSuite, ByteSpan masterSecret, ByteSpan serverRandom, ByteSpan clientRandom)
         {
             switch (cipherSuite)
             {
-            case CipherSuite.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:
-                return new Aes128GcmRecordProtection(masterSecret, serverRandom, clientRandom);
+                case CipherSuite.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:
+                    return new Aes128GcmRecordProtection(bufferPool, masterSecret, serverRandom, clientRandom);
 
-            default:
-                return null;
+                default:
+                    return null;
             }
         }
     }
