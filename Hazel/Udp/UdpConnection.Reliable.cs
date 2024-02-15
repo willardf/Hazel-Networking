@@ -70,7 +70,7 @@ namespace Hazel.Udp
         ///     This returns the average ping for a one-way trip as calculated from the reliable packets that have been sent 
         ///     and acknowledged by the endpoint.
         /// </remarks>
-        private float _pingMs = 500;
+        private float _pingMs = 100;
 
         /// <summary>
         ///     The maximum times a message should be resent before marking the endpoint as disconnected.
@@ -89,6 +89,8 @@ namespace Hazel.Udp
         public class Packet : IRecyclable
         {
             public ushort Id;
+
+            private ILogger logger;
             private SmartBuffer Data;
             private readonly UdpConnection Connection;
             private int Length;
@@ -106,9 +108,10 @@ namespace Hazel.Udp
                 this.Connection = connection;
             }
 
-            internal void Set(ushort id, SmartBuffer data, int length, int timeout, Action ackCallback)
+            internal void Set(ushort id, ILogger logger, SmartBuffer data, int length, int timeout, Action ackCallback)
             {
                 this.Id = id;
+                this.logger = logger;
                 this.Data = data;
                 this.Data.AddUsage();
 
@@ -160,6 +163,8 @@ namespace Hazel.Udp
                         this.NextTimeoutMs += (int)Math.Min(this.NextTimeoutMs * connection.ResendPingMultiplier, MaxAdditionalResendDelayMs);
                         try
                         {
+                            this.logger.WriteVerbose($"Resent message id {this.Data[1] >> 8 | this.Data[2]} after {lifetimeMs}ms");
+
                             connection.WriteBytesToConnection(this.Data, this.Length);
                             connection.Statistics.LogMessageResent();
                             return 1;
@@ -227,6 +232,7 @@ namespace Hazel.Udp
             Packet packet = this.PacketPool.GetObject();
             packet.Set(
                 id,
+                this.logger,
                 buffer,
                 length,
                 resendDelayMs,
@@ -274,8 +280,7 @@ namespace Hazel.Udp
         /// <param name="message">The buffer received.</param>
         private void ReliableMessageReceive(MessageReader message, int bytesReceived)
         {
-            ushort id;
-            if (ProcessReliableReceive(message.Buffer, 1, out id))
+            if (ProcessReliableReceive(message.Buffer, 1))
             {
                 InvokeDataReceived(SendOption.Reliable, message, 3, bytesReceived);
             }
@@ -293,13 +298,13 @@ namespace Hazel.Udp
         /// <param name="bytes">The buffer containing the data.</param>
         /// <param name="offset">The offset of the reliable header.</param>
         /// <returns>Whether the packet was a new packet or not.</returns>
-        private bool ProcessReliableReceive(byte[] bytes, int offset, out ushort id)
+        private bool ProcessReliableReceive(byte[] bytes, int offset)
         {
             byte b1 = bytes[offset];
             byte b2 = bytes[offset + 1];
 
             //Get the ID form the packet
-            id = (ushort)((b1 << 8) + b2);
+            ushort id = (ushort)((b1 << 8) + b2);
 
             /*
              * It gets a little complicated here (note the fact I'm actually using a multiline comment for once...)
@@ -424,6 +429,8 @@ namespace Hazel.Udp
                 {
                     this._pingMs = this._pingMs * .7f + rt * .3f;
                 }
+
+                this.logger.WriteVerbose($"Packet {id} RT: {rt}ms  Ping:{this._pingMs} Active: {reliableDataPacketsSent.Count}/{activePingPackets.Count}");
             }
             else if (this.activePingPackets.TryRemove(id, out PingPacket pingPkt))
             {
@@ -436,6 +443,8 @@ namespace Hazel.Udp
                 {
                     this._pingMs = this._pingMs * .7f + rt * .3f;
                 }
+
+                this.logger.WriteVerbose($"Ping {id} RT: {rt}ms  Ping:{this._pingMs} Active: {reliableDataPacketsSent.Count}/{activePingPackets.Count}");
             }
         }
 
