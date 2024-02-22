@@ -41,7 +41,7 @@ namespace Hazel.Udp
             this.Dispose(false);
         }
 
-        public void FixedUpdate()
+        public int FixedUpdate()
         {
             try
             {
@@ -54,12 +54,14 @@ namespace Hazel.Udp
 
             try
             {
-                ManageReliablePackets();
+                return ManageReliablePackets();
             }
             catch (Exception e)
             {
                 this.logger.WriteError("FixedUpdate: " + e);
             }
+
+            return 0;
         }
 
         protected virtual void RestartConnection()

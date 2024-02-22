@@ -8,9 +8,20 @@ namespace Hazel.Udp
 {
     partial class UdpConnection
     {
-        private const int MinResendDelayMs = 50;
-        private const int MaxInitialResendDelayMs = 300;
-        private const int MaxAdditionalResendDelayMs = 1000;
+        /// <summary>
+        /// The minimum delay to resend a packet for the first time. Even if <see cref="AveragePingMs"/> times <see cref="ResendPingMultiplier"/> is less.
+        /// </summary>
+        public int MinResendDelayMs = 50;
+
+        /// <summary>
+        /// The maximum delay to resend a packet for the first time. Even if <see cref="AveragePingMs"/> times <see cref="ResendPingMultiplier"/> is more.
+        /// </summary>
+        public int MaxInitialResendDelayMs = 300;
+
+        /// <summary>
+        /// The maximum delay to resend a packet after the first resend.
+        /// </summary>
+        public int MaxAdditionalResendDelayMs = 1000;
 
         public readonly ObjectPool<Packet> PacketPool;
 
@@ -19,12 +30,12 @@ namespace Hazel.Udp
         /// </summary>
         /// <remarks>
         ///     <para>
-        ///         For reliable delivery data is resent at specified intervals unless an acknowledgement is received from the 
+        ///         Reliable messages are resent at specified intervals unless an acknowledgement is received from the 
         ///         receiving device. The ResendTimeout specifies the interval between the packets being resent, each time a packet
         ///         is resent the interval is increased for that packet until the duration exceeds the <see cref="DisconnectTimeoutMs"/> value.
         ///     </para>
         ///     <para>
-        ///         Setting this to its default of 0 will mean the timeout is 2 times the value of the average ping, usually 
+        ///         Setting this to its default of 0 will mean the timeout is <see cref="ResendPingMultiplier"/> times the value of the average ping, usually 
         ///         resulting in a more dynamic resend that responds to endpoints on slower or faster connections.
         ///     </para>
         /// </remarks>
@@ -95,7 +106,7 @@ namespace Hazel.Udp
             private readonly UdpConnection Connection;
             private int Length;
 
-            public int NextTimeoutMs;
+            private int NextTimeoutMs;
             private volatile bool Acknowledged;
 
             public Action AckCallback;
@@ -126,17 +137,42 @@ namespace Hazel.Udp
             }
 
             // Packets resent
-            public int Resend()
+            public int Resend(bool force = false)
             {
-                var connection = this.Connection;
-                if (!this.Acknowledged && connection != null)
+                if (this.Acknowledged)
                 {
-                    long lifetimeMs = this.Stopwatch.ElapsedMilliseconds;
-                    if (lifetimeMs >= connection.DisconnectTimeoutMs)
+                    return 0;
+                }
+
+                var connection = this.Connection;
+                int lifetimeMs = (int)this.Stopwatch.ElapsedMilliseconds;
+                if (lifetimeMs >= connection.DisconnectTimeoutMs)
+                {
+                    if (connection.reliableDataPacketsSent.TryRemove(this.Id, out Packet self))
+                    {
+                        connection.DisconnectInternal(HazelInternalErrors.ReliablePacketWithoutResponse, $"Reliable packet {self.Id} (size={this.Length}) was not ack'd after {lifetimeMs}ms ({self.Retransmissions} resends)");
+
+                        self.Recycle();
+                    }
+
+                    return 0;
+                }
+
+                if (force || lifetimeMs >= this.NextTimeoutMs)
+                {
+                    // Enforce 10 ms min resend delay
+                    if (this.NextTimeoutMs > lifetimeMs + 10)
+                    {
+                        return 0;
+                    }
+
+                    ++this.Retransmissions;
+                    if (connection.ResendLimit != 0
+                        && this.Retransmissions > connection.ResendLimit)
                     {
                         if (connection.reliableDataPacketsSent.TryRemove(this.Id, out Packet self))
                         {
-                            connection.DisconnectInternal(HazelInternalErrors.ReliablePacketWithoutResponse, $"Reliable packet {self.Id} (size={this.Length}) was not ack'd after {lifetimeMs}ms ({self.Retransmissions} resends)");
+                            connection.DisconnectInternal(HazelInternalErrors.ReliablePacketWithoutResponse, $"Reliable packet {self.Id} (size={this.Length}) was not ack'd after {self.Retransmissions} resends ({lifetimeMs}ms)");
 
                             self.Recycle();
                         }
@@ -144,35 +180,25 @@ namespace Hazel.Udp
                         return 0;
                     }
 
-                    if (lifetimeMs >= this.NextTimeoutMs)
+#if DEBUG
+                    this.logger.WriteVerbose($"Resent message id {this.Data[1] >> 8 | this.Data[2]} after {lifetimeMs}ms {this.NextTimeoutMs - lifetimeMs}ms delta (Forced: {force})");
+#endif
+
+                    if (force)
                     {
-                        ++this.Retransmissions;
-                        if (connection.ResendLimit != 0
-                            && this.Retransmissions > connection.ResendLimit)
-                        {
-                            if (connection.reliableDataPacketsSent.TryRemove(this.Id, out Packet self))
-                            {
-                                connection.DisconnectInternal(HazelInternalErrors.ReliablePacketWithoutResponse, $"Reliable packet {self.Id} (size={this.Length}) was not ack'd after {self.Retransmissions} resends ({lifetimeMs}ms)");
+                        this.NextTimeoutMs = lifetimeMs;
+                    }
 
-                                self.Recycle();
-                            }
-
-                            return 0;
-                        }
-
-                        this.NextTimeoutMs += (int)Math.Min(this.NextTimeoutMs * connection.ResendPingMultiplier, MaxAdditionalResendDelayMs);
-                        try
-                        {
-                            this.logger.WriteVerbose($"Resent message id {this.Data[1] >> 8 | this.Data[2]} after {lifetimeMs}ms");
-
-                            connection.WriteBytesToConnection(this.Data, this.Length);
-                            connection.Statistics.LogMessageResent();
-                            return 1;
-                        }
-                        catch (InvalidOperationException)
-                        {
-                            connection.DisconnectInternal(HazelInternalErrors.ConnectionDisconnected, "Could not resend data as connection is no longer connected");
-                        }
+                    this.NextTimeoutMs = connection.CalculateNextResendDelayMs(this.NextTimeoutMs);
+                    try
+                    {
+                        connection.WriteBytesToConnection(this.Data, this.Length);
+                        connection.Statistics.LogMessageResent();
+                        return 1;
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        connection.DisconnectInternal(HazelInternalErrors.ConnectionDisconnected, "Could not resend data as connection is no longer connected");
                     }
                 }
 
@@ -226,7 +252,7 @@ namespace Hazel.Udp
             int resendDelayMs = this.ResendTimeoutMs;
             if (resendDelayMs <= 0)
             {
-                resendDelayMs = (_pingMs * this.ResendPingMultiplier).ClampToInt(MinResendDelayMs, MaxInitialResendDelayMs);
+                resendDelayMs = (_pingMs * this.ResendPingMultiplier).ClampToInt(this.MinResendDelayMs, this.MaxInitialResendDelayMs);
             }
 
             Packet packet = this.PacketPool.GetObject();
@@ -244,11 +270,9 @@ namespace Hazel.Udp
             }
         }
 
-        public static int ClampToInt(float value, int min, int max)
+        public int CalculateNextResendDelayMs(int lastDelayMs)
         {
-            if (value < min) return min;
-            if (value > max) return max;
-            return (int)value;
+            return lastDelayMs + (int)Math.Min(lastDelayMs * this.ResendPingMultiplier, this.MaxAdditionalResendDelayMs);
         }
 
         /// <summary>
@@ -406,12 +430,24 @@ namespace Hazel.Udp
                     {
                         AcknowledgeMessageId((ushort)(id - i));
                     }
+                    else
+                    {
+                        ForceResendMessageId((ushort)(id - i));
+                    }
 
                     recentPackets >>= 1;
                 }
             }
 
             Statistics.LogAcknowledgementReceive(bytesReceived);
+        }
+
+        private void ForceResendMessageId(ushort id)
+        {
+            if (this.reliableDataPacketsSent.TryGetValue(id, out Packet pkt))
+            {
+                pkt.Resend(force: true);
+            }
         }
 
         private void AcknowledgeMessageId(ushort id)
@@ -430,7 +466,9 @@ namespace Hazel.Udp
                     this._pingMs = this._pingMs * .7f + rt * .3f;
                 }
 
-                this.logger.WriteVerbose($"Packet {id} RT: {rt}ms  Ping:{this._pingMs} Active: {reliableDataPacketsSent.Count}/{activePingPackets.Count}");
+#if DEBUG
+                this.logger.WriteVerbose($"Packet {id} RTT: {rt}ms  Ping:{this._pingMs} Active: {reliableDataPacketsSent.Count}/{activePingPackets.Count}");
+#endif
             }
             else if (this.activePingPackets.TryRemove(id, out PingPacket pingPkt))
             {
@@ -444,7 +482,9 @@ namespace Hazel.Udp
                     this._pingMs = this._pingMs * .7f + rt * .3f;
                 }
 
-                this.logger.WriteVerbose($"Ping {id} RT: {rt}ms  Ping:{this._pingMs} Active: {reliableDataPacketsSent.Count}/{activePingPackets.Count}");
+#if DEBUG
+                this.logger.WriteVerbose($"Ping {id} RTT: {rt}ms  Ping:{this._pingMs} Active: {reliableDataPacketsSent.Count}/{activePingPackets.Count}");
+#endif
             }
         }
 

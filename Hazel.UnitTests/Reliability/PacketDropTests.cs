@@ -2,6 +2,7 @@
 using Hazel.Udp.FewerThreads;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using System.Diagnostics;
 using System.Net;
 using System.Threading;
 
@@ -10,6 +11,7 @@ namespace Hazel.UnitTests.Reliability
     [TestClass]
     public class PacketDropTests
     {
+        // This test fails because even at 10% packet drop and 10ms 
         [TestMethod]
         public void SustainedPacketLossShouldBeFine()
         {
@@ -21,8 +23,17 @@ namespace Hazel.UnitTests.Reliability
             using (SocketCapture capture = new UnreliableSocketCapture(clientEp, serverEp, logger))
             using (ThreadLimitedUdpConnectionListener server = new ThreadLimitedUdpConnectionListener(4, serverEp, logger))
             using (UnityUdpClientConnection client = new UnityUdpClientConnection(logger, clientEp))
-            using (Timer timer = new Timer(_ => client.FixedUpdate(), null, 10, 10))
+            using (Timer timer = new Timer(_ =>
+                {
+                    var up = Stopwatch.StartNew();
+                    var cnt = client.FixedUpdate();
+                    if (cnt != 0)
+                    {
+                        logger.WriteInfo($"Took {up.ElapsedMilliseconds}ms to resend {cnt} pkts");
+                    }
+                }, null, 100, 100))
             { 
+                server.ReliableResendPollRateMs = 10;
                 UdpConnection serverClient = null;
                 server.NewConnection += (evt) => serverClient = (UdpConnection)evt.Connection;
 
