@@ -13,11 +13,11 @@ namespace Hazel
     public sealed class ObjectPool<T> where T : IRecyclable
     {
         private int numberCreated;
-        public int NumberCreated { get { return numberCreated; } }
+        public int NumberCreated => this.numberCreated;
 
-        public int NumberInUse { get { return this.inuse.Count; } }
-        public int NumberNotInUse { get { return this.pool.Count; } }
-        public int Size { get { return this.NumberInUse + this.NumberNotInUse; } }
+        public int NumberInUse => this.inuse.Count;
+        public int NumberNotInUse => this.pool.Count;
+        public int Size => this.NumberInUse + this.NumberNotInUse;
 
 #if HAZEL_BAG
         private readonly ConcurrentBag<T> pool = new ConcurrentBag<T>();
@@ -33,11 +33,11 @@ namespace Hazel
         /// </summary>
         /// <returns></returns>
         private readonly Func<T> objectFactory;
-        
+
         /// <summary>
         ///     Internal constructor for our ObjectPool.
         /// </summary>
-        internal ObjectPool(Func<T> objectFactory)
+        public ObjectPool(Func<T> objectFactory)
         {
             this.objectFactory = objectFactory;
         }
@@ -46,7 +46,7 @@ namespace Hazel
         ///     Returns a pooled object of type T, if none are available another is created.
         /// </summary>
         /// <returns>An instance of T.</returns>
-        internal T GetObject()
+        public T GetObject()
         {
 #if HAZEL_BAG
             if (!pool.TryTake(out T item))
@@ -84,7 +84,7 @@ namespace Hazel
         ///     Returns an object to the pool.
         /// </summary>
         /// <param name="item">The item to return.</param>
-        internal void PutObject(T item)
+        public void PutObject(T item)
         {
             if (inuse.TryRemove(item, out bool b))
             {
