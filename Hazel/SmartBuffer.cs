@@ -82,10 +82,24 @@ namespace Hazel
             Buffer.BlockCopy(bytes, 0, this.buffer, 0, bytes.Length);
         }
 
-        public void CopyFrom(MessageWriter data)
+        public void CopyFrom(MessageWriter data, bool includeHeader = true)
         {
-            this.Length = data.Length;
-            Buffer.BlockCopy(data.Buffer, 0, this.buffer, 0, data.Length);
+            int offset = 0;
+            if (!includeHeader)
+            {
+                switch (data.SendOption)
+                {
+                    case SendOption.None:
+                        offset = 1;
+                        break;
+                    case SendOption.Reliable:
+                        offset = 3;
+                        break;
+                }
+            }
+
+            this.Length = data.Length - offset;
+            Buffer.BlockCopy(data.Buffer, offset, this.buffer, 0, this.Length);
         }
     }
 }
