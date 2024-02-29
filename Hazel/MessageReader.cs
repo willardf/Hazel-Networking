@@ -376,7 +376,7 @@ namespace Hazel
         }
 
 
-        public void ReadBytesAndSize(byte[] destination)
+        public int ReadBytesAndSize(byte[] destination)
         {
             int length = ReadPackedInt32();
             if (BytesRemaining < length)
@@ -384,7 +384,13 @@ namespace Hazel
                 throw new InvalidDataException($"Read length is longer than message length: {length} of {BytesRemaining}");
             }
 
+            if (destination.Length < length)
+            {
+                throw new OverflowException($"Read length is longer than buffer length: {length} > {destination.Length}");
+            }
+
             ReadBytes(length, destination);
+            return length;
         }
 
         public byte[] ReadBytesAndSize()
