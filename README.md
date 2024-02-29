@@ -1,6 +1,6 @@
 #### Hazel Networking is a low-level networking library for C# providing connection-oriented, message based communication via UDP and RUDP.
 
-The aim of this fork is to create a simple interface for ultra-fast connection-based UDP communication for games. JamJar and I generally consider it the primary fork, but we goofed and didn't transfer the repo, so idk maybe someday.
+This was originally a fork of a project started by the Dark Rift Networking developer. I stripped that down with the aim of making a simple interface for ultra-fast connection-based UDP communication for games. After Among Us launched, the agreed to make this the primary fork. If you see mention of the original repo, know that it's just a tad out of date.
 
 -----
 
@@ -25,6 +25,13 @@ There is currently no online documentation. I might get around to it someday. I 
 If you want to make improvements, I am open to pull requests. If you find bugs, feel free raise issues.
 
 -----
+
+## Installing Hazel
+For non unity projects, Hazel can be installed via the NuGet [innersloth.Hazel-Networking](https://www.nuget.org/packages/innersloth.Hazel-Networking) package.
+
+For Unity projects, you'll have to build Hazel first. I recommend just dropping the output DLLs somewhere in the Assets folder.
+
+----
 
 ## Building Hazel
 
