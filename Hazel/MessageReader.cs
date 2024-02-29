@@ -375,6 +375,18 @@ namespace Hazel
             return output;
         }
 
+
+        public void ReadBytesAndSize(byte[] destination)
+        {
+            int length = ReadPackedInt32();
+            if (BytesRemaining < length)
+            {
+                throw new InvalidDataException($"Read length is longer than message length: {length} of {BytesRemaining}");
+            }
+
+            ReadBytes(length, destination);
+        }
+
         public byte[] ReadBytesAndSize()
         {
             int len = this.ReadPackedInt32();
@@ -388,9 +400,16 @@ namespace Hazel
             if (this.BytesRemaining < length) throw new InvalidDataException($"Read length is longer than message length: {length} of {this.BytesRemaining}");
 
             byte[] output = new byte[length];
-            Array.Copy(this.Buffer, this.readHead, output, 0, output.Length);
-            this.Position += output.Length;
+            ReadBytes(length, output);
             return output;
+        }
+
+        public void ReadBytes(int length, byte[] destination)
+        {
+            if (this.BytesRemaining < length) throw new InvalidDataException($"Read length is longer than message length: {length} of {this.BytesRemaining}");
+
+            Array.Copy(this.Buffer, this.readHead, destination, 0, length);
+            this.Position += length;
         }
 
         ///
