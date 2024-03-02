@@ -28,6 +28,11 @@ namespace Hazel.Udp.FewerThreads
 
         private const int SendReceiveBufferSize = 1024 * 1024;
 
+        /// <summary>
+        /// How frequently sent reliable messages are checked for needing resend.
+        /// </summary>
+        public int ReliableResendPollRateMs = 100;
+
         private Socket socket;
         protected ILogger Logger;
 
@@ -154,7 +159,7 @@ namespace Hazel.Udp.FewerThreads
                     sock.ManageReliablePackets();
                 }
 
-                Thread.Sleep(100);
+                Thread.Sleep(this.ReliableResendPollRateMs);
             }
         }
 

@@ -142,6 +142,8 @@ namespace Hazel.UnitTests
             }
         }
 
+        protected virtual bool ShouldSendToRemote() => true;
+
         private void SendToRemoteLoop()
         {
             while (!this.cancellationToken.IsCancellationRequested)
@@ -156,8 +158,15 @@ namespace Hazel.UnitTests
 
                 if (this.forRemote.TryTake(out var packet))
                 {
-                    this.logger.WriteInfo($"Passed 1 packet of {packet.Length} bytes to remote");
-                    this.captureSocket.SendTo(packet.GetUnderlyingArray(), packet.Offset, packet.Length, SocketFlags.None, this.remoteEndPoint);
+                    if (ShouldSendToRemote())
+                    {
+                        // this.logger.WriteInfo($"Passed 1 packet of {packet.Length} bytes to remote");
+                        this.captureSocket.SendTo(packet.GetUnderlyingArray(), packet.Offset, packet.Length, SocketFlags.None, this.remoteEndPoint);
+                    }
+                    else
+                    {
+                        this.logger.WriteInfo($"Dropped 1 packet of {packet.Length} bytes to remote");
+                    }
                 }
             }
         }
@@ -176,7 +185,7 @@ namespace Hazel.UnitTests
 
                 if (this.forLocal.TryTake(out var packet))
                 {
-                    this.logger.WriteInfo($"Passed 1 packet of {packet.Length} bytes to local");
+                    // this.logger.WriteInfo($"Passed 1 packet of {packet.Length} bytes to local");
                     this.captureSocket.SendTo(packet.GetUnderlyingArray(), packet.Offset, packet.Length, SocketFlags.None, this.localEndPoint);
                 }
             }
