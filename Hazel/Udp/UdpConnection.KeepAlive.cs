@@ -129,7 +129,7 @@ namespace Hazel.Udp
             ping.Stopwatch.Restart();
 
             WriteBytesToConnection(buffer, buffer.Length);
-            Statistics.LogReliableSend(0);
+            Statistics.LogPingSend(buffer.Length);
         }
 
         /// <summary>

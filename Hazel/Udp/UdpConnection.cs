@@ -131,7 +131,6 @@ namespace Hazel.Udp
         /// <param name="message">The buffer containing the bytes received.</param>
         protected internal virtual void HandleReceive(MessageReader message, int bytesReceived)
         {
-            ushort id;
             switch (message.Buffer[0])
             {
                 //Handle reliable receives
@@ -147,12 +146,13 @@ namespace Hazel.Udp
 
                 //We need to acknowledge hello and ping messages but dont want to invoke any events!
                 case (byte)UdpSendOption.Ping:
-                    ProcessReliableReceive(message.Buffer, 1, out id);
-                    Statistics.LogHelloReceive(bytesReceived);
+                    ProcessReliableReceive(message.Buffer, 1);
+                    Statistics.LogPingReceive(bytesReceived);
                     message.Recycle();
                     break;
+
                 case (byte)UdpSendOption.Hello:
-                    ProcessReliableReceive(message.Buffer, 1, out id);
+                    ProcessReliableReceive(message.Buffer, 1);
                     Statistics.LogHelloReceive(bytesReceived);
                     message.Recycle();
                     break;
@@ -243,6 +243,7 @@ namespace Hazel.Udp
             }
 
             HandleSend(actualBytes, (byte)UdpSendOption.Hello, acknowledgeCallback);
+            Statistics.LogHelloSend();
         }
                 
         /// <inheritdoc/>
