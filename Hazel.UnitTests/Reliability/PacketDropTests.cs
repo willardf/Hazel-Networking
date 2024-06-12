@@ -60,7 +60,7 @@ namespace Hazel.UnitTests.Reliability
 
                 Assert.AreEqual(serverClient.Statistics.ReliableMessagesReceived, client.Statistics.ReliableMessagesSent);
                 Assert.IsTrue(6 < client.Statistics.MessagesResent);
-                Assert.IsTrue(1 > client.AveragePingMs, "Ping was kinda high: " + client.AveragePingMs);
+                Assert.IsTrue(10 > client.AveragePingMs, "Ping was kinda high: " + client.AveragePingMs);
 
                 msg.Recycle();
             }

@@ -133,11 +133,11 @@ namespace Hazel.UnitTests
             Assert.AreEqual(21, statistics.DataBytesReceived);
             Assert.AreEqual(33, statistics.TotalBytesReceived);
 
-            statistics.LogHelloReceive(7);
+            statistics.LogHelloReceive(7); // <-- NOTE: this also logs as a reliable message 
 
-            Assert.AreEqual(5, statistics.MessagesReceived);
+            Assert.AreEqual(6, statistics.MessagesReceived);
             Assert.AreEqual(1, statistics.UnreliableMessagesReceived);
-            Assert.AreEqual(1, statistics.ReliableMessagesReceived);
+            Assert.AreEqual(2, statistics.ReliableMessagesReceived);
             Assert.AreEqual(1, statistics.FragmentedMessagesReceived);
             Assert.AreEqual(1, statistics.AcknowledgementMessagesReceived);
             Assert.AreEqual(1, statistics.HelloMessagesReceived);

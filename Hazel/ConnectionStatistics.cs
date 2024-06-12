@@ -418,7 +418,7 @@ namespace Hazel
         internal void LogPingSend(int totalLength)
         {
             Interlocked.Increment(ref pingMessagesSent);
-            Interlocked.Add(ref totalBytesSent, totalLength);
+            // Interlocked.Add(ref totalBytesSent, totalLength); // NOTE: bytes sent is already added to for this via LogPacketSend
         }
 
         /// <summary>

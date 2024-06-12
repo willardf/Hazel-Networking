@@ -463,7 +463,7 @@ namespace Hazel.Udp
 
                 lock (PingLock)
                 {
-                    this._pingMs = this._pingMs * .7f + rt * .3f;
+                    this._pingMs = this._pingMs * .9f + rt * .1f;
                 }
 
 #if DEBUG
@@ -479,7 +479,7 @@ namespace Hazel.Udp
 
                 lock (PingLock)
                 {
-                    this._pingMs = this._pingMs * .7f + rt * .3f;
+                    this._pingMs = this._pingMs * .9f + rt * .1f;
                 }
 
 #if DEBUG
