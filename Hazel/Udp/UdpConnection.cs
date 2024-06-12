@@ -19,6 +19,7 @@ namespace Hazel.Udp
 
         public UdpConnection(ILogger logger) : base()
         {
+            logger.WriteInfo("Experimental version: Interlocked.Increment on pingsSinceAck");
             this.bufferPool = new ObjectPool<SmartBuffer>(() => new SmartBuffer(this.bufferPool, 1024));
 
             this.logger = logger;

@@ -61,7 +61,7 @@ namespace Hazel.Udp
         private int keepAliveInterval = 1500;
 
         public int MissingPingsUntilDisconnect { get; set; } = 6;
-        private volatile int pingsSinceAck = 0;
+        private int pingsSinceAck = 0;
 
         /// <summary>
         ///     The timer creating keepalive pulses.
@@ -94,7 +94,7 @@ namespace Hazel.Udp
 
             try
             {
-                this.pingsSinceAck++;
+                Interlocked.Increment(ref this.pingsSinceAck);
                 SendPing();
             }
             catch

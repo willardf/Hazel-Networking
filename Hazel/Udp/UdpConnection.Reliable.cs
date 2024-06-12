@@ -387,7 +387,7 @@ namespace Hazel.Udp
         /// <param name="bytes">The buffer containing the data.</param>
         private void AcknowledgementMessageReceive(byte[] bytes, int bytesReceived)
         {
-            this.pingsSinceAck = 0;
+            Interlocked.Exchange(ref this.pingsSinceAck, 0);
 
             ushort id = (ushort)((bytes[1] << 8) + bytes[2]);
             AcknowledgeMessageId(id);
