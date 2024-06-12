@@ -144,6 +144,11 @@ namespace Hazel.Udp
                     return 0;
                 }
 
+                // TODO: Whenever we resend we aren't resetting the packet lifetime, this means that when this packet does get
+                // acked it is calculating the RT from the moment this packet was created instead of from the moment it
+                // was resent. We should do a nother expirment where we fix the influence these resent packets can have on ping
+                // by properly updating packet with a LastSentTime or something....
+
                 var connection = this.Connection;
                 int lifetimeMs = (int)this.Stopwatch.ElapsedMilliseconds;
                 if (lifetimeMs >= connection.DisconnectTimeoutMs)
@@ -272,6 +277,8 @@ namespace Hazel.Udp
 
         public int CalculateNextResendDelayMs(int lastDelayMs)
         {
+            // TODO: This should maybe just be lastDelayMs * resendPingMultipler and not also adding that to the previous lastDelayMs
+            // This can be experiment 2, where we just remove the + here...should also make a new branch from main
             return lastDelayMs + (int)Math.Min(lastDelayMs * this.ResendPingMultiplier, this.MaxAdditionalResendDelayMs);
         }
 
@@ -470,6 +477,8 @@ namespace Hazel.Udp
                 this.logger.WriteVerbose($"Packet {id} RTT: {rt}ms  Ping:{this._pingMs} Active: {reliableDataPacketsSent.Count}/{activePingPackets.Count}");
 #endif
             }
+            // TODO: So...if we drop a ping packet, we may never actually call remove on it because we don't
+            // ever resend pings...
             else if (this.activePingPackets.TryRemove(id, out PingPacket pingPkt))
             {
                 this.Statistics.LogReliablePacketAcknowledged();

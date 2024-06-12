@@ -249,6 +249,7 @@ namespace Hazel.Udp
         /// <inheritdoc/>
         protected override void Dispose(bool disposing)
         {
+            // TODO: If disposing == false, these don't get cleaned up and there is a case with UDPClientConnection destructor
             if (disposing)
             {
                 DisposeKeepAliveTimer();

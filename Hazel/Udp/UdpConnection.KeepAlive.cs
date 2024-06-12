@@ -85,6 +85,7 @@ namespace Hazel.Udp
         {
             if (this.State != ConnectionState.Connected) return;
 
+            // NOTE/TODO: If we decrease the ping interval we may need to incrase the `MissingPingsUntilDisconnect`
             if (this.pingsSinceAck >= this.MissingPingsUntilDisconnect)
             {
                 this.DisposeKeepAliveTimer();
@@ -94,6 +95,8 @@ namespace Hazel.Udp
 
             try
             {
+                // TODO: This is a race, we should make a new branch off main and change this to Interlocked.increment and Interlocked.exchange for setting to 0
+                // because volatile doesn't protect against concurrency, just against thread collisions...
                 this.pingsSinceAck++;
                 SendPing();
             }
