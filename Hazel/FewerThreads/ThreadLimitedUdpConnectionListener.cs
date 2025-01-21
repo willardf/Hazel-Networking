@@ -376,24 +376,19 @@ namespace Hazel.Udp.FewerThreads
 
             // Flush outgoing packets
             this.sendQueue?.CompleteAdding();
+            this.receiveQueue?.CompleteAdding();
 
             if (wasActive)
             {
                 this.sendThread.Join();
+                this.reliablePacketThread.Join();
+                this.receiveThread.Join();
+                this.processThreads.Join();
             }
 
             try { this.socket.Shutdown(SocketShutdown.Both); } catch { }
             try { this.socket.Close(); } catch { }
             try { this.socket.Dispose(); } catch { }
-
-            this.receiveQueue?.CompleteAdding();
-
-            if (wasActive)
-            {
-                this.reliablePacketThread.Join();
-                this.receiveThread.Join();
-                this.processThreads.Join();
-            }
 
             this.receiveQueue?.Dispose();
             this.receiveQueue = null;

@@ -297,6 +297,9 @@ namespace Hazel.UnitTests
 
                         capture.SendToLocalSemaphore.Release(); // Actually let it send.
                         capture.AssertPacketsToLocalCountEquals(0);
+                        
+                        // Allow time to prevent out of order (probably)
+                        Thread.Sleep(100);
                     }
                 }
 

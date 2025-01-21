@@ -144,41 +144,55 @@ namespace Hazel.UnitTests
 
         private void SendToRemoteLoop()
         {
-            while (!this.cancellationToken.IsCancellationRequested)
+            try
             {
-                if (this.SendToRemoteSemaphore != null)
+                while (!this.cancellationToken.IsCancellationRequested)
                 {
-                    if (!this.SendToRemoteSemaphore.WaitOne(100))
+                    if (this.SendToRemoteSemaphore != null)
                     {
-                        continue;
+                        if (!this.SendToRemoteSemaphore.WaitOne(100))
+                        {
+                            continue;
+                        }
+                    }
+
+                    if (this.forRemote.TryTake(out var packet))
+                    {
+                        this.logger.WriteInfo($"Passed 1 packet of {packet.Length} bytes to remote");
+                        this.captureSocket.SendTo(packet.GetUnderlyingArray(), packet.Offset, packet.Length, SocketFlags.None, this.remoteEndPoint);
                     }
                 }
-
-                if (this.forRemote.TryTake(out var packet))
-                {
-                    this.logger.WriteInfo($"Passed 1 packet of {packet.Length} bytes to remote");
-                    this.captureSocket.SendTo(packet.GetUnderlyingArray(), packet.Offset, packet.Length, SocketFlags.None, this.remoteEndPoint);
-                }
+            }
+            catch
+            {
+                //
             }
         }
 
         private void SendToLocalLoop()
         {
-            while (!this.cancellationToken.IsCancellationRequested)
+            try
             {
-                if (this.SendToLocalSemaphore != null)
+                while (!this.cancellationToken.IsCancellationRequested)
                 {
-                    if (!this.SendToLocalSemaphore.WaitOne(100))
+                    if (this.SendToLocalSemaphore != null)
                     {
-                        continue;
+                        if (!this.SendToLocalSemaphore.WaitOne(100))
+                        {
+                            continue;
+                        }
+                    }
+
+                    if (this.forLocal.TryTake(out var packet))
+                    {
+                        this.logger.WriteInfo($"Passed 1 packet of {packet.Length} bytes to local");
+                        this.captureSocket.SendTo(packet.GetUnderlyingArray(), packet.Offset, packet.Length, SocketFlags.None, this.localEndPoint);
                     }
                 }
-
-                if (this.forLocal.TryTake(out var packet))
-                {
-                    this.logger.WriteInfo($"Passed 1 packet of {packet.Length} bytes to local");
-                    this.captureSocket.SendTo(packet.GetUnderlyingArray(), packet.Offset, packet.Length, SocketFlags.None, this.localEndPoint);
-                }
+            }
+            catch
+            {
+                //
             }
         }
 
