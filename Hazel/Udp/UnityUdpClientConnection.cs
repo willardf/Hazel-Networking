@@ -366,5 +366,22 @@ namespace Hazel.Udp
 
             base.Dispose(disposing);
         }
+
+        protected override void WriteSpanToConnection(Span<byte> bytes)
+        {
+            try
+            {
+                socket.SendTo(bytes, EndPoint);
+            }
+            catch (NullReferenceException) { }
+            catch (ObjectDisposedException)
+            {
+                // Already disposed and disconnected...
+            }
+            catch (SocketException ex)
+            {
+                DisconnectInternal(HazelInternalErrors.SocketExceptionSend, "Could not send data as a SocketException occurred: " + ex.Message);
+            }
+        }
     }
 }

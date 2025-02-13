@@ -16,7 +16,7 @@ namespace Hazel.Udp
         private const int SendReceiveBufferSize = 1024 * 1024;
         private const int BufferSize = ushort.MaxValue;
 
-        private Socket socket;
+        public Socket socket;
         private ILogger Logger;
         private Timer reliablePacketTimer;
 
@@ -273,6 +273,24 @@ namespace Hazel.Udp
                     bytes);
 
                 this.Statistics.AddBytesSent(length);
+            }
+            catch (SocketException e)
+            {
+                this.Logger?.WriteError("Could not send data as a SocketException occurred: " + e);
+            }
+            catch (ObjectDisposedException)
+            {
+                //Keep alive timer probably ran, ignore
+                return;
+            }
+        }
+
+        internal void SendData(Span<byte> bytes, EndPoint endPoint)
+        {
+            try
+            {
+                socket.SendTo(bytes, endPoint);
+                Statistics.AddBytesSent(bytes.Length);
             }
             catch (SocketException e)
             {

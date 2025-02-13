@@ -7,7 +7,7 @@ namespace Hazel
     {
         private readonly ObjectPool<SmartBuffer> parent;
 
-        private byte[] buffer;
+        public byte[] Buffer;
         private int usageCount;
 
         private int length;
@@ -18,9 +18,9 @@ namespace Hazel
             {
                 this.length = value;
 
-                if (value > this.buffer.Length)
+                if (value > this.Buffer.Length)
                 {
-                    this.buffer = new byte[value];
+                    this.Buffer = new byte[value];
                 }
             }
         }
@@ -28,25 +28,25 @@ namespace Hazel
         public SmartBuffer(ObjectPool<SmartBuffer> parent, int size)
         {
             this.parent = parent;
-            this.buffer = new byte[size];
+            this.Buffer = new byte[size];
             this.usageCount = 1;
         }
 
         public byte this[int i]
         {
-            get => this.buffer[i];
-            set => this.buffer[i] = value;
+            get => this.Buffer[i];
+            set => this.Buffer[i] = value;
         }
 
 
         public static explicit operator ByteSpan(SmartBuffer b)
         {
-            return new ByteSpan(b.buffer, 0, b.length);
+            return new ByteSpan(b.Buffer, 0, b.length);
         }
 
         public static explicit operator byte[](SmartBuffer b)
         {
-            return b.buffer;
+            return b.Buffer;
         }
 
         public void AddUsage()
@@ -79,7 +79,7 @@ namespace Hazel
         public void CopyFrom(byte[] bytes)
         {
             this.Length = bytes.Length;
-            Buffer.BlockCopy(bytes, 0, this.buffer, 0, bytes.Length);
+            System.Buffer.BlockCopy(bytes, 0, this.Buffer, 0, bytes.Length);
         }
 
         public void CopyFrom(MessageWriter data, bool includeHeader = true)
@@ -99,7 +99,7 @@ namespace Hazel
             }
 
             this.Length = data.Length - offset;
-            Buffer.BlockCopy(data.Buffer, offset, this.buffer, 0, this.Length);
+            System.Buffer.BlockCopy(data.Buffer, offset, this.Buffer, 0, this.Length);
         }
     }
 }

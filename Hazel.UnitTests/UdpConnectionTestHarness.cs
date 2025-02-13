@@ -59,5 +59,10 @@ namespace Hazel.UnitTests
             var data = MessageReader.Get(buffer);
             this.HandleReceive(data, data.Length);
         }
+
+        protected override void WriteSpanToConnection(Span<byte> bytes)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

@@ -42,6 +42,12 @@ namespace Hazel.Udp
             Listener.SendData(bytes, length, EndPoint);
         }
 
+        protected override void WriteSpanToConnection(Span<byte> bytes)
+        {
+            this.Statistics.LogPacketSend(bytes.Length);
+            Listener.SendData(bytes, EndPoint);
+        }
+
         /// <inheritdoc />
         /// <remarks>
         ///     This will always throw a HazelException.

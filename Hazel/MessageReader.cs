@@ -20,18 +20,18 @@ namespace Hazel
 
         private MessageReader Parent;
 
+        public int ReadHead;
         public int Position
         {
             get { return this._position; }
             set
             {
                 this._position = value;
-                this.readHead = value + Offset;
+                this.ReadHead = value + Offset;
             }
         }
 
         private int _position;
-        private int readHead;
 
         public static MessageReader GetSized(int minSize)
         {
@@ -85,7 +85,7 @@ namespace Hazel
             output.Offset = source.Offset;
 
             output._position = source._position;
-            output.readHead = source.readHead;
+            output.ReadHead = source.ReadHead;
 
             output.Length = source.Length;
             output.Tag = source.Tag;
@@ -125,7 +125,7 @@ namespace Hazel
 
             output.Parent = this;
             output.Buffer = this.Buffer;
-            output.Offset = this.readHead;
+            output.Offset = this.ReadHead;
             output.Position = 0;
 
             output.Length = output.ReadUInt16();
@@ -134,7 +134,7 @@ namespace Hazel
             output.Offset += 3;
             output.Position = 0;
 
-            if (this.BytesRemaining < output.Length + 3) throw new InvalidDataException($"Message Length at Position {this.readHead} is longer than message length: {output.Length + 3} of {this.BytesRemaining}");
+            if (this.BytesRemaining < output.Length + 3) throw new InvalidDataException($"Message Length at Position {this.ReadHead} is longer than message length: {output.Length + 3} of {this.BytesRemaining}");
 
             this.Position += output.Length + 3;
             return output;
@@ -150,11 +150,11 @@ namespace Hazel
             var len = this.ReadUInt16();
             var tag = this.ReadByte();
 
-            if (this.BytesRemaining < len) throw new InvalidDataException($"Message Length at Position {this.readHead} is longer than message length: {len} of {this.BytesRemaining}");
+            if (this.BytesRemaining < len) throw new InvalidDataException($"Message Length at Position {this.ReadHead} is longer than message length: {len} of {this.BytesRemaining}");
 
             var output = MessageReader.GetSized(len);
 
-            Array.Copy(this.Buffer, this.readHead, output.Buffer, 0, len);
+            Array.Copy(this.Buffer, this.ReadHead, output.Buffer, 0, len);
 
             output.Length = len;
             output.Tag = tag;
@@ -166,7 +166,7 @@ namespace Hazel
         public MessageWriter StartWriter()
         {
             var output = new MessageWriter(this.Buffer);
-            output.Position = this.readHead;
+            output.Position = this.ReadHead;
             return output;
         }
 
@@ -239,7 +239,7 @@ namespace Hazel
 
         private void AdjustLength(int offset, int amount)
         {
-            if (this.readHead > offset)
+            if (this.ReadHead > offset)
             {
                 this.Position -= amount;
             }
@@ -350,7 +350,7 @@ namespace Hazel
         public unsafe float ReadSingle()
         {
             float output = 0;
-            fixed (byte* bufPtr = &this.Buffer[this.readHead])
+            fixed (byte* bufPtr = &this.Buffer[this.ReadHead])
             {
                 byte* outPtr = (byte*)&output;
 
@@ -369,7 +369,7 @@ namespace Hazel
             int len = this.ReadPackedInt32();
             if (this.BytesRemaining < len) throw new InvalidDataException($"Read length is longer than message length: {len} of {this.BytesRemaining}");
 
-            string output = UTF8Encoding.UTF8.GetString(this.Buffer, this.readHead, len);
+            string output = UTF8Encoding.UTF8.GetString(this.Buffer, this.ReadHead, len);
 
             this.Position += len;
             return output;
@@ -414,7 +414,7 @@ namespace Hazel
         {
             if (this.BytesRemaining < length) throw new InvalidDataException($"Read length is longer than message length: {length} of {this.BytesRemaining}");
 
-            Array.Copy(this.Buffer, this.readHead, destination, 0, length);
+            Array.Copy(this.Buffer, this.ReadHead, destination, 0, length);
             this.Position += length;
         }
 
@@ -458,7 +458,7 @@ namespace Hazel
         private byte FastByte()
         {
             this._position++;
-            return this.Buffer[this.readHead++];
+            return this.Buffer[this.ReadHead++];
         }
 
         public unsafe static bool IsLittleEndian()

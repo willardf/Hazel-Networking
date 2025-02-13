@@ -342,6 +342,24 @@ namespace Hazel.Udp.FewerThreads
             QueueRawData(response, remoteEndPoint);
         }
 
+        internal void SendDataSingleThread(Span<byte> bytes, EndPoint endPoint)
+        {
+            try
+            {
+                socket.SendTo(bytes, endPoint);
+                Statistics.AddBytesSent(bytes.Length);
+            }
+            catch (SocketException e)
+            {
+                this.Logger?.WriteError("Could not send data as a SocketException occurred: " + e);
+            }
+            catch (ObjectDisposedException)
+            {
+                //Keep alive timer probably ran, ignore
+                return;
+            }
+        }
+
         protected virtual void QueueRawData(SmartBuffer span, IPEndPoint remoteEndPoint)
         {
             span.AddUsage();

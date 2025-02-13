@@ -1,5 +1,7 @@
 using System;
+using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 
 namespace Hazel.Udp
 {
@@ -62,6 +64,7 @@ namespace Hazel.Udp
         /// </summary>
         /// <param name="bytes">The bytes to write.</param>
         protected abstract void WriteBytesToConnection(SmartBuffer bytes, int length);
+        protected abstract void WriteSpanToConnection(Span<byte> bytes);
 
         /// <inheritdoc/>
         public override SendErrors Send(MessageWriter msg)
@@ -100,7 +103,45 @@ namespace Hazel.Udp
 
             return SendErrors.None;
         }
-        
+
+        public SendErrors Send(Span<byte> msg, SendOption sendOption)
+        {
+            if (this._state != ConnectionState.Connected)
+            {
+                return SendErrors.Disconnected;
+            }
+
+            try
+            {
+                switch (sendOption)
+                {
+                    case SendOption.Reliable:
+                        // TODO: for reliable we probably do need to copy to a smartBuffer since they stay in Hazel's mem for resends
+                        //ResetKeepAliveTimer();
+
+                        //using (SmartBuffer buffer = this.bufferPool.GetObject())
+                        //{
+                        //    buffer.CopyFrom(msg);
+                        //    AttachReliableID(buffer, 1, msg.Length);
+                        //    WriteBytesToConnection(buffer, msg.Length);
+                        //    Statistics.LogReliableSend(msg.Length - 3);
+                        //}
+                        break;
+
+                    default:
+                        WriteSpanToConnection(msg);
+                        break;
+                }
+            }
+            catch (Exception e)
+            {
+                this.logger?.WriteError("Unknown exception while sending: " + e);
+                return SendErrors.Unknown;
+            }
+
+            return SendErrors.None;
+        }
+
         /// <summary>
         ///     Handles the reliable/fragmented sending from this connection.
         /// </summary>

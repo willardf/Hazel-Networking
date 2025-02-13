@@ -52,6 +52,12 @@ namespace Hazel.Udp.FewerThreads
             Listener.SendDataRaw(bytes, EndPoint);
         }
 
+        protected override void WriteSpanToConnection(Span<byte> bytes)
+        {
+            this.Statistics.LogPacketSend(bytes.Length);
+            Listener.SendDataSingleThread(bytes, EndPoint);
+        }
+
         /// <inheritdoc />
         /// <remarks>
         ///     This will always throw a HazelException.
