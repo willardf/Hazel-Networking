@@ -244,20 +244,26 @@ namespace Hazel
                 this.Position -= amount;
             }
 
-            if (Parent != null)
+            this.Length -= amount;
+
+            if (Parent == null)
             {
-                var lengthOffset = this.Offset - 3;
-                var curLen = this.Buffer[lengthOffset]
-                    | (this.Buffer[lengthOffset + 1] << 8);
-
-                curLen -= amount;
-                this.Length -= amount;
-
-                this.Buffer[lengthOffset] = (byte)curLen;
-                this.Buffer[lengthOffset + 1] = (byte)(this.Buffer[lengthOffset + 1] >> 8);
-
-                Parent.AdjustLength(offset, amount);
+                // If there's no parent reference, we're at the top-most message
+                // and this is not a normal Message, as it either contains no data, or it contains
+                // a network reliability header
+                return;
             }
+
+            var lengthOffset = this.Offset - 3;
+            var curLen = this.Buffer[lengthOffset]
+                | (this.Buffer[lengthOffset + 1] << 8);
+
+            curLen -= amount;
+
+            this.Buffer[lengthOffset] = (byte)curLen;
+            this.Buffer[lengthOffset + 1] = (byte)(this.Buffer[lengthOffset + 1] >> 8);
+
+            Parent.AdjustLength(offset, amount);
         }
 
         public void Recycle()
