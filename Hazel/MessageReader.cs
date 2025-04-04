@@ -41,10 +41,6 @@ namespace Hazel
             {
                 output.Buffer = new byte[minSize];
             }
-            else
-            {
-                Array.Clear(output.Buffer, 0, output.Buffer.Length);
-            }
 
             output.Offset = 0;
             output.Position = 0;
