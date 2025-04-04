@@ -375,6 +375,18 @@ namespace Hazel
             return output;
         }
 
+        public void ReadBytesAndSize(SmartBuffer buffer)
+        {
+            int num = ReadPackedInt32();
+            if (BytesRemaining < num)
+            {
+                throw new InvalidDataException($"Read length is longer than message length: {num} of {BytesRemaining}");
+            }
+
+            buffer.Length = num;
+            Array.Copy(Buffer, readHead, (byte[])buffer, 0, num);
+            Position += num;
+        }
 
         public int ReadBytesAndSize(byte[] destination)
         {
