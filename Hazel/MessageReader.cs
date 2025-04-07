@@ -31,7 +31,7 @@ namespace Hazel
         }
 
         private int _position;
-        private int readHead;
+        public int readHead;
 
         public static MessageReader GetSized(int minSize)
         {

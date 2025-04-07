@@ -63,10 +63,10 @@ namespace Hazel
 
         ///
         /// <param name="sendOption">The option specifying how the message should be sent.</param>
-        public static MessageWriter Get(SendOption sendOption = SendOption.None)
+        public static MessageWriter Get(SendOption sendOption = SendOption.None, bool clearArray = true)
         {
             var output = WriterPool.GetObject();
-            output.Clear(sendOption);
+            output.Clear(sendOption, clearArray);
 
             return output;
         }
@@ -113,9 +113,10 @@ namespace Hazel
             this.messageStarts.Clear();
         }
 
-        public void Clear(SendOption sendOption)
+        public void Clear(SendOption sendOption, bool clearArray = true)
         {
-            ClearMessageStarts();
+            if (clearArray) { Array.Clear(this.Buffer, 0, this.Buffer.Length); }
+            this.messageStarts.Clear();
             this.SendOption = sendOption;
             this.Buffer[0] = (byte)sendOption;
             switch (sendOption)
