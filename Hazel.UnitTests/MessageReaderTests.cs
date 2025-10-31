@@ -145,11 +145,16 @@ namespace Hazel.UnitTests
             Assert.AreEqual(Test5, five.ReadByte());
         }
         
-        
-
         [TestMethod]
-        public void SomeTestToBeNamed4()
+        public void RemoveMessagePreservesLengthForSmallMessageLengths()
         {
+            // Context: When called RemoveMessage, the parent message's header length
+            // will be updated accordingly. This test came from discovering a bug where
+            // that header length was not updating properly, leading to a remote client
+            // misreading the length when multiple messages are packed together and
+            // leading to derailed deserialization
+            // This test handles the case for small messages where the overall size
+            // remains lower than 256 bytes
             MessageWriter msg = MessageWriter.Get(SendOption.Reliable);
             // top level msg
             msg.StartMessage(5);
@@ -172,7 +177,7 @@ namespace Hazel.UnitTests
             msg.EndMessage(); // end two
 
             msg.EndMessage(); // top lvl msg end
-            // No more top lvl msgs
+            // No more top lvl msgs (per loop below only running once)
 
             MessageReader parentReader = MessageReader.Get(msg.Buffer);
             parentReader.Offset = 3;    // B/c reliable
@@ -197,7 +202,6 @@ namespace Hazel.UnitTests
             // If this test works, this loop will only roll once
             while (reader.Position < reader.Length)
             {
-                Console.WriteLine($"A");
                 MessageReader topMsg = reader.ReadMessage();
                 Assert.AreEqual(12344, topMsg.ReadInt32());
                 MessageReader zeroMsg = topMsg.ReadMessage();
@@ -208,8 +212,15 @@ namespace Hazel.UnitTests
         }
 
         [TestMethod]
-        public void SomeTestToBeNamed5()
+        public void RemoveMessagePreservesLengthForLongMessageLengths()
         {
+            // Context: When called RemoveMessage, the parent message's header length
+            // will be updated accordingly. This test came from discovering a bug where
+            // that header length was not updating properly, leading to a remote client
+            // misreading the length when multiple messages are packed together and
+            // leading to derailed deserialization
+            // This test handles the case for large messages where the overall size
+            // remains greater or equal to 256 bytes
             MessageWriter msg = MessageWriter.Get(SendOption.Reliable);
             // top level msg
             msg.StartMessage(5);
@@ -232,7 +243,7 @@ namespace Hazel.UnitTests
             msg.EndMessage(); // end two
 
             msg.EndMessage(); // top lvl msg end
-            // No more top lvl msgs
+            // No more top lvl msgs (per loop below only running once)
 
             MessageReader parentReader = MessageReader.Get(msg.Buffer);
             parentReader.Offset = 3;    // B/c reliable
@@ -257,7 +268,6 @@ namespace Hazel.UnitTests
             // If this test works, this loop will only roll once
             while (reader.Position < reader.Length)
             {
-                Console.WriteLine($"A");
                 MessageReader topMsg = reader.ReadMessage();
                 Assert.AreEqual(12344, topMsg.ReadInt32());
                 MessageReader zeroMsg = topMsg.ReadMessage();
