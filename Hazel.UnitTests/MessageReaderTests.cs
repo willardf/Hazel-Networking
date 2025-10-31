@@ -91,7 +91,7 @@ namespace Hazel.UnitTests
         }
 
         [TestMethod]
-        public void RemoveMessageWorks()
+        public void RemoveMessageWorksForCustomMessages()
         {
             const byte Test0 = 11;
             const byte Test3 = 33;
@@ -268,7 +268,141 @@ namespace Hazel.UnitTests
         }
 
         [TestMethod]
-        public void InsertMessageWorks()
+        public void RemoveMessageWorksForReliableMessages()
+        {
+            const int Test3 = 33;
+            const uint Test4 = 44;
+            const byte Test5 = 55;
+            const uint Test6 = 66;
+            const uint Test7 = 77;
+
+            // Test using a reliable message
+            // This adds a sendoption header that does not fix the same header format
+            // created by StartMessage()
+            MessageWriter msg = MessageWriter.Get(SendOption.Reliable);
+
+            // Sub message 1
+            msg.StartMessage(5);
+            msg.Write(Test3);
+
+            // Sub sub message 2
+            msg.StartMessage(2);
+            msg.WritePacked(Test4);
+            msg.Write(Test5);
+            msg.WritePacked(Test6);
+
+            msg.EndMessage(); // End sub sub message 2
+            msg.EndMessage(); // End sub message 1
+
+            // Sub message 3
+            msg.StartMessage(9);
+            msg.Write(Test7);
+            msg.EndMessage(); // End sub message 3
+
+            // Convert to a message reader in the same way DataReceivedEventArgs
+            // is constructed (see: UdpConnection.InvokeDataReceived())
+            MessageReader parentReader = MessageReader.Get(msg.Buffer);
+            parentReader.Offset = 3;    // B/c reliable
+            parentReader.Length = 20;
+            parentReader.Position = 0;
+
+            // The total length is 23, but the above offsetting sets the parent reader to consider its
+            // length to be its contents, header not included
+            Assert.AreEqual(20, parentReader.BytesRemaining);
+
+            MessageReader subMessage1 = parentReader.ReadMessage();
+
+            Assert.AreEqual(7, parentReader.BytesRemaining);
+
+            _ = subMessage1.ReadInt32();
+            MessageReader subSubMessage2 = subMessage1.ReadMessage();
+            _ = subSubMessage2.ReadPackedUInt32();
+            _ = subSubMessage2.ReadByte();
+            _ = subSubMessage2.ReadPackedUInt32();
+            Assert.AreEqual(7, parentReader.BytesRemaining);
+            Assert.AreEqual(0, subMessage1.BytesRemaining);
+            Assert.AreEqual(0, subSubMessage2.BytesRemaining);
+            subMessage1.RemoveMessage(subSubMessage2);
+
+            // After removal, the parent should look the same
+            Assert.AreEqual(7, parentReader.BytesRemaining);
+            Assert.AreEqual(0, subMessage1.BytesRemaining);
+
+            // After removal, we can still continue reading messages
+            MessageReader subMessage3 = parentReader.ReadMessage();
+            uint subMessage3Value = subMessage3.ReadUInt32();
+
+            Assert.AreEqual(Test7, subMessage3Value);
+        }
+
+        [TestMethod]
+        public void RemoveMessageWorksForUnReliableMessages()
+        {
+            const int Test3 = 33;
+            const uint Test4 = 44;
+            const byte Test5 = 55;
+            const uint Test6 = 66;
+            const uint Test7 = 77;
+
+            // Test using an unreliable message
+            // This adds a sendoption header that does not fix the same header format
+            // created by StartMessage()
+            MessageWriter msg = MessageWriter.Get(SendOption.None);
+
+            // Sub message 1
+            msg.StartMessage(5);
+            msg.Write(Test3);
+
+            // Sub sub message 2
+            msg.StartMessage(2);
+            msg.WritePacked(Test4);
+            msg.Write(Test5);
+            msg.WritePacked(Test6);
+
+            msg.EndMessage(); // End sub sub message 2
+            msg.EndMessage(); // End sub message 1
+
+            // Sub message 3
+            msg.StartMessage(9);
+            msg.Write(Test7);
+            msg.EndMessage(); // End sub message 3
+
+            MessageReader parentReader = MessageReader.Get(msg.Buffer);
+            parentReader.Offset = 1;    // B/c unreliable
+            parentReader.Length = 20;
+            parentReader.Position = 0;
+
+            // The total length is 21, but the above offsetting sets the parent reader to consider its
+            // length to be its contents, header not included
+            Assert.AreEqual(20, parentReader.BytesRemaining);
+
+            MessageReader subMessage1 = parentReader.ReadMessage();
+
+            Assert.AreEqual(7, parentReader.BytesRemaining);
+
+            _ = subMessage1.ReadInt32();
+            MessageReader subSubMessage2 = subMessage1.ReadMessage();
+            _ = subSubMessage2.ReadPackedUInt32();
+            _ = subSubMessage2.ReadByte();
+            _ = subSubMessage2.ReadPackedUInt32();
+            Assert.AreEqual(7, parentReader.BytesRemaining);
+            Assert.AreEqual(0, subMessage1.BytesRemaining);
+            Assert.AreEqual(0, subSubMessage2.BytesRemaining);
+            subMessage1.RemoveMessage(subSubMessage2);
+
+            // After removal, the parent should look the same
+            Assert.AreEqual(7, parentReader.BytesRemaining);
+            Assert.AreEqual(0, subMessage1.BytesRemaining);
+
+            // After removal, we can still continue reading messages
+            MessageReader subMessage3 = parentReader.ReadMessage();
+            uint subMessage3Value = subMessage3.ReadUInt32();
+
+            Assert.AreEqual(Test7, subMessage3Value);
+        }
+
+        [TestMethod]
+        public void InsertMessageWorksCustomMessages()
         {
             const byte Test0 = 11;
             const byte Test3 = 33;
@@ -329,6 +463,192 @@ namespace Hazel.UnitTests
 
             var five = reader.ReadMessage();
             Assert.AreEqual(Test5, five.ReadByte());
+        }
+
+        [TestMethod]
+        public void InsertMessageWorksForReliableMessages()
+        {
+            const int Test3 = 33;
+            const uint Test4 = 44;
+            const byte Test5 = 55;
+            const uint Test6 = 66;
+            const uint Test7 = 77;
+            const uint Test8 = 88;
+
+            // Test using a reliable message
+            // This adds a sendoption header that does not fix the same header format
+            // created by StartMessage()
+            MessageWriter msg = MessageWriter.Get(SendOption.Reliable);
+
+            // Sub message 1
+            msg.StartMessage(5);
+            msg.Write(Test3);
+
+            // Sub sub message 2
+            msg.StartMessage(2);
+            msg.WritePacked(Test4);
+            msg.Write(Test5);
+            msg.WritePacked(Test6);
+
+            msg.EndMessage(); // End sub sub message 2
+            msg.EndMessage(); // End sub message 1
+
+            // Sub message 3
+            msg.StartMessage(9);
+            msg.Write(Test7);
+            msg.EndMessage(); // End sub message 3
+
+            // Convert to a message reader in the same way DataReceivedEventArgs
+            // is constructed (see: UdpConnection.InvokeDataReceived())
+            MessageReader parentReader = MessageReader.Get(msg.Buffer);
+            parentReader.Offset = 3;    // B/c reliable
+            parentReader.Length = 20;
+            parentReader.Position = 0;
+
+            // The total length is 23, but the above offsetting sets the parent reader to consider its
+            // length to be its contents, header not included
+            Assert.AreEqual(20, parentReader.BytesRemaining);
+
+            MessageReader subMessage1 = parentReader.ReadMessage();
+
+            Assert.AreEqual(7, parentReader.BytesRemaining);
+
+            _ = subMessage1.ReadInt32();
+            var subSubMessage2 = subMessage1.ReadMessage();
+            _ = subSubMessage2.ReadPackedUInt32();
+            _ = subSubMessage2.ReadByte();
+            _ = subSubMessage2.ReadPackedUInt32();
+            Assert.AreEqual(7, parentReader.BytesRemaining);
+            Assert.AreEqual(0, subMessage1.BytesRemaining);
+            Assert.AreEqual(0, subSubMessage2.BytesRemaining);
+
+            // Insert an internal message, which shouldn't affect the parent's read
+            MessageWriter writer = MessageWriter.Get(SendOption.Reliable);
+            writer.StartMessage(11);
+            writer.Write(Test8);
+            writer.EndMessage();
+
+            // Inserts writer before subSubMessage2
+            subMessage1.InsertMessage(subSubMessage2, writer);
+
+            // After insert, the parent should look the same
+            Assert.AreEqual(7, parentReader.BytesRemaining);
+            Assert.AreEqual(0, subMessage1.BytesRemaining);
+
+            // After insert, we can still continue reading messages
+            MessageReader subMessage3 = parentReader.ReadMessage();
+            uint subMessage3Value = subMessage3.ReadUInt32();
+
+            Assert.AreEqual(Test7, subMessage3Value);
+
+            // We can now re-read from the start and read the inserted message
+            parentReader.Position = 0;
+            MessageReader subMessage1Again = parentReader.ReadMessage();
+
+            _ = subMessage1Again.ReadInt32();
+            MessageReader insertedMessage = subMessage1Again.ReadMessage();
+            uint insertedMessageValue = insertedMessage.ReadUInt32();
+
+            Assert.AreEqual(Test8, insertedMessageValue);
+
+            // After insert, we can still continue reading messages
+            MessageReader subMessage3Again = parentReader.ReadMessage();
+            uint subMessage3ValueAgain = subMessage3Again.ReadUInt32();
+
+            Assert.AreEqual(Test7, subMessage3ValueAgain);
+        }
+
+        [TestMethod]
+        public void InsertMessageWorksForUnReliableMessages()
+        {
+            const int Test3 = 33;
+            const uint Test4 = 44;
+            const byte Test5 = 55;
+            const uint Test6 = 66;
+            const uint Test7 = 77;
+            const uint Test8 = 88;
+
+            // Test using an unreliable message
+            // This adds a sendoption header that does not fix the same header format
+            // created by StartMessage()
+            MessageWriter msg = MessageWriter.Get(SendOption.None);
+
+            // Sub message 1
+            msg.StartMessage(5);
+            msg.Write(Test3);
+
+            // Sub sub message 2
+            msg.StartMessage(2);
+            msg.WritePacked(Test4);
+            msg.Write(Test5);
+            msg.WritePacked(Test6);
+
+            msg.EndMessage(); // End sub sub message 2
+            msg.EndMessage(); // End sub message 1
+
+            // Sub message 3
+            msg.StartMessage(9);
+            msg.Write(Test7);
+            msg.EndMessage(); // End sub message 3
+
+            // Convert to a message reader in the same way DataReceivedEventArgs
+            // is constructed (see: UdpConnection.InvokeDataReceived())
+            MessageReader parentReader = MessageReader.Get(msg.Buffer);
+            parentReader.Offset = 1;    // B/c unreliable
+            parentReader.Length = 20;
+            parentReader.Position = 0;
+
+            // The total length is 21, but the above offsetting sets the parent reader to consider its
+            // length to be its contents, header not included
+            Assert.AreEqual(20, parentReader.BytesRemaining);
+
+            MessageReader subMessage1 = parentReader.ReadMessage();
+
+            Assert.AreEqual(7, parentReader.BytesRemaining);
+
+            _ = subMessage1.ReadInt32();
+            var subSubMessage2 = subMessage1.ReadMessage();
+            _ = subSubMessage2.ReadPackedUInt32();
+            _ = subSubMessage2.ReadByte();
+            _ = subSubMessage2.ReadPackedUInt32();
+            Assert.AreEqual(7, parentReader.BytesRemaining);
+            Assert.AreEqual(0, subMessage1.BytesRemaining);
+            Assert.AreEqual(0, subSubMessage2.BytesRemaining);
+
+            // Insert an internal message, which shouldn't affect the parent's read
+            MessageWriter writer = MessageWriter.Get(SendOption.Reliable);
+            writer.StartMessage(11);
+            writer.Write(Test8);
+            writer.EndMessage();
+
+            // Inserts writer before subSubMessage2
+            subMessage1.InsertMessage(subSubMessage2, writer);
+
+            // After insert, the parent should look the same
+            Assert.AreEqual(7, parentReader.BytesRemaining);
+            Assert.AreEqual(0, subMessage1.BytesRemaining);
+
+            // After insert, we can still continue reading messages
+            MessageReader subMessage3 = parentReader.ReadMessage();
+            uint subMessage3Value = subMessage3.ReadUInt32();
+
+            Assert.AreEqual(Test7, subMessage3Value);
+
+            // We can now re-read from the start and read the inserted message
+            parentReader.Position = 0;
+            MessageReader subMessage1Again = parentReader.ReadMessage();
+
+            _ = subMessage1Again.ReadInt32();
+            MessageReader insertedMessage = subMessage1Again.ReadMessage();
+            uint insertedMessageValue = insertedMessage.ReadUInt32();
+
+            Assert.AreEqual(Test8, insertedMessageValue);
+
+            // After insert, we can still continue reading messages
+            MessageReader subMessage3Again = parentReader.ReadMessage();
+            uint subMessage3ValueAgain = subMessage3Again.ReadUInt32();
+
+            Assert.AreEqual(Test7, subMessage3ValueAgain);
         }
 
         [TestMethod]
