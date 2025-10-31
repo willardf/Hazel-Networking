@@ -144,6 +144,128 @@ namespace Hazel.UnitTests
             var five = reader.ReadMessage();
             Assert.AreEqual(Test5, five.ReadByte());
         }
+        
+        
+
+        [TestMethod]
+        public void SomeTestToBeNamed4()
+        {
+            MessageWriter msg = MessageWriter.Get(SendOption.Reliable);
+            // top level msg
+            msg.StartMessage(5);
+            int someValue = 12344;
+            msg.Write(someValue);
+
+            // zero
+            msg.StartMessage(1);
+            msg.Write("wasd");
+            msg.EndMessage(); // end zero
+
+            // one
+            msg.StartMessage(3);
+            msg.Write("wasd");
+            msg.EndMessage(); // end one
+
+            // two
+            msg.StartMessage(5);
+            msg.Write("wasd");
+            msg.EndMessage(); // end two
+
+            msg.EndMessage(); // top lvl msg end
+            // No more top lvl msgs
+
+            MessageReader parentReader = MessageReader.Get(msg.Buffer);
+            parentReader.Offset = 3;    // B/c reliable
+            parentReader.Length = msg.Length - 3;
+            parentReader.Position = 0;
+
+            MessageReader subMsg = parentReader.ReadMessage();
+            _ = subMsg.ReadInt32();
+            MessageReader zero = subMsg.ReadMessage();
+            _ = zero.ReadString();
+            MessageReader one = subMsg.ReadMessage();
+            subMsg.RemoveMessage(one);
+
+            MessageWriter mockBroadcast = MessageWriter.Get(SendOption.Reliable);
+            mockBroadcast.CopyFrom(parentReader);
+
+            MessageReader reader = MessageReader.Get(msg.Buffer);
+            reader.Offset = 3;    // B/c reliable
+            reader.Length = mockBroadcast.Length - 3;
+            reader.Position = 0;
+
+            // If this test works, this loop will only roll once
+            while (reader.Position < reader.Length)
+            {
+                Console.WriteLine($"A");
+                MessageReader topMsg = reader.ReadMessage();
+                Assert.AreEqual(12344, topMsg.ReadInt32());
+                MessageReader zeroMsg = topMsg.ReadMessage();
+                Assert.AreEqual("wasd", zeroMsg.ReadString());
+                MessageReader twoMsg = topMsg.ReadMessage();
+                Assert.AreEqual("wasd", twoMsg.ReadString());
+            }
+        }
+
+        [TestMethod]
+        public void SomeTestToBeNamed5()
+        {
+            MessageWriter msg = MessageWriter.Get(SendOption.Reliable);
+            // top level msg
+            msg.StartMessage(5);
+            int someValue = 12344;
+            msg.Write(someValue);
+
+            // zero
+            msg.StartMessage(1);
+            msg.Write("VERYSUPERLONGMESSAGEWOIJWOIFJWOIJFWOFEIJEOWIFJOIEJFOIWEJFOIEWJFOIWEJFOIJWEFOIJWEIOFJEOWIJFOIEWJFOIEWJWEFWEFIJOIJOIWJEFOIJWEOIJF");
+            msg.EndMessage(); // end zero
+
+            // one
+            msg.StartMessage(3);
+            msg.Write("VERYSUPERLONGMESSAGEWOIJWOIFJWOIJFWOFEIJEOWIFJOIEJFOIWEJFOIEWJFOIWEJFOIJWEFOIJWEIOFJEOWIJFOIEWJFOIEWJWEFWEFIJOIJOIWJEFOIJWEOIJF");
+            msg.EndMessage(); // end one
+
+            // two
+            msg.StartMessage(5);
+            msg.Write("VERYSUPERLONGMESSAGEWOIJWOIFJWOIJFWOFEIJEOWIFJOIEJFOIWEJFOIEWJFOIWEJFOIJWEFOIJWEIOFJEOWIJFOIEWJFOIEWJWEFWEFIJOIJOIWJEFOIJWEOIJF");
+            msg.EndMessage(); // end two
+
+            msg.EndMessage(); // top lvl msg end
+            // No more top lvl msgs
+
+            MessageReader parentReader = MessageReader.Get(msg.Buffer);
+            parentReader.Offset = 3;    // B/c reliable
+            parentReader.Length = msg.Length - 3;
+            parentReader.Position = 0;
+
+            MessageReader subMsg = parentReader.ReadMessage();
+            _ = subMsg.ReadInt32();
+            MessageReader zero = subMsg.ReadMessage();
+            _ = zero.ReadString();
+            MessageReader one = subMsg.ReadMessage();
+            subMsg.RemoveMessage(one);
+
+            MessageWriter mockBroadcast = MessageWriter.Get(SendOption.Reliable);
+            mockBroadcast.CopyFrom(parentReader);
+
+            MessageReader reader = MessageReader.Get(msg.Buffer);
+            reader.Offset = 3;    // B/c reliable
+            reader.Length = mockBroadcast.Length - 3;
+            reader.Position = 0;
+
+            // If this test works, this loop will only roll once
+            while (reader.Position < reader.Length)
+            {
+                Console.WriteLine($"A");
+                MessageReader topMsg = reader.ReadMessage();
+                Assert.AreEqual(12344, topMsg.ReadInt32());
+                MessageReader zeroMsg = topMsg.ReadMessage();
+                Assert.AreEqual("VERYSUPERLONGMESSAGEWOIJWOIFJWOIJFWOFEIJEOWIFJOIEJFOIWEJFOIEWJFOIWEJFOIJWEFOIJWEIOFJEOWIJFOIEWJFOIEWJWEFWEFIJOIJOIWJEFOIJWEOIJF", zeroMsg.ReadString());
+                MessageReader twoMsg = topMsg.ReadMessage();
+                Assert.AreEqual("VERYSUPERLONGMESSAGEWOIJWOIFJWOIJFWOFEIJEOWIFJOIEJFOIWEJFOIEWJFOIWEJFOIJWEFOIJWEIOFJEOWIJFOIEWJFOIEWJWEFWEFIJOIJOIWJEFOIJWEOIJF", twoMsg.ReadString());
+            }
+        }
 
         [TestMethod]
         public void InsertMessageWorks()
