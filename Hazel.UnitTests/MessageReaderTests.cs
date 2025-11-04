@@ -144,6 +144,138 @@ namespace Hazel.UnitTests
             var five = reader.ReadMessage();
             Assert.AreEqual(Test5, five.ReadByte());
         }
+        
+        [TestMethod]
+        public void RemoveMessagePreservesLengthForSmallMessageLengths()
+        {
+            // Context: When called RemoveMessage, the parent message's header length
+            // will be updated accordingly. This test came from discovering a bug where
+            // that header length was not updating properly, leading to a remote client
+            // misreading the length when multiple messages are packed together and
+            // leading to derailed deserialization
+            // This test handles the case for small messages where the overall size
+            // remains lower than 256 bytes
+            MessageWriter msg = MessageWriter.Get(SendOption.Reliable);
+            // top level msg
+            msg.StartMessage(5);
+            int someValue = 12344;
+            msg.Write(someValue);
+
+            // zero
+            msg.StartMessage(1);
+            msg.Write("wasd");
+            msg.EndMessage(); // end zero
+
+            // one
+            msg.StartMessage(3);
+            msg.Write("wasd");
+            msg.EndMessage(); // end one
+
+            // two
+            msg.StartMessage(5);
+            msg.Write("wasd");
+            msg.EndMessage(); // end two
+
+            msg.EndMessage(); // top lvl msg end
+            // No more top lvl msgs (per loop below only running once)
+
+            MessageReader parentReader = MessageReader.Get(msg.Buffer);
+            parentReader.Offset = 3;    // B/c reliable
+            parentReader.Length = msg.Length - 3;
+            parentReader.Position = 0;
+
+            MessageReader subMsg = parentReader.ReadMessage();
+            _ = subMsg.ReadInt32();
+            MessageReader zero = subMsg.ReadMessage();
+            _ = zero.ReadString();
+            MessageReader one = subMsg.ReadMessage();
+            subMsg.RemoveMessage(one);
+
+            MessageWriter mockBroadcast = MessageWriter.Get(SendOption.Reliable);
+            mockBroadcast.CopyFrom(parentReader);
+
+            MessageReader reader = MessageReader.Get(msg.Buffer);
+            reader.Offset = 3;    // B/c reliable
+            reader.Length = mockBroadcast.Length - 3;
+            reader.Position = 0;
+
+            // If this test works, this loop will only roll once
+            while (reader.Position < reader.Length)
+            {
+                MessageReader topMsg = reader.ReadMessage();
+                Assert.AreEqual(12344, topMsg.ReadInt32());
+                MessageReader zeroMsg = topMsg.ReadMessage();
+                Assert.AreEqual("wasd", zeroMsg.ReadString());
+                MessageReader twoMsg = topMsg.ReadMessage();
+                Assert.AreEqual("wasd", twoMsg.ReadString());
+            }
+        }
+
+        [TestMethod]
+        public void RemoveMessagePreservesLengthForLongMessageLengths()
+        {
+            // Context: When called RemoveMessage, the parent message's header length
+            // will be updated accordingly. This test came from discovering a bug where
+            // that header length was not updating properly, leading to a remote client
+            // misreading the length when multiple messages are packed together and
+            // leading to derailed deserialization
+            // This test handles the case for large messages where the overall size
+            // remains greater or equal to 256 bytes
+            MessageWriter msg = MessageWriter.Get(SendOption.Reliable);
+            // top level msg
+            msg.StartMessage(5);
+            int someValue = 12344;
+            msg.Write(someValue);
+
+            // zero
+            msg.StartMessage(1);
+            msg.Write("VERYSUPERLONGMESSAGEWOIJWOIFJWOIJFWOFEIJEOWIFJOIEJFOIWEJFOIEWJFOIWEJFOIJWEFOIJWEIOFJEOWIJFOIEWJFOIEWJWEFWEFIJOIJOIWJEFOIJWEOIJF");
+            msg.EndMessage(); // end zero
+
+            // one
+            msg.StartMessage(3);
+            msg.Write("VERYSUPERLONGMESSAGEWOIJWOIFJWOIJFWOFEIJEOWIFJOIEJFOIWEJFOIEWJFOIWEJFOIJWEFOIJWEIOFJEOWIJFOIEWJFOIEWJWEFWEFIJOIJOIWJEFOIJWEOIJF");
+            msg.EndMessage(); // end one
+
+            // two
+            msg.StartMessage(5);
+            msg.Write("VERYSUPERLONGMESSAGEWOIJWOIFJWOIJFWOFEIJEOWIFJOIEJFOIWEJFOIEWJFOIWEJFOIJWEFOIJWEIOFJEOWIJFOIEWJFOIEWJWEFWEFIJOIJOIWJEFOIJWEOIJF");
+            msg.EndMessage(); // end two
+
+            msg.EndMessage(); // top lvl msg end
+            // No more top lvl msgs (per loop below only running once)
+
+            MessageReader parentReader = MessageReader.Get(msg.Buffer);
+            parentReader.Offset = 3;    // B/c reliable
+            parentReader.Length = msg.Length - 3;
+            parentReader.Position = 0;
+
+            MessageReader subMsg = parentReader.ReadMessage();
+            _ = subMsg.ReadInt32();
+            MessageReader zero = subMsg.ReadMessage();
+            _ = zero.ReadString();
+            MessageReader one = subMsg.ReadMessage();
+            subMsg.RemoveMessage(one);
+
+            MessageWriter mockBroadcast = MessageWriter.Get(SendOption.Reliable);
+            mockBroadcast.CopyFrom(parentReader);
+
+            MessageReader reader = MessageReader.Get(msg.Buffer);
+            reader.Offset = 3;    // B/c reliable
+            reader.Length = mockBroadcast.Length - 3;
+            reader.Position = 0;
+
+            // If this test works, this loop will only roll once
+            while (reader.Position < reader.Length)
+            {
+                MessageReader topMsg = reader.ReadMessage();
+                Assert.AreEqual(12344, topMsg.ReadInt32());
+                MessageReader zeroMsg = topMsg.ReadMessage();
+                Assert.AreEqual("VERYSUPERLONGMESSAGEWOIJWOIFJWOIJFWOFEIJEOWIFJOIEJFOIWEJFOIEWJFOIWEJFOIJWEFOIJWEIOFJEOWIJFOIEWJFOIEWJWEFWEFIJOIJOIWJEFOIJWEOIJF", zeroMsg.ReadString());
+                MessageReader twoMsg = topMsg.ReadMessage();
+                Assert.AreEqual("VERYSUPERLONGMESSAGEWOIJWOIFJWOIJFWOFEIJEOWIFJOIEJFOIWEJFOIEWJFOIWEJFOIJWEFOIJWEIOFJEOWIJFOIEWJFOIEWJWEFWEFIJOIJOIWJEFOIJWEOIJF", twoMsg.ReadString());
+            }
+        }
 
         [TestMethod]
         public void RemoveMessageWorksForReliableMessages()
