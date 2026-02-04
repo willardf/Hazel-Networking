@@ -352,13 +352,13 @@ namespace Hazel.Dtls
         }
 
         /// <inheritdoc />
-        protected override void WriteBytesToConnection(SmartBuffer bytes, int length)
+        protected override void WriteBytesToConnection(SmartBuffer bytes, int length, Action<System.Net.Sockets.SocketException> onError = null)
         {
             using SmartBuffer wireData = this.WriteBytesToConnectionInternal(bytes, length);
             
             if (wireData.Length > 0)
             {
-                base.WriteBytesToConnection(wireData, wireData.Length);
+                base.WriteBytesToConnection(wireData, wireData.Length, onError);
             }
         }
 

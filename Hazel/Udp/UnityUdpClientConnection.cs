@@ -26,13 +26,13 @@ namespace Hazel.Udp
 
         private Socket socket;
 
-        public UnityUdpClientConnection(ILogger logger, IPEndPoint remoteEndPoint, IPMode ipMode = IPMode.IPv4)
-            : base(logger)
+        public UnityUdpClientConnection(ILogger logger, IPEndPoint remoteEndPoint, IPMode ipMode = IPMode.IPv4, bool enableFragmentation = false)
+            : base(logger, enableFragmentation)
         {
             this.EndPoint = remoteEndPoint;
             this.IPMode = ipMode;
 
-            this.socket = CreateSocket(ipMode);
+            this.socket = CreateSocket(ipMode, enableFragmentation);
             this.socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ExclusiveAddressUse, true);
         }
         
@@ -62,6 +62,15 @@ namespace Hazel.Udp
             }
         }
 
+        protected override void ApplyDontFragment(bool dontFragment)
+        {
+            try
+            {
+                socket.DontFragment = dontFragment;
+            }
+            catch { }
+        }
+
         protected virtual void RestartConnection()
         {
         }
@@ -71,25 +80,39 @@ namespace Hazel.Udp
         }
 
         /// <inheritdoc />
-        protected override void WriteBytesToConnection(SmartBuffer bytes, int length)
+        protected override void WriteBytesToConnection(SmartBuffer bytes, int length, Action<SocketException> onError = null)
         {
 #if DEBUG
             if (TestLagMs > 0)
             {
-                ThreadPool.QueueUserWorkItem(a => { Thread.Sleep(this.TestLagMs); WriteBytesToConnectionReal(bytes, length); });
+                ThreadPool.QueueUserWorkItem(a => { Thread.Sleep(this.TestLagMs); WriteBytesToConnectionReal(bytes, length, onError); });
             }
             else
 #endif
             {
-                WriteBytesToConnectionReal(bytes, length);
+                WriteBytesToConnectionReal(bytes, length, onError);
             }
         }
 
-        private void WriteBytesToConnectionReal(SmartBuffer bytes, int length)
+        private sealed class SendContext
         {
+            public SmartBuffer Buffer;
+            public Action<SocketException> OnError;
+
+            public SendContext(SmartBuffer buffer, Action<SocketException> onError)
+            {
+                Buffer = buffer;
+                OnError = onError;
+            }
+        }
+
+        private void WriteBytesToConnectionReal(SmartBuffer bytes, int length, Action<SocketException> onError)
+        {
+            bool addedUsage = false;
             try
             {
                 bytes.AddUsage();
+                addedUsage = true;
                 this.Statistics.LogPacketSend(length);
                 socket.BeginSendTo(
                     (byte[])bytes,
@@ -98,20 +121,27 @@ namespace Hazel.Udp
                     SocketFlags.None,
                     EndPoint,
                     HandleSendTo,
-                    bytes);
+                    new SendContext(bytes, onError));
             }
             catch (NullReferenceException)
             {
-                bytes.Recycle();
+                if (addedUsage) bytes.Recycle();
             }
             catch (ObjectDisposedException)
             {
                 // Already disposed and disconnected...
-                bytes.Recycle();
+                if (addedUsage) bytes.Recycle();
             }
             catch (SocketException ex)
             {
-                bytes.Recycle();
+                if (addedUsage) bytes.Recycle();
+
+                if (onError != null)
+                {
+                    onError(ex);
+                    return;
+                }
+
                 DisconnectInternal(HazelInternalErrors.SocketExceptionSend, "Could not send data as a SocketException occurred: " + ex.Message);
             }
         }
@@ -149,6 +179,7 @@ namespace Hazel.Udp
 
         private void HandleSendTo(IAsyncResult result)
         {
+            var ctx = (SendContext)result.AsyncState;
             try
             {
                 socket.EndSendTo(result);
@@ -160,11 +191,18 @@ namespace Hazel.Udp
             }
             catch (SocketException ex)
             {
-                DisconnectInternal(HazelInternalErrors.SocketExceptionSend, "Could not send data as a SocketException occurred: " + ex.Message);
+                if (ctx.OnError != null)
+                {
+                    ctx.OnError(ex);
+                }
+                else
+                {
+                    DisconnectInternal(HazelInternalErrors.SocketExceptionSend, "Could not send data as a SocketException occurred: " + ex.Message);
+                }
             }
             finally
             {
-                ((SmartBuffer)result.AsyncState).Recycle();
+                ctx.Buffer.Recycle();
             }
         }
 
@@ -224,6 +262,7 @@ namespace Hazel.Udp
             {
                 this.InitializeKeepAliveTimer();
                 this.State = ConnectionState.Connected;
+                this.StartMtuDiscovery();
             });
         }
 

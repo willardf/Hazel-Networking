@@ -20,6 +20,11 @@ namespace Hazel.Udp
         private ILogger Logger;
         private Timer reliablePacketTimer;
 
+        /// <summary>
+        /// Whether application-level fragmentation and MTU discovery are enabled for connections created by this listener.
+        /// </summary>
+        public bool FragmentationEnabled { get; }
+
         private ConcurrentDictionary<EndPoint, UdpServerConnection> allConnections = new ConcurrentDictionary<EndPoint, UdpServerConnection>();
 
         public override double AveragePing => this.allConnections.Values.Sum(c => c.AveragePingMs) / this.allConnections.Count;
@@ -31,13 +36,15 @@ namespace Hazel.Udp
         ///     Creates a new UdpConnectionListener for the given <see cref="IPAddress"/>, port and <see cref="IPMode"/>.
         /// </summary>
         /// <param name="endPoint">The endpoint to listen on.</param>
-        public UdpConnectionListener(IPEndPoint endPoint, IPMode ipMode = IPMode.IPv4, ILogger logger = null)
+        public UdpConnectionListener(IPEndPoint endPoint, IPMode ipMode = IPMode.IPv4, ILogger logger = null, bool enableFragmentation = false)
         {
             this.Logger = logger;
             this.EndPoint = endPoint;
             this.IPMode = ipMode;
 
-            this.socket = UdpConnection.CreateSocket(this.IPMode);
+            this.FragmentationEnabled = enableFragmentation;
+
+            this.socket = UdpConnection.CreateSocket(this.IPMode, enableFragmentation);
             
             socket.ReceiveBufferSize = SendReceiveBufferSize;
             socket.SendBufferSize = SendReceiveBufferSize;
@@ -208,7 +215,7 @@ namespace Hazel.Udp
                         }
 
                         aware = false;
-                        connection = new UdpServerConnection(this, (IPEndPoint)remoteEndPoint, this.IPMode, this.Logger);
+                        connection = new UdpServerConnection(this, (IPEndPoint)remoteEndPoint, this.IPMode, this.Logger, this.FragmentationEnabled);
                         if (!this.allConnections.TryAdd(remoteEndPoint, connection))
                         {
                             throw new HazelException("Failed to add a connection. This should never happen.");
@@ -222,6 +229,19 @@ namespace Hazel.Udp
             // subsequent messages can happen before the NewConnection event sets up OnDataRecieved handlers
             if (!aware)
             {
+                // Negotiate capabilities using the hello version byte.
+                // Layout: [SendOption(1)][ReliableId(2)][HelloVersion(1)]...
+                if (bytesReceived >= 4)
+                {
+                    connection.SetRemoteHelloVersion(message.Buffer[3]);
+                }
+
+                // Send our hello version back so the client can negotiate too.
+                if (this.FragmentationEnabled)
+                {
+                    connection.SendHelloResponse();
+                }
+
                 // Skip header and hello byte;
                 message.Offset = 4;
                 message.Length = bytesReceived - 4;
@@ -243,7 +263,7 @@ namespace Hazel.Udp
         /// </summary>
         /// <param name="bytes">The bytes to send.</param>
         /// <param name="endPoint">The endpoint to send to.</param>
-        internal void SendData(SmartBuffer bytes, int length, EndPoint endPoint)
+        internal void SendData(SmartBuffer bytes, int length, EndPoint endPoint, Action<SocketException> onError = null)
         {
             if (length > bytes.Length)
             {
@@ -260,9 +280,11 @@ namespace Hazel.Udp
             }
 #endif
 
+            bool addedUsage = false;
             try
             {
                 bytes.AddUsage();
+                addedUsage = true;
                 socket.BeginSendTo(
                     (byte[])bytes,
                     0,
@@ -270,31 +292,64 @@ namespace Hazel.Udp
                     SocketFlags.None,
                     endPoint,
                     SendCallback,
-                    bytes);
+                    new SendContext(bytes, onError));
 
                 this.Statistics.AddBytesSent(length);
             }
             catch (SocketException e)
             {
-                this.Logger?.WriteError("Could not send data as a SocketException occurred: " + e);
+                if (addedUsage)
+                {
+                    bytes.Recycle();
+                }
+
+                if (onError != null)
+                {
+                    onError(e);
+                }
+                else
+                {
+                    this.Logger?.WriteError("Could not send data as a SocketException occurred: " + e);
+                }
             }
             catch (ObjectDisposedException)
             {
                 //Keep alive timer probably ran, ignore
+                if (addedUsage)
+                {
+                    bytes.Recycle();
+                }
                 return;
+            }
+        }
+
+        private sealed class SendContext
+        {
+            public SmartBuffer Buffer;
+            public Action<SocketException> OnError;
+
+            public SendContext(SmartBuffer buffer, Action<SocketException> onError)
+            {
+                Buffer = buffer;
+                OnError = onError;
             }
         }
 
         private void SendCallback(IAsyncResult result)
         {
+            var ctx = (SendContext)result.AsyncState;
             try
             {
                 socket.EndSendTo(result);
             }
+            catch (SocketException ex)
+            {
+                ctx.OnError?.Invoke(ex);
+            }
             catch { }
             finally
             {
-                ((SmartBuffer)result.AsyncState).Recycle();
+                ctx.Buffer.Recycle();
             }
         }
 

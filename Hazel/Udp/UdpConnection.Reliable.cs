@@ -211,7 +211,7 @@ namespace Hazel.Udp
         /// <param name="buffer">The buffer to attach to.</param>
         /// <param name="offset">The offset to attach at.</param>
         /// <param name="ackCallback">The callback to make once the packet has been acknowledged.</param>
-        protected void AttachReliableID(SmartBuffer buffer, int offset, int length, Action ackCallback = null)
+        protected ushort AttachReliableID(SmartBuffer buffer, int offset, int length, Action ackCallback = null)
         {
             ushort id = (ushort)Interlocked.Increment(ref lastIDAllocated);
 
@@ -236,6 +236,8 @@ namespace Hazel.Udp
             {
                 throw new Exception("That shouldn't be possible");
             }
+
+            return id;
         }
 
         public static int ClampToInt(float value, int min, int max)
@@ -436,6 +438,18 @@ namespace Hazel.Udp
                 {
                     this._pingMs = this._pingMs * .7f + rt * .3f;
                 }
+            }
+        }
+
+        /// <summary>
+        ///     Removes a reliably-sent packet without treating it as acknowledged.
+        ///     Used when a send fails (e.g. MTU discovery).
+        /// </summary>
+        private void CancelReliableMessageId(ushort id)
+        {
+            if (reliableDataPacketsSent.TryRemove(id, out Packet packet))
+            {
+                packet.Recycle();
             }
         }
 

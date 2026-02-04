@@ -17,6 +17,7 @@ namespace Hazel.Udp.FewerThreads
         {
             public SmartBuffer Span;
             public IPEndPoint Recipient;
+            public Action<SocketException> OnError;
         }
 
         private struct ReceiveMessageInfo
@@ -30,6 +31,11 @@ namespace Hazel.Udp.FewerThreads
 
         private Socket socket;
         protected ILogger Logger;
+
+        /// <summary>
+        /// Whether application-level fragmentation and MTU discovery are enabled for connections created by this listener.
+        /// </summary>
+        public bool FragmentationEnabled { get; }
 
         private Thread reliablePacketThread;
         private Thread receiveThread;
@@ -105,15 +111,17 @@ namespace Hazel.Udp.FewerThreads
 
         private bool isActive;
 
-        public ThreadLimitedUdpConnectionListener(int numWorkers, IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4)
+        public ThreadLimitedUdpConnectionListener(int numWorkers, IPEndPoint endPoint, ILogger logger, IPMode ipMode = IPMode.IPv4, bool enableFragmentation = false)
         {
             this.Logger = logger;
             this.EndPoint = endPoint;
             this.IPMode = ipMode;
 
+            this.FragmentationEnabled = enableFragmentation;
+
             this.receiveQueue = new BlockingCollection<ReceiveMessageInfo>(10000);
 
-            this.socket = UdpConnection.CreateSocket(this.IPMode);
+            this.socket = UdpConnection.CreateSocket(this.IPMode, enableFragmentation);
             this.socket.ExclusiveAddressUse = true;
             this.socket.Blocking = false;
 
@@ -258,6 +266,16 @@ namespace Hazel.Udp.FewerThreads
                         break;
                     }
                 }
+                catch (SocketException ex)
+                {
+                    msg.OnError?.Invoke(ex);
+                    if (msg.OnError == null)
+                    {
+                        this.Logger.WriteError("Error in loop while sending: " + ex.Message);
+                    }
+
+                    Thread.Sleep(1);
+                }
                 catch (Exception e)
                 {
                     this.Logger.WriteError("Error in loop while sending: " + e.Message);
@@ -305,7 +323,7 @@ namespace Hazel.Udp.FewerThreads
                         }
 
                         aware = false;
-                        connection = new ThreadLimitedUdpServerConnection(this, connectionId, remoteEndPoint, this.IPMode, this.Logger);
+                        connection = new ThreadLimitedUdpServerConnection(this, connectionId, remoteEndPoint, this.IPMode, this.Logger, this.FragmentationEnabled);
                         if (!this.allConnections.TryAdd(connectionId, connection))
                         {
                             throw new HazelException("Failed to add a connection. This should never happen.");
@@ -319,6 +337,19 @@ namespace Hazel.Udp.FewerThreads
             // subsequent messages can happen before the NewConnection event sets up OnDataRecieved handlers
             if (!aware)
             {
+                // Negotiate capabilities using the hello version byte.
+                // Layout: [SendOption(1)][ReliableId(2)][HelloVersion(1)]...
+                if (bytesReceived >= 4)
+                {
+                    connection.SetRemoteHelloVersion(message.Buffer[3]);
+                }
+
+                // Send our hello version back so the client can negotiate too.
+                if (this.FragmentationEnabled)
+                {
+                    connection.SendHelloResponse();
+                }
+
                 // Skip header and hello byte;
                 message.Offset = 4;
                 message.Length = bytesReceived - 4;
@@ -337,15 +368,15 @@ namespace Hazel.Udp.FewerThreads
             connection.HandleReceive(message, bytesReceived);
         }
 
-        internal void SendDataRaw(SmartBuffer response, IPEndPoint remoteEndPoint)
+        internal void SendDataRaw(SmartBuffer response, IPEndPoint remoteEndPoint, Action<SocketException> onError = null)
         {
-            QueueRawData(response, remoteEndPoint);
+            QueueRawData(response, remoteEndPoint, onError);
         }
 
-        protected virtual void QueueRawData(SmartBuffer span, IPEndPoint remoteEndPoint)
+        protected virtual void QueueRawData(SmartBuffer span, IPEndPoint remoteEndPoint, Action<SocketException> onError)
         {
             span.AddUsage();
-            this.sendQueue.TryAdd(new SendMessageInfo() { Span = span, Recipient = remoteEndPoint });
+            this.sendQueue.TryAdd(new SendMessageInfo() { Span = span, Recipient = remoteEndPoint, OnError = onError });
         }
 
         /// <summary>

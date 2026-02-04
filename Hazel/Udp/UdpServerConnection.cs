@@ -24,8 +24,8 @@ namespace Hazel.Udp
         /// <param name="listener">The listener that created this connection.</param>
         /// <param name="endPoint">The endpoint that we are connected to.</param>
         /// <param name="IPMode">The IPMode we are connected using.</param>
-        internal UdpServerConnection(UdpConnectionListener listener, IPEndPoint endPoint, IPMode IPMode, ILogger logger)
-            : base(logger)
+        internal UdpServerConnection(UdpConnectionListener listener, IPEndPoint endPoint, IPMode IPMode, ILogger logger, bool enableFragmentation)
+            : base(logger, enableFragmentation)
         {
             this.Listener = listener;
             this.EndPoint = endPoint;
@@ -35,11 +35,13 @@ namespace Hazel.Udp
             this.InitializeKeepAliveTimer();
         }
 
+        protected override bool UseMtuDiscovery => false;
+
         /// <inheritdoc />
-        protected override void WriteBytesToConnection(SmartBuffer bytes, int length)
+        protected override void WriteBytesToConnection(SmartBuffer bytes, int length, Action<System.Net.Sockets.SocketException> onError = null)
         {
             this.Statistics.LogPacketSend(length);
-            Listener.SendData(bytes, length, EndPoint);
+            Listener.SendData(bytes, length, EndPoint, onError);
         }
 
         /// <inheritdoc />

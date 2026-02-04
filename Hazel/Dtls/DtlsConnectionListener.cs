@@ -8,6 +8,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using Hazel.Udp.FewerThreads;
 using Hazel.Crypto;
+using System.Net.Sockets;
 
 namespace Hazel.Dtls
 {
@@ -543,9 +544,6 @@ namespace Hazel.Dtls
                     continue;
                 }
 
-                ByteSpan packet;
-                ByteSpan writer;
-
 #if DEBUG
                 this.Logger.WriteVerbose($"Received handshake {handshake.MessageType} ({peer.NextEpoch.State})");
 #endif
@@ -800,7 +798,7 @@ namespace Hazel.Dtls
             // Current epoch can now handle application data
             peer.CanHandleApplicationData = true;
 
-            base.QueueRawData(buffer, peerAddress);
+            base.QueueRawData(buffer, peerAddress, null);
         }
 
         /// <summary>
@@ -1031,7 +1029,7 @@ namespace Hazel.Dtls
                 ref initialRecord
             );
 
-            base.QueueRawData(initialBuffer, peerAddress);
+            base.QueueRawData(initialBuffer, peerAddress, null);
 
             // Record record payload for verification
             if (recordMessagesForVerifyData)
@@ -1096,7 +1094,7 @@ namespace Hazel.Dtls
                     ref additionalRecord
                 );
 
-                base.QueueRawData(certBuffer, peerAddress);
+                base.QueueRawData(certBuffer, peerAddress, null);
             }
 
             // Describe final record of the flight
@@ -1158,7 +1156,7 @@ namespace Hazel.Dtls
                 ref finalRecord
             );
 
-            base.QueueRawData(finalBuffer, peerAddress);
+            base.QueueRawData(finalBuffer, peerAddress, null);
 
             return true;
         }
@@ -1299,13 +1297,13 @@ namespace Hazel.Dtls
                 ref record
             );
 
-            base.QueueRawData(buffer, peerAddress);
+            base.QueueRawData(buffer, peerAddress, null);
         }
 
         /// <summary>
         /// Handle a requrest to send a datagram to the network
         /// </summary>
-        protected override void QueueRawData(SmartBuffer span, IPEndPoint remoteEndPoint)
+        protected override void QueueRawData(SmartBuffer span, IPEndPoint remoteEndPoint, Action<SocketException> onError)
         {
             if (!this.existingPeers.TryGetValue(remoteEndPoint, out PeerData peer))
             {
@@ -1353,7 +1351,7 @@ namespace Hazel.Dtls
                         ref outgoingRecord
                     );
 
-                    base.QueueRawData(buffer, remoteEndPoint);
+                    base.QueueRawData(buffer, remoteEndPoint, onError);
                 }
 
                 {
@@ -1381,7 +1379,7 @@ namespace Hazel.Dtls
                         ref outgoingRecord
                     );
 
-                    base.QueueRawData(buffer, remoteEndPoint);
+                    base.QueueRawData(buffer, remoteEndPoint, null);
                 }
             }
         }
