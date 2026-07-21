@@ -76,6 +76,8 @@ namespace Hazel.Dtls
 
             public ByteSpan ClientVerification;
             public ByteSpan ServerVerification;
+            public ByteSpan ServerCertificate;
+            public ByteSpan ServerKeyExchange;
 
         }
 
@@ -99,6 +101,7 @@ namespace Hazel.Dtls
             public readonly ProtocolVersion ProtocolVersion;
 
             public DateTime StartOfNegotiation;
+            public int ApplicationDataProcessingCount;
 
             public PeerData(ConnectionId connectionId, ulong nextExpectedSequenceNumber, ProtocolVersion protocolVersion)
             {
@@ -136,6 +139,8 @@ namespace Hazel.Dtls
                 this.NextEpoch.VerificationStream = new Sha256Stream();
                 this.NextEpoch.ClientVerification = block.Slice(Random.Size * 2, Finished.Size);
                 this.NextEpoch.ServerVerification = block.Slice(Random.Size * 2 + Finished.Size, Finished.Size);
+                this.NextEpoch.ServerCertificate = ByteSpan.Empty;
+                this.NextEpoch.ServerKeyExchange = ByteSpan.Empty;
 
                 this.ConnectionId = connectionId;
 
@@ -166,6 +171,7 @@ namespace Hazel.Dtls
         // Private key component of certificate's public key
         private ByteSpan encodedCertificate;
         private RSA certificatePrivateKey;
+        private readonly ReaderWriterLockSlim certificateLock = new ReaderWriterLockSlim();
 
         // HMAC key to validate ClientHello cookie
         private ThreadedHmacHelper hmacHelper;
@@ -250,10 +256,21 @@ namespace Hazel.Dtls
                 throw new ArgumentException("Certificate must be signed by an RSA key", nameof(certificate));
             }
 
-            this.certificatePrivateKey?.Dispose();
-            this.certificatePrivateKey = privateKey;
+            ByteSpan encodedCertificate = Certificate.Encode(certificate);
+            RSA previousPrivateKey;
+            this.certificateLock.EnterWriteLock();
+            try
+            {
+                previousPrivateKey = this.certificatePrivateKey;
+                this.certificatePrivateKey = privateKey;
+                this.encodedCertificate = encodedCertificate;
+            }
+            finally
+            {
+                this.certificateLock.ExitWriteLock();
+            }
 
-            this.encodedCertificate = Certificate.Encode(certificate);
+            previousPrivateKey?.Dispose();
         }
 
         /// <summary>
@@ -294,9 +311,19 @@ namespace Hazel.Dtls
             }
 
             ConnectionId peerConnectionId;
+            bool processApplicationData = false;
 
             lock (peer)
             {
+                // The peer may have been removed while this packet was waiting
+                // for its lock. Do not process state that has already been
+                // disposed or replaced by a new peer at the same endpoint.
+                if (!this.existingPeers.TryGetValue(peerAddress, out PeerData currentPeer)
+                    || !ReferenceEquals(peer, currentPeer))
+                {
+                    return;
+                }
+
                 peerConnectionId = peer.ConnectionId;
 
                 // Each incoming packet may contain multiple DTLS
@@ -461,6 +488,8 @@ namespace Hazel.Dtls
                             peer.NextEpoch.State = HandshakeState.ExpectingHello;
                             peer.NextEpoch.Handshake?.Dispose();
                             peer.NextEpoch.Handshake = null;
+                            peer.NextEpoch.ServerCertificate = ByteSpan.Empty;
+                            peer.NextEpoch.ServerKeyExchange = ByteSpan.Empty;
                             peer.NextEpoch.NextOutgoingSequence = 1;
                             peer.NextEpoch.RecordProtection = null;
                             peer.NextEpoch.VerificationStream.Reset();
@@ -485,17 +514,36 @@ namespace Hazel.Dtls
                             reader.Length = recordPayload.Length;
                             recordPayload.CopyTo(reader.Buffer);
 
-                            peer.ApplicationData.Add(reader);
-                            break;
+                        peer.ApplicationData.Add(reader);
+                        break;
                     }
+                }
+
+                if (!peer.ApplicationData.IsEmpty)
+                {
+                    ++peer.ApplicationDataProcessingCount;
+                    processApplicationData = true;
                 }
             }
 
             // The peer lock must be exited before leaving the DtlsConnectionListener context to prevent deadlocks
             //   because ApplicationData processing may reenter this context
-            while (peer.ApplicationData.TryTake(out var appMsg))
+            if (processApplicationData)
             {
-                base.ReadCallback(appMsg, peerAddress, peerConnectionId);
+                try
+                {
+                    while (peer.ApplicationData.TryTake(out var appMsg))
+                    {
+                        base.ReadCallback(appMsg, peerAddress, peerConnectionId);
+                    }
+                }
+                finally
+                {
+                    lock (peer)
+                    {
+                        --peer.ApplicationDataProcessingCount;
+                    }
+                }
             }
         }
 
@@ -708,7 +756,6 @@ namespace Hazel.Dtls
                             // Either way, there is not a feasible
                             // way to progress the connection.
                             MarkConnectionAsStale(peer.ConnectionId);
-                            this.existingPeers.TryRemove(peerAddress, out _);
 
                             return false;
                         }
@@ -918,6 +965,8 @@ namespace Hazel.Dtls
                 peer.NextEpoch.State = HandshakeState.ExpectingClientKeyExchange;
                 peer.NextEpoch.SelectedCipherSuite = selectedCipherSuite;
                 peer.NextEpoch.Handshake = handshakeCipherSuite;
+                peer.NextEpoch.ServerCertificate = ByteSpan.Empty;
+                peer.NextEpoch.ServerKeyExchange = ByteSpan.Empty;
                 clientHello.Random.CopyTo(peer.NextEpoch.ClientRandom);
                 peer.NextEpoch.ServerRandom.FillWithRandom(this.random);
                 recordMessagesForVerifyData = true;
@@ -962,11 +1011,21 @@ namespace Hazel.Dtls
             // ServerKeyExchange and the ServerHelloDone
             // messages.
 
-            // Describe first record of the flight
-            ServerHello serverHello = new ServerHello();
-            serverHello.ServerProtocolVersion = protocolVersion;
-            serverHello.Random = peer.NextEpoch.ServerRandom;
-            serverHello.CipherSuite = selectedCipherSuite;
+            bool certificateLockTaken = false;
+            if (peer.NextEpoch.ServerKeyExchange.Length == 0)
+            {
+                this.certificateLock.EnterReadLock();
+                certificateLockTaken = true;
+                peer.NextEpoch.ServerCertificate = this.encodedCertificate;
+            }
+
+            try
+            {
+                // Describe first record of the flight
+                ServerHello serverHello = new ServerHello();
+                serverHello.ServerProtocolVersion = protocolVersion;
+                serverHello.Random = peer.NextEpoch.ServerRandom;
+                serverHello.CipherSuite = selectedCipherSuite;
 
             Handshake serverHelloHandshake = new Handshake();
             serverHelloHandshake.MessageType = HandshakeType.ServerHello;
@@ -983,7 +1042,7 @@ namespace Hazel.Dtls
             //  * ServerHello payload
             //  * Certificate header
 
-            var certificateData = this.encodedCertificate;
+            var certificateData = peer.NextEpoch.ServerCertificate;
             int initialCertPadding = Record.Size + Handshake.Size + serverHello.Size + Handshake.Size;
             int certInitialFragmentSize = Math.Min(certificateData.Length, maxCertFragmentSize - initialCertPadding);
 
@@ -1052,7 +1111,7 @@ namespace Hazel.Dtls
                 certWriter = certWriter.Slice(Handshake.Size);
 
                 peer.NextEpoch.VerificationStream.AddData(certPacket);
-                peer.NextEpoch.VerificationStream.AddData(this.encodedCertificate);
+                peer.NextEpoch.VerificationStream.AddData(peer.NextEpoch.ServerCertificate);
             }
 
             // Process additional certificate records
@@ -1099,10 +1158,16 @@ namespace Hazel.Dtls
                 base.QueueRawData(certBuffer, peerAddress);
             }
 
-            // Describe final record of the flight
-            Handshake serverKeyExchangeHandshake = new Handshake();
+                // Describe final record of the flight
+                if (peer.NextEpoch.ServerKeyExchange.Length == 0)
+                {
+                    peer.NextEpoch.ServerKeyExchange = new byte[peer.NextEpoch.Handshake.CalculateServerMessageSize(this.certificatePrivateKey)];
+                    peer.NextEpoch.Handshake.EncodeServerKeyExchangeMessage(peer.NextEpoch.ServerKeyExchange, this.certificatePrivateKey);
+                }
+
+                Handshake serverKeyExchangeHandshake = new Handshake();
             serverKeyExchangeHandshake.MessageType = HandshakeType.ServerKeyExchange;
-            serverKeyExchangeHandshake.Length = (uint)peer.NextEpoch.Handshake.CalculateServerMessageSize(this.certificatePrivateKey);
+            serverKeyExchangeHandshake.Length = (uint)peer.NextEpoch.ServerKeyExchange.Length;
             serverKeyExchangeHandshake.MessageSequence = 3;
             serverKeyExchangeHandshake.FragmentOffset = 0;
             serverKeyExchangeHandshake.FragmentLength = serverKeyExchangeHandshake.Length;
@@ -1136,7 +1201,7 @@ namespace Hazel.Dtls
             writer = writer.Slice(Record.Size);
             serverKeyExchangeHandshake.Encode(writer);
             writer = writer.Slice(Handshake.Size);
-            peer.NextEpoch.Handshake.EncodeServerKeyExchangeMessage(writer, this.certificatePrivateKey);
+            peer.NextEpoch.ServerKeyExchange.CopyTo(writer);
             writer = writer.Slice((int)serverKeyExchangeHandshake.Length);
             serverHelloDoneHandshake.Encode(writer);
 
@@ -1158,9 +1223,17 @@ namespace Hazel.Dtls
                 ref finalRecord
             );
 
-            base.QueueRawData(finalBuffer, peerAddress);
+                base.QueueRawData(finalBuffer, peerAddress);
 
-            return true;
+                return true;
+            }
+            finally
+            {
+                if (certificateLockTaken)
+                {
+                    this.certificateLock.ExitReadLock();
+                }
+            }
         }
 
         /// <summary>
@@ -1395,7 +1468,11 @@ namespace Hazel.Dtls
                 PeerData peer = kvp.Value;
                 lock (peer)
                 {
-                    if (peer.Epoch == 0 || peer.NextEpoch.State != HandshakeState.ExpectingHello)
+                    bool waitingForApplicationConnection = !this.allConnections.ContainsKey(peer.ConnectionId)
+                        && peer.ApplicationDataProcessingCount == 0;
+                    if (waitingForApplicationConnection
+                        || peer.Epoch == 0
+                        || peer.NextEpoch.State != HandshakeState.ExpectingHello)
                     {
                         TimeSpan negotiationAge = now - peer.StartOfNegotiation;
                         if (negotiationAge > maxAge)
@@ -1422,16 +1499,61 @@ namespace Hazel.Dtls
             if (this.allConnections.ContainsKey(connectionId))
             {
                 this.staleConnections.Push(connectionId);
+                return;
+            }
+
+            // A DTLS peer is created before its application-level UDP
+            // connection. If negotiation stalls before that connection is
+            // created, there is nothing to disconnect, so remove and dispose
+            // the half-open peer directly.
+            if (this.existingPeers.TryGetValue(connectionId.EndPoint, out PeerData peer))
+            {
+                lock (peer)
+                {
+                    if (peer.ConnectionId.Equals(connectionId)
+                        && peer.ApplicationDataProcessingCount == 0
+                        && !this.allConnections.ContainsKey(connectionId))
+                    {
+                        this.RemovePeerRecord(connectionId.EndPoint, peer);
+                    }
+                }
             }
         }
 
         /// <inheritdoc />
         internal override void RemovePeerRecord(ConnectionId connectionId)
         {
-            if (this.existingPeers.TryRemove(connectionId.EndPoint, out var peer))
+            if (this.existingPeers.TryGetValue(connectionId.EndPoint, out PeerData peer))
             {
-                peer.Dispose();
+                lock (peer)
+                {
+                    if (peer.ConnectionId.Equals(connectionId))
+                    {
+                        this.RemovePeerRecord(connectionId.EndPoint, peer);
+                    }
+                }
             }
+        }
+
+        private bool RemovePeerRecord(IPEndPoint peerAddress, PeerData expectedPeer)
+        {
+            PeerData removedPeer = null;
+            lock (this.existingPeers)
+            {
+                if (this.existingPeers.TryGetValue(peerAddress, out PeerData currentPeer)
+                    && ReferenceEquals(expectedPeer, currentPeer))
+                {
+                    this.existingPeers.TryRemove(peerAddress, out removedPeer);
+                }
+            }
+
+            if (removedPeer != null)
+            {
+                removedPeer.Dispose();
+                return true;
+            }
+
+            return false;
         }
 
         /// <summary>

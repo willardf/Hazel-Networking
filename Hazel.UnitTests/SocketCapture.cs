@@ -45,6 +45,7 @@ namespace Hazel.UnitTests
 
         public Semaphore SendToLocalSemaphore = null;
         public Semaphore SendToRemoteSemaphore = null;
+        public Func<ByteSpan, ByteSpan> PacketForRemoteTransform = null;
 
         private CancellationTokenSource cancellationSource = new CancellationTokenSource();
         private readonly CancellationToken cancellationToken;
@@ -158,6 +159,7 @@ namespace Hazel.UnitTests
 
                     if (this.forRemote.TryTake(out var packet))
                     {
+                        packet = this.PacketForRemoteTransform?.Invoke(packet) ?? packet;
                         this.logger.WriteInfo($"Passed 1 packet of {packet.Length} bytes to remote");
                         this.captureSocket.SendTo(packet.GetUnderlyingArray(), packet.Offset, packet.Length, SocketFlags.None, this.remoteEndPoint);
                     }
