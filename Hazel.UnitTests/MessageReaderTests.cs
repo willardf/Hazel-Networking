@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -1121,6 +1121,70 @@ namespace Hazel.UnitTests
             {
                 outer.ReadMessage();
                 Assert.Fail("ReadMessage is expected to throw");
+            }
+            catch (InvalidDataException) { }
+        }
+
+        [TestMethod]
+        public void ReadPackedUInt32AcceptsMaxValue()
+        {
+            var msg = new MessageWriter(32);
+            msg.StartMessage(0);
+            msg.WritePacked(uint.MaxValue);
+            msg.WritePacked(0u);
+            msg.EndMessage();
+
+            // uint.MaxValue encodes to exactly 5 packed bytes.
+            Assert.AreEqual(3 + 5 + 1, msg.Position);
+
+            MessageReader reader = MessageReader.Get(msg.Buffer, 0);
+            Assert.AreEqual(uint.MaxValue, reader.ReadPackedUInt32());
+            Assert.AreEqual(0u, reader.ReadPackedUInt32());
+        }
+
+        [TestMethod]
+        public void ReadPackedUInt32RejectsOverlongEncoding()
+        {
+            // 6-byte varint: five continuation bytes then a terminator.
+            // A uint only needs 5 bytes max; the 6th is rejected via shift >= 35.
+            byte[] overlong = new byte[] { 0x80, 0x80, 0x80, 0x80, 0x80, 0x00 };
+            MessageReader reader = MessageReader.Get(overlong);
+
+            try
+            {
+                reader.ReadPackedUInt32();
+                Assert.Fail("ReadPackedUInt32 is expected to throw for overlong encodings");
+            }
+            catch (InvalidDataException) { }
+        }
+
+        [TestMethod]
+        public void ReadPackedUInt32RejectsFiveContinuationBytes()
+        {
+            // Fifth byte still has the continuation bit set: more than 5 bytes required.
+            byte[] overlong = new byte[] { 0x80, 0x80, 0x80, 0x80, 0x80 };
+            MessageReader reader = MessageReader.Get(overlong);
+
+            try
+            {
+                reader.ReadPackedUInt32();
+                Assert.Fail("ReadPackedUInt32 is expected to throw for encodings longer than 5 bytes");
+            }
+            catch (InvalidDataException) { }
+        }
+
+        [TestMethod]
+        public void ReadPackedUInt32RejectsOutOfRangeFifthByte()
+        {
+            // First four bytes contribute 28 bits of ones; fifth data nibble must be <= 0x0F.
+            // 0x10 would decode past UInt32.MaxValue if accepted.
+            byte[] tooLarge = new byte[] { 0xFF, 0xFF, 0xFF, 0xFF, 0x10 };
+            MessageReader reader = MessageReader.Get(tooLarge);
+
+            try
+            {
+                reader.ReadPackedUInt32();
+                Assert.Fail("ReadPackedUInt32 is expected to throw when the 5th byte exceeds UInt32 range");
             }
             catch (InvalidDataException) { }
         }

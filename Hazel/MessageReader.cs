@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -433,30 +433,46 @@ namespace Hazel
         ///
         public uint ReadPackedUInt32()
         {
-            bool readMore = true;
-            int shift = 0;
             uint output = 0;
 
-            while (readMore)
+            for (int index = 0; index < 5; index++)
             {
-                if (this.BytesRemaining < 1) throw new InvalidDataException($"Read length is longer than message length.");
-
-                byte b = this.ReadByte();
-                if (b >= 0x80)
+                if (this.BytesRemaining < 1)
                 {
-                    readMore = true;
-                    b ^= 0x80;
-                }
-                else
-                {
-                    readMore = false;
+                    throw new InvalidDataException(
+                        "Unexpected end of message while reading packed UInt32.");
                 }
 
-                output |= (uint)(b << shift);
-                shift += 7;
+                byte current = this.ReadByte();
+                uint value = (uint)(current & 0x7F);
+
+                if (index == 4)
+                {
+                    // Fifth byte must not request another continuation byte.
+                    if ((current & 0x80) != 0)
+                    {
+                        throw new InvalidDataException(
+                            "Packed UInt32 exceeds maximum of 5 bytes.");
+                    }
+
+                    // Fifth byte may only use the low 4 data bits.
+                    if (value > 0x0F)
+                    {
+                        throw new InvalidDataException(
+                            "Packed UInt32 exceeds UInt32 range.");
+                    }
+                }
+
+                output |= value << (index * 7);
+
+                if ((current & 0x80) == 0)
+                {
+                    return output;
+                }
             }
 
-            return output;
+            throw new InvalidDataException(
+                "Packed UInt32 exceeds maximum of 5 bytes.");
         }
         #endregion
 
