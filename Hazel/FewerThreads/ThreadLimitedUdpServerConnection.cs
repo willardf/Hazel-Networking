@@ -9,6 +9,8 @@ namespace Hazel.Udp.FewerThreads
     /// <inheritdoc/>
     public sealed class ThreadLimitedUdpServerConnection : UdpConnection
     {
+        internal volatile bool IsInitialized;
+
         public readonly DateTime CreationTime = DateTime.UtcNow;
 
         /// <summary>

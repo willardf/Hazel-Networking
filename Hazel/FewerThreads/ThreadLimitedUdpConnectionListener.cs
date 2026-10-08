@@ -314,6 +314,17 @@ namespace Hazel.Udp.FewerThreads
                 }
             }
 
+            // A published connection may still be running NewConnection on another worker.
+            // Leave Hello and data unacknowledged so reliable packets can be retried after
+            // initialization. ACKs and disconnects must still progress for work done by the callback.
+            if (aware && !connection.IsInitialized
+                && message.Buffer[0] != (byte)UdpSendOption.Acknowledgement
+                && message.Buffer[0] != (byte)UdpSendOption.Disconnect)
+            {
+                message.Recycle();
+                return;
+            }
+
             // If it's a new connection invoke the NewConnection event.
             // This needs to happen before handling the message because in localhost scenarios, the ACK and
             // subsequent messages can happen before the NewConnection event sets up OnDataRecieved handlers
@@ -331,6 +342,15 @@ namespace Hazel.Udp.FewerThreads
                 {
                     this.Logger.WriteError("NewConnection handler threw: " + e);
                 }
+
+                connection.IsInitialized = true;
+            }
+
+            // The initialization callback or a concurrent disconnect may have closed the connection.
+            if (connection.State != ConnectionState.Connected)
+            {
+                message.Recycle();
+                return;
             }
 
             // Inform the connection of the buffer (new connections need to send an ack back to client)

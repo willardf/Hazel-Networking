@@ -199,11 +199,13 @@ namespace Hazel.UnitTests
         public void AssertPacketsToLocalCountEquals(int pktCnt)
         {
             DateTime start = DateTime.UtcNow;
-            while (this.forLocal.Count != pktCnt)
+            // Count is decremented before TryTake removes the underlying queue entry.
+            // Wait for the snapshot used by PeekPacketForLocal to reflect the removal too.
+            while (this.forLocal.ToArray().Length != pktCnt)
             {
                 if ((DateTime.UtcNow - start).TotalSeconds >= 5)
                 {
-                    Assert.AreEqual(pktCnt, this.forLocal.Count);
+                    Assert.AreEqual(pktCnt, this.forLocal.ToArray().Length);
                 }
 
                 Thread.Yield();
@@ -213,11 +215,11 @@ namespace Hazel.UnitTests
         public void AssertPacketsToRemoteCountEquals(int pktCnt)
         {
             DateTime start = DateTime.UtcNow;
-            while (this.forRemote.Count != pktCnt)
+            while (this.forRemote.ToArray().Length != pktCnt)
             {
                 if ((DateTime.UtcNow - start).TotalSeconds >= 5)
                 {
-                    Assert.AreEqual(pktCnt, this.forRemote.Count);
+                    Assert.AreEqual(pktCnt, this.forRemote.ToArray().Length);
                 }
 
                 Thread.Yield();
@@ -269,14 +271,14 @@ namespace Hazel.UnitTests
 
         internal void ReleasePacketsForRemote(int numToSend)
         {
-            var newExpected = this.forRemote.Count - numToSend;
+            var newExpected = this.forRemote.ToArray().Length - numToSend;
             this.SendToRemoteSemaphore.Release(numToSend);
             this.AssertPacketsToRemoteCountEquals(newExpected);
         }
 
         internal void ReleasePacketsToLocal(int numToSend)
         {
-            var newExpected = this.forLocal.Count - numToSend;
+            var newExpected = this.forLocal.ToArray().Length - numToSend;
             this.SendToLocalSemaphore.Release(numToSend);
             this.AssertPacketsToLocalCountEquals(newExpected);
         }

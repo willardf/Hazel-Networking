@@ -9,6 +9,8 @@ namespace Hazel.Udp
     /// <inheritdoc/>
     internal sealed class UdpServerConnection : UdpConnection
     {
+        internal volatile bool IsInitialized;
+
         /// <summary>
         ///     The connection listener that we use the socket of.
         /// </summary>
