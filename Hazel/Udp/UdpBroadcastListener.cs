@@ -99,8 +99,6 @@ namespace Hazel.Udp
 
             IPEndPoint ipEnd = (IPEndPoint)endpt;
             string data = UTF8Encoding.UTF8.GetString(buffer, 2, numBytes - 2);
-            int dataHash = data.GetHashCode();
-
             lock (packets)
             {
                 bool found = false;
@@ -114,10 +112,11 @@ namespace Hazel.Udp
                         continue;
                     }
 
-                    if (pkt.Data.GetHashCode() == dataHash
+                    if (string.Equals(pkt.Data, data, StringComparison.Ordinal)
                         && pkt.Sender.Equals(ipEnd))
                     {
                         this.packets[i].ReceiveTime = DateTime.Now;
+                        found = true;
                         break;
                     }
                 }
