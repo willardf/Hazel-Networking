@@ -78,7 +78,30 @@ namespace Hazel.Udp
 #if DEBUG
             if (TestLagMs > 0)
             {
-                ThreadPool.QueueUserWorkItem(a => { Thread.Sleep(this.TestLagMs); WriteBytesToConnectionReal(bytes, length); });
+                bytes.AddUsage();
+                try
+                {
+                    if (!ThreadPool.QueueUserWorkItem(a =>
+                    {
+                        try
+                        {
+                            Thread.Sleep(this.TestLagMs);
+                            WriteBytesToConnectionReal(bytes, length);
+                        }
+                        finally
+                        {
+                            bytes.Recycle();
+                        }
+                    }))
+                    {
+                        bytes.Recycle();
+                    }
+                }
+                catch
+                {
+                    bytes.Recycle();
+                    throw;
+                }
             }
             else
 #endif
@@ -93,10 +116,11 @@ namespace Hazel.Udp
             DataSentRaw?.Invoke((byte[])bytes, length);
 #endif
 
+            bool sendStarted = false;
+            bytes.AddUsage();
             try
             {
                 this.Statistics.LogPacketSend(length);
-                bytes.AddUsage();
                 socket.BeginSendTo(
                     (byte[])bytes,
                     0,
@@ -105,6 +129,7 @@ namespace Hazel.Udp
                     EndPoint,
                     HandleSendTo,
                     bytes);
+                sendStarted = true;
             }
             catch (NullReferenceException) { }
             catch (ObjectDisposedException)
@@ -114,6 +139,13 @@ namespace Hazel.Udp
             catch (SocketException ex)
             {
                 DisconnectInternal(HazelInternalErrors.SocketExceptionSend, "Could not send data as a SocketException occurred: " + ex.Message);
+            }
+            finally
+            {
+                if (!sendStarted)
+                {
+                    bytes.Recycle();
+                }
             }
         }
 

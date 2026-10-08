@@ -49,7 +49,20 @@ namespace Hazel.Udp
         /// <summary>
         ///     The packets of data that have been transmitted reliably and not acknowledged.
         /// </summary>
-        internal ConcurrentDictionary<ushort, Packet> reliableDataPacketsSent = new ConcurrentDictionary<ushort, Packet>();
+        internal ConcurrentDictionary<ushort, SentPacket> reliableDataPacketsSent = new ConcurrentDictionary<ushort, SentPacket>();
+
+        // Dictionary snapshots must identify a particular use of a pooled Packet, even after ID wraparound.
+        internal readonly struct SentPacket
+        {
+            internal readonly Packet Packet;
+            internal readonly long Generation;
+
+            internal SentPacket(Packet packet, long generation)
+            {
+                this.Packet = packet;
+                this.Generation = generation;
+            }
+        }
 
         /// <summary>
         ///     Packet ids that have not been received, but are expected. 
@@ -92,6 +105,8 @@ namespace Hazel.Udp
             private SmartBuffer Data;
             private readonly UdpConnection Connection;
             private int Length;
+            private readonly object lifecycleLock = new object();
+            private long generation;
 
             public int NextTimeoutMs;
             private volatile bool Acknowledged;
@@ -106,68 +121,102 @@ namespace Hazel.Udp
                 this.Connection = connection;
             }
 
-            internal void Set(ushort id, SmartBuffer data, int length, int timeout, Action ackCallback)
+            internal SentPacket Set(ushort id, SmartBuffer data, int length, int timeout, Action ackCallback)
             {
-                this.Id = id;
-                this.Data = data;
-                this.Data.AddUsage();
+                lock (this.lifecycleLock)
+                {
+                    this.Id = id;
+                    this.Data = data;
+                    this.Data.AddUsage();
 
-                this.Length = length;
+                    this.Length = length;
 
-                this.Acknowledged = false;
-                this.NextTimeoutMs = timeout;
-                this.AckCallback = ackCallback;
-                this.Retransmissions = 0;
+                    this.Acknowledged = false;
+                    this.NextTimeoutMs = timeout;
+                    this.AckCallback = ackCallback;
+                    this.Retransmissions = 0;
 
-                this.Stopwatch.Restart();
+                    this.Stopwatch.Restart();
+                    return new SentPacket(this, ++this.generation);
+                }
             }
 
-            // Packets resent
+            /// <summary>
+            ///     Resends the current pool rental. Do not retain this reference across recycling.
+            /// </summary>
             public int Resend()
             {
+                return this.Resend(Interlocked.Read(ref this.generation));
+            }
+
+            internal int Resend(long expectedGeneration)
+            {
                 var connection = this.Connection;
-                if (!this.Acknowledged && connection != null)
+                SmartBuffer data = null;
+                int length = 0;
+                string disconnectReason = null;
+                lock (this.lifecycleLock)
                 {
-                    long lifetimeMs = this.Stopwatch.ElapsedMilliseconds;
-                    if (lifetimeMs >= connection.DisconnectTimeoutMs)
+                    if (this.Acknowledged || this.generation != expectedGeneration)
                     {
-                        if (connection.reliableDataPacketsSent.TryRemove(this.Id, out Packet self))
-                        {
-                            connection.DisconnectInternal(HazelInternalErrors.ReliablePacketWithoutResponse, $"Reliable packet {self.Id} (size={this.Length}) was not ack'd after {lifetimeMs}ms ({self.Retransmissions} resends)");
-
-                            self.Recycle();
-                        }
-
                         return 0;
                     }
 
-                    if (lifetimeMs >= this.NextTimeoutMs)
+                    long lifetimeMs = this.Stopwatch.ElapsedMilliseconds;
+                    if (lifetimeMs >= connection.DisconnectTimeoutMs)
+                    {
+                        disconnectReason = $"Reliable packet {this.Id} (size={this.Length}) was not ack'd after {lifetimeMs}ms ({this.Retransmissions} resends)";
+                    }
+                    else if (lifetimeMs >= this.NextTimeoutMs)
                     {
                         ++this.Retransmissions;
                         if (connection.ResendLimit != 0
                             && this.Retransmissions > connection.ResendLimit)
                         {
-                            if (connection.reliableDataPacketsSent.TryRemove(this.Id, out Packet self))
-                            {
-                                connection.DisconnectInternal(HazelInternalErrors.ReliablePacketWithoutResponse, $"Reliable packet {self.Id} (size={this.Length}) was not ack'd after {self.Retransmissions} resends ({lifetimeMs}ms)");
+                            disconnectReason = $"Reliable packet {this.Id} (size={this.Length}) was not ack'd after {this.Retransmissions} resends ({lifetimeMs}ms)";
+                        }
+                        else
+                        {
+                            this.NextTimeoutMs += (int)Math.Min(this.NextTimeoutMs * connection.ResendPingMultiplier, MaxAdditionalResendDelayMs);
+                            data = this.Data;
+                            length = this.Length;
+                            // Take a send lease before ACK, timeout or disposal can release the packet's lease.
+                            data.AddUsage();
+                        }
+                    }
 
-                                self.Recycle();
-                            }
-
+                    if (disconnectReason != null)
+                    {
+                        var entry = new KeyValuePair<ushort, SentPacket>(this.Id, new SentPacket(this, expectedGeneration));
+                        if (!((ICollection<KeyValuePair<ushort, SentPacket>>)connection.reliableDataPacketsSent).Remove(entry))
+                        {
                             return 0;
                         }
 
-                        this.NextTimeoutMs += (int)Math.Min(this.NextTimeoutMs * connection.ResendPingMultiplier, MaxAdditionalResendDelayMs);
-                        try
-                        {
-                            connection.WriteBytesToConnection(this.Data, this.Length);
-                            connection.Statistics.LogMessageResent();
-                            return 1;
-                        }
-                        catch (InvalidOperationException)
-                        {
-                            connection.DisconnectInternal(HazelInternalErrors.ConnectionDisconnected, "Could not resend data as connection is no longer connected");
-                        }
+                        this.Recycle(expectedGeneration);
+                    }
+                }
+
+                // Virtual transports and application callbacks may reenter this connection or take DTLS locks.
+                if (disconnectReason != null)
+                {
+                    connection.DisconnectInternal(HazelInternalErrors.ReliablePacketWithoutResponse, disconnectReason);
+                }
+                else if (data != null)
+                {
+                    try
+                    {
+                        connection.WriteBytesToConnection(data, length);
+                        connection.Statistics.LogMessageResent();
+                        return 1;
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        connection.DisconnectInternal(HazelInternalErrors.ConnectionDisconnected, "Could not resend data as connection is no longer connected");
+                    }
+                    finally
+                    {
+                        data.Recycle();
                     }
                 }
 
@@ -177,11 +226,27 @@ namespace Hazel.Udp
             /// <summary>
             ///     Returns this object back to the object pool from whence it came.
             /// </summary>
+            /// <remarks>Only the owner of the current pool rental may call this method.</remarks>
             public void Recycle()
             {
-                this.Acknowledged = true;
-                this.Data.Recycle();
-                this.Connection.PacketPool.PutObject(this);
+                this.Recycle(Interlocked.Read(ref this.generation));
+            }
+
+            internal void Recycle(long expectedGeneration)
+            {
+                lock (this.lifecycleLock)
+                {
+                    if (this.Acknowledged || this.generation != expectedGeneration)
+                    {
+                        return;
+                    }
+
+                    this.Acknowledged = true;
+                    this.Data.Recycle();
+                    this.Data = null;
+                    this.AckCallback = null;
+                    this.Connection.PacketPool.PutObject(this);
+                }
             }
         }
 
@@ -192,11 +257,9 @@ namespace Hazel.Udp
             {
                 foreach (var kvp in this.reliableDataPacketsSent)
                 {
-                    Packet pkt = kvp.Value;
-
                     try
                     {
-                        output += pkt.Resend();
+                        output += kvp.Value.Packet.Resend(kvp.Value.Generation);
                     }
                     catch { }
                 }
@@ -225,15 +288,16 @@ namespace Hazel.Udp
             }
 
             Packet packet = this.PacketPool.GetObject();
-            packet.Set(
+            SentPacket sentPacket = packet.Set(
                 id,
                 buffer,
                 length,
                 resendDelayMs,
                 ackCallback);
 
-            if (!reliableDataPacketsSent.TryAdd(id, packet))
+            if (!reliableDataPacketsSent.TryAdd(id, sentPacket))
             {
+                packet.Recycle(sentPacket.Generation);
                 throw new Exception("That shouldn't be possible");
             }
         }
@@ -412,13 +476,20 @@ namespace Hazel.Udp
         private void AcknowledgeMessageId(ushort id)
         {
             // Dispose of timer and remove from dictionary
-            if (reliableDataPacketsSent.TryRemove(id, out Packet packet))
+            if (reliableDataPacketsSent.TryRemove(id, out SentPacket sentPacket))
             {
+                Packet packet = sentPacket.Packet;
                 this.Statistics.LogReliablePacketAcknowledged();
                 float rt = packet.Stopwatch.ElapsedMilliseconds;
 
-                packet.AckCallback?.Invoke();
-                packet.Recycle();
+                try
+                {
+                    packet.AckCallback?.Invoke();
+                }
+                finally
+                {
+                    packet.Recycle(sentPacket.Generation);
+                }
 
                 lock (PingLock)
                 {
@@ -476,9 +547,9 @@ namespace Hazel.Udp
         {
             foreach (var kvp in reliableDataPacketsSent)
             {
-                if (this.reliableDataPacketsSent.TryRemove(kvp.Key, out var pkt))
+                if (((ICollection<KeyValuePair<ushort, SentPacket>>)this.reliableDataPacketsSent).Remove(kvp))
                 {
-                    pkt.Recycle();
+                    kvp.Value.Packet.Recycle(kvp.Value.Generation);
                 }
             }
         }

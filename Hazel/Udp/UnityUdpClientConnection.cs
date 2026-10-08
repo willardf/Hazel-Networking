@@ -76,7 +76,30 @@ namespace Hazel.Udp
 #if DEBUG
             if (TestLagMs > 0)
             {
-                ThreadPool.QueueUserWorkItem(a => { Thread.Sleep(this.TestLagMs); WriteBytesToConnectionReal(bytes, length); });
+                bytes.AddUsage();
+                try
+                {
+                    if (!ThreadPool.QueueUserWorkItem(a =>
+                    {
+                        try
+                        {
+                            Thread.Sleep(this.TestLagMs);
+                            WriteBytesToConnectionReal(bytes, length);
+                        }
+                        finally
+                        {
+                            bytes.Recycle();
+                        }
+                    }))
+                    {
+                        bytes.Recycle();
+                    }
+                }
+                catch
+                {
+                    bytes.Recycle();
+                    throw;
+                }
             }
             else
 #endif

@@ -345,7 +345,18 @@ namespace Hazel.Udp.FewerThreads
         protected virtual void QueueRawData(SmartBuffer span, IPEndPoint remoteEndPoint)
         {
             span.AddUsage();
-            this.sendQueue.TryAdd(new SendMessageInfo() { Span = span, Recipient = remoteEndPoint });
+            bool queued = false;
+            try
+            {
+                queued = this.sendQueue.TryAdd(new SendMessageInfo() { Span = span, Recipient = remoteEndPoint });
+            }
+            finally
+            {
+                if (!queued)
+                {
+                    span.Recycle();
+                }
+            }
         }
 
         /// <summary>

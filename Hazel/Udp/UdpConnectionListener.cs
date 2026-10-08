@@ -260,9 +260,10 @@ namespace Hazel.Udp
             }
 #endif
 
+            bool sendStarted = false;
+            bytes.AddUsage();
             try
             {
-                bytes.AddUsage();
                 socket.BeginSendTo(
                     (byte[])bytes,
                     0,
@@ -271,6 +272,7 @@ namespace Hazel.Udp
                     endPoint,
                     SendCallback,
                     bytes);
+                sendStarted = true;
 
                 this.Statistics.AddBytesSent(length);
             }
@@ -282,6 +284,13 @@ namespace Hazel.Udp
             {
                 //Keep alive timer probably ran, ignore
                 return;
+            }
+            finally
+            {
+                if (!sendStarted)
+                {
+                    bytes.Recycle();
+                }
             }
         }
 
