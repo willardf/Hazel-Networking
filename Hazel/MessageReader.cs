@@ -19,6 +19,8 @@ namespace Hazel
         public int BytesRemaining => this.Length - this.Position;
 
         private MessageReader Parent;
+        // A framed reader can be independent of its parent, while raw readers may have a network header.
+        private bool hasMessageHeader;
 
         public int Position
         {
@@ -49,6 +51,7 @@ namespace Hazel
             output.Offset = 0;
             output.Position = 0;
             output.Tag = byte.MaxValue;
+            output.hasMessageHeader = false;
             return output;
         }
 
@@ -61,6 +64,7 @@ namespace Hazel
             output.Position = 0;
             output.Length = buffer.Length;
             output.Tag = byte.MaxValue;
+            output.hasMessageHeader = false;
 
             return output;
         }
@@ -89,6 +93,7 @@ namespace Hazel
 
             output.Length = source.Length;
             output.Tag = source.Tag;
+            output.hasMessageHeader = source.hasMessageHeader;
 
             return output;
         }
@@ -103,6 +108,7 @@ namespace Hazel
             output.Buffer = buffer;
             output.Offset = offset;
             output.Position = 0;
+            output.hasMessageHeader = true;
 
             output.Length = output.ReadUInt16();
             output.Tag = output.ReadByte();
@@ -124,6 +130,7 @@ namespace Hazel
             var output = new MessageReader();
 
             output.Parent = this;
+            output.hasMessageHeader = true;
             output.Buffer = this.Buffer;
             output.Offset = this.readHead;
             output.Position = 0;
@@ -246,24 +253,14 @@ namespace Hazel
 
             this.Length -= amount;
 
-            if (Parent == null)
+            if (this.hasMessageHeader)
             {
-                // If there's no parent reference, we're at the top-most message
-                // and this is not a normal Message, as it either contains no data, or it contains
-                // a network reliability header
-                return;
+                var lengthOffset = this.Offset - 3;
+                this.Buffer[lengthOffset] = (byte)this.Length;
+                this.Buffer[lengthOffset + 1] = (byte)(this.Length >> 8);
             }
 
-            var lengthOffset = this.Offset - 3;
-            var curLen = this.Buffer[lengthOffset]
-                | (this.Buffer[lengthOffset + 1] << 8);
-
-            curLen -= amount;
-
-            this.Buffer[lengthOffset] = (byte)curLen;
-            this.Buffer[lengthOffset + 1] = (byte)(curLen >> 8);
-
-            Parent.AdjustLength(offset, amount);
+            Parent?.AdjustLength(offset, amount);
         }
 
         public void Recycle()
