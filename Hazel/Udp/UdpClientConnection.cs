@@ -193,8 +193,9 @@ namespace Hazel.Udp
             // When acknowledged set the state to connected
             SendHello(bytes, () =>
             {
+                // Restart the timer created by the constructor instead of orphaning it.
+                this.ResetKeepAliveTimer();
                 this.State = ConnectionState.Connected;
-                this.InitializeKeepAliveTimer();
             });
         }
 
