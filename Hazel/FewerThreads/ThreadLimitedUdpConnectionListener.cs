@@ -223,9 +223,9 @@ namespace Hazel.Udp.FewerThreads
                 {
                     this.ReadCallback(msg.Message, msg.Sender, msg.ConnectionId);
                 }
-                catch
+                catch (Exception ex)
                 {
-
+                    this.Logger.WriteError($"Exception in ReadCallback: {ex}");
                 }
             }
         }
